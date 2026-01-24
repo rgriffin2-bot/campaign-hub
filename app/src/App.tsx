@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CampaignProvider } from './core/context/CampaignContext';
 import { Layout } from './components/Layout';
 import { CharacterDashboard } from './modules/characters/components/CharacterDashboard';
+import { LocationDashboard } from './modules/locations/components/LocationDashboard';
+import { LoreDashboard } from './modules/lore/components/LoreDashboard';
 
 function App() {
   return (
@@ -30,9 +32,43 @@ function App() {
               element={<CharacterDashboard mode="edit" />}
             />
 
+            {/* Locations routes */}
+            <Route
+              path="/locations"
+              element={<LocationDashboard mode="list" />}
+            />
+            <Route
+              path="/locations/new"
+              element={<LocationDashboard mode="new" />}
+            />
+            <Route
+              path="/locations/:id"
+              element={<LocationDashboard mode="detail" />}
+            />
+            <Route
+              path="/locations/:id/edit"
+              element={<LocationDashboard mode="edit" />}
+            />
+
+            {/* Lore routes */}
+            <Route
+              path="/lore"
+              element={<LoreDashboard mode="list" />}
+            />
+            <Route
+              path="/lore/new"
+              element={<LoreDashboard mode="new" />}
+            />
+            <Route
+              path="/lore/:id"
+              element={<LoreDashboard mode="detail" />}
+            />
+            <Route
+              path="/lore/:id/edit"
+              element={<LoreDashboard mode="edit" />}
+            />
+
             {/* Placeholder routes for future modules */}
-            <Route path="/locations" element={<ComingSoon module="Locations" />} />
-            <Route path="/lore" element={<ComingSoon module="Lore" />} />
             <Route path="/sessions" element={<ComingSoon module="Sessions" />} />
             <Route path="/factions" element={<ComingSoon module="Factions" />} />
             <Route path="/maps" element={<ComingSoon module="Maps" />} />

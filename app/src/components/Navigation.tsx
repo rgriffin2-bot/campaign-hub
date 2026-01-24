@@ -12,13 +12,13 @@ const navigationItems = [
     name: 'Locations',
     href: '/locations',
     icon: MapPin,
-    disabled: true,
+    disabled: false,
   },
   {
     name: 'Lore',
     href: '/lore',
     icon: BookOpen,
-    disabled: true,
+    disabled: false,
   },
   {
     name: 'Sessions',
