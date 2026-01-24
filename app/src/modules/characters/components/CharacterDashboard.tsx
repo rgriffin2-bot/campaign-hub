@@ -16,7 +16,7 @@ export function CharacterDashboard({ mode = 'list' }: CharacterDashboardProps) {
   const { currentCampaign } = useCampaign();
   const { id } = useParams<{ id: string }>();
 
-  const { characters, loading: listLoading } = useCharacters(currentCampaign?.id || null);
+  const { characters, loading: listLoading, refetch: refetchList } = useCharacters(currentCampaign?.id || null);
   const {
     character,
     loading: charLoading,
@@ -43,6 +43,8 @@ export function CharacterDashboard({ mode = 'list' }: CharacterDashboardProps) {
           throw new Error('Failed to create character');
         }
 
+        // Refetch the list to show the new character
+        await refetchList();
         return true;
       } else {
         // Update existing

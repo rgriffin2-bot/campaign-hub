@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, ArrowLeft, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import type { Location } from '../types';
 
 interface LocationSheetProps {
@@ -216,10 +217,8 @@ export function LocationSheet({ location, allLocations, onDelete }: LocationShee
             <CardTitle>Additional Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans">
-                {(location as any)._content}
-              </pre>
+            <div className="prose prose-sm max-w-none prose-invert">
+              <ReactMarkdown>{(location as any)._content}</ReactMarkdown>
             </div>
           </CardContent>
         </Card>

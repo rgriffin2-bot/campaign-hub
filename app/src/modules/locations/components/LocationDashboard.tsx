@@ -16,7 +16,7 @@ export function LocationDashboard({ mode = 'list' }: LocationDashboardProps) {
   const { currentCampaign } = useCampaign();
   const { id } = useParams<{ id: string }>();
 
-  const { locations, loading: listLoading } = useLocations(currentCampaign?.id || null);
+  const { locations, loading: listLoading, refetch: refetchList } = useLocations(currentCampaign?.id || null);
   const {
     location,
     loading: locLoading,
@@ -43,6 +43,8 @@ export function LocationDashboard({ mode = 'list' }: LocationDashboardProps) {
           throw new Error('Failed to create location');
         }
 
+        // Refetch the list to show the new location
+        await refetchList();
         return true;
       } else {
         // Update existing

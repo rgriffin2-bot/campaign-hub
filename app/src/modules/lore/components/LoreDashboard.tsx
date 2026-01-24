@@ -16,7 +16,7 @@ export function LoreDashboard({ mode = 'list' }: LoreDashboardProps) {
   const { currentCampaign } = useCampaign();
   const { id } = useParams<{ id: string }>();
 
-  const { loreEntries, loading: listLoading } = useLore(currentCampaign?.id || null);
+  const { loreEntries, loading: listLoading, refetch: refetchList } = useLore(currentCampaign?.id || null);
   const {
     loreEntry,
     loading: entryLoading,
@@ -43,6 +43,8 @@ export function LoreDashboard({ mode = 'list' }: LoreDashboardProps) {
           throw new Error('Failed to create lore entry');
         }
 
+        // Refetch the list to show the new lore entry
+        await refetchList();
         return true;
       } else {
         // Update existing

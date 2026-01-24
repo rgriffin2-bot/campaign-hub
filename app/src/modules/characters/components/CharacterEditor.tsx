@@ -52,7 +52,13 @@ export function CharacterEditor({ character, onSave }: CharacterEditorProps) {
     }
   }
 
+  // Store tags as string for easier editing
+  const [tagsInput, setTagsInput] = useState<string>(
+    character?.tags?.join(', ') || ''
+  );
+
   function handleTagsChange(value: string) {
+    setTagsInput(value);
     const tags = value
       .split(',')
       .map((t) => t.trim())
@@ -166,7 +172,7 @@ export function CharacterEditor({ character, onSave }: CharacterEditorProps) {
             <Label htmlFor="tags">Tags (comma-separated)</Label>
             <Input
               id="tags"
-              value={formData.tags?.join(', ') || ''}
+              value={tagsInput}
               onChange={(e) => handleTagsChange(e.target.value)}
               placeholder="pilot, veteran, mysterious"
             />

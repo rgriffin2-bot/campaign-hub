@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, ArrowLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import type { LoreEntry } from '../types';
 
 interface LoreSheetProps {
@@ -82,10 +83,8 @@ export function LoreSheet({ loreEntry, onDelete }: LoreSheetProps) {
             <CardTitle>Content</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans">
-                {(loreEntry as any)._content}
-              </pre>
+            <div className="prose prose-sm max-w-none prose-invert">
+              <ReactMarkdown>{(loreEntry as any)._content}</ReactMarkdown>
             </div>
           </CardContent>
         </Card>
@@ -160,29 +159,6 @@ export function LoreSheet({ loreEntry, onDelete }: LoreSheetProps) {
         )}
       </div>
 
-      {/* Sources */}
-      {(loreEntry as any).sources && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sources</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{(loreEntry as any).sources}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Contradictions */}
-      {(loreEntry as any).contradictions && (
-        <Card className="border-yellow-500/50">
-          <CardHeader>
-            <CardTitle className="text-yellow-600">Known Contradictions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{(loreEntry as any).contradictions}</p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Relationships */}
       {loreEntry.relationships && loreEntry.relationships.length > 0 && (

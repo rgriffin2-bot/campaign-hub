@@ -47,7 +47,22 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
     }
   }
 
+  // Store inputs as strings for easier editing
+  const [tagsInput, setTagsInput] = useState<string>(
+    loreEntry?.tags?.join(', ') || ''
+  );
+  const [relatedCharsInput, setRelatedCharsInput] = useState<string>(
+    loreEntry?.related_characters?.join(', ') || ''
+  );
+  const [relatedLocsInput, setRelatedLocsInput] = useState<string>(
+    loreEntry?.related_locations?.join(', ') || ''
+  );
+  const [relatedFactionsInput, setRelatedFactionsInput] = useState<string>(
+    loreEntry?.related_factions?.join(', ') || ''
+  );
+
   function handleTagsChange(value: string) {
+    setTagsInput(value);
     const tags = value
       .split(',')
       .map((t) => t.trim())
@@ -55,7 +70,8 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
     updateField('tags', tags);
   }
 
-  function handleListChange(field: keyof LoreEntry, value: string) {
+  function handleListChange(field: keyof LoreEntry, value: string, setter: (v: string) => void) {
+    setter(value);
     const items = value
       .split(',')
       .map((t) => t.trim())
@@ -136,7 +152,7 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
             <Label htmlFor="tags">Tags (comma-separated)</Label>
             <Input
               id="tags"
-              value={formData.tags?.join(', ') || ''}
+              value={tagsInput}
               onChange={(e) => handleTagsChange(e.target.value)}
               placeholder="mystery, important, secret"
             />
@@ -187,8 +203,8 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
             <Label htmlFor="related_characters">Related Characters (comma-separated IDs)</Label>
             <Input
               id="related_characters"
-              value={formData.related_characters?.join(', ') || ''}
-              onChange={(e) => handleListChange('related_characters' as any, e.target.value)}
+              value={relatedCharsInput}
+              onChange={(e) => handleListChange('related_characters' as any, e.target.value, setRelatedCharsInput)}
               placeholder="captain-zara-chen, maven"
             />
           </div>
@@ -197,8 +213,8 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
             <Label htmlFor="related_locations">Related Locations (comma-separated IDs)</Label>
             <Input
               id="related_locations"
-              value={formData.related_locations?.join(', ') || ''}
-              onChange={(e) => handleListChange('related_locations' as any, e.target.value)}
+              value={relatedLocsInput}
+              onChange={(e) => handleListChange('related_locations' as any, e.target.value, setRelatedLocsInput)}
               placeholder="haven-station, haven-undercity"
             />
           </div>
@@ -207,33 +223,12 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
             <Label htmlFor="related_factions">Related Factions (comma-separated IDs)</Label>
             <Input
               id="related_factions"
-              value={formData.related_factions?.join(', ') || ''}
-              onChange={(e) => handleListChange('related_factions' as any, e.target.value)}
+              value={relatedFactionsInput}
+              onChange={(e) => handleListChange('related_factions' as any, e.target.value, setRelatedFactionsInput)}
               placeholder="faction-id-1, faction-id-2"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="sources">In-World Sources</Label>
-            <Textarea
-              id="sources"
-              value={(formData as any).sources || ''}
-              onChange={(e) => updateField('sources' as any, e.target.value)}
-              placeholder="Where this information comes from in-universe"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="contradictions">Known Contradictions</Label>
-            <Textarea
-              id="contradictions"
-              value={(formData as any).contradictions || ''}
-              onChange={(e) => updateField('contradictions' as any, e.target.value)}
-              placeholder="Conflicting accounts or inconsistencies"
-              rows={3}
-            />
-          </div>
         </CardContent>
       </Card>
 

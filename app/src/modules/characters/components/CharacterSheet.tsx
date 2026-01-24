@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, ArrowLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import type { Character } from '../types';
 
 interface CharacterSheetProps {
@@ -180,10 +181,8 @@ export function CharacterSheet({ character, onDelete }: CharacterSheetProps) {
             <CardTitle>Additional Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans">
-                {(character as any)._content}
-              </pre>
+            <div className="prose prose-sm max-w-none prose-invert">
+              <ReactMarkdown>{(character as any)._content}</ReactMarkdown>
             </div>
           </CardContent>
         </Card>
