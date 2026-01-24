@@ -63,6 +63,7 @@ export function CharacterDashboard({ mode = 'list' }: CharacterDashboardProps) {
 
     const success = await deleteCharacter();
     if (success) {
+      await refetchList();
       navigate('/characters');
     }
   }

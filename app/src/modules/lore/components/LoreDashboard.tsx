@@ -63,6 +63,7 @@ export function LoreDashboard({ mode = 'list' }: LoreDashboardProps) {
 
     const success = await deleteLoreEntry();
     if (success) {
+      await refetchList();
       navigate('/lore');
     }
   }

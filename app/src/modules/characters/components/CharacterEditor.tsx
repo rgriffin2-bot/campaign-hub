@@ -229,6 +229,20 @@ export function CharacterEditor({ character, onSave }: CharacterEditorProps) {
               rows={6}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="_content">Additional Notes (Markdown)</Label>
+            <Textarea
+              id="_content"
+              value={(formData as any)._content || ''}
+              onChange={(e) => updateField('_content' as any, e.target.value)}
+              placeholder="Additional notes in markdown format..."
+              rows={8}
+            />
+            <p className="text-xs text-muted-foreground">
+              Supports markdown formatting (headings, lists, bold, italic, etc.)
+            </p>
+          </div>
         </CardContent>
       </Card>
 

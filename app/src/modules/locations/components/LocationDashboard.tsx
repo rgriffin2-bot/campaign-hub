@@ -63,6 +63,7 @@ export function LocationDashboard({ mode = 'list' }: LocationDashboardProps) {
 
     const success = await deleteLocation();
     if (success) {
+      await refetchList();
       navigate('/locations');
     }
   }
