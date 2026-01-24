@@ -1,0 +1,23 @@
+# Base Entity Schema
+# All entities inherit these fields
+
+required:
+  - id              # Unique identifier (auto-generated if not provided)
+  - type            # Entity type (character, location, faction, etc.)
+  - name            # Display name
+
+optional:
+  - tags            # Array of strings for filtering/categorization
+  - description     # Brief summary
+  - notes           # Freeform DM notes (never shown to players)
+  - created         # ISO date, auto-set
+  - modified        # ISO date, auto-updated
+  - visibility      # public | players | dm-only (default: dm-only)
+  - relationships   # Array of relationship objects
+
+# Relationship structure
+relationship:
+  target: entity-id
+  type: relationship-type
+  description: optional context
+  bidirectional: true | false

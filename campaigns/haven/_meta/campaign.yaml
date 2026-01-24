@@ -1,0 +1,84 @@
+id: haven
+name: "Haven: The Shattered Expanse"
+description: "A space opera campaign set in a universe where space itself is breathable"
+game_system: custom
+created: "2024-01-15"
+last_modified: "2026-01-24"
+
+dm:
+  name: Rob
+  email: rob@example.com
+
+entity_types:
+  location_types:
+    - id: system
+      label: "Star System"
+      can_contain: [world, station, anomaly]
+    - id: world
+      label: "World"
+      can_contain: [region, city, landmark]
+    - id: station
+      label: "Station"
+      can_contain: [district, bay, section]
+    - id: region
+      label: "Region"
+      can_contain: [city, landmark, wilderness]
+    - id: city
+      label: "City"
+      can_contain: [district, building, landmark]
+    - id: district
+      label: "District"
+      can_contain: [building, landmark]
+    - id: building
+      label: "Building"
+      can_contain: [room, floor]
+
+  faction_types:
+    - id: government
+      label: "Government"
+    - id: corporation
+      label: "Corporation"
+    - id: guild
+      label: "Guild"
+    - id: cult
+      label: "Cult"
+    - id: military
+      label: "Military"
+    - id: criminal
+      label: "Criminal Organization"
+
+  character_types:
+    - id: pc
+      label: "Player Character"
+    - id: npc
+      label: "NPC"
+    - id: historical
+      label: "Historical Figure"
+
+labels:
+  location: "Location"
+  faction: "Faction"
+  character: "Character"
+
+custom_fields:
+  character:
+    - name: grit
+      type: number
+      label: "Grit"
+      description: "Physical resilience and toughness"
+    - name: savvy
+      type: number
+      label: "Savvy"
+      description: "Mental acuity and perception"
+    - name: charm
+      type: number
+      label: "Charm"
+      description: "Social grace and persuasiveness"
+    - name: weird
+      type: number
+      label: "Weird"
+      description: "Connection to the strange and supernatural"
+    - name: species
+      type: select
+      label: "Species"
+      options: [Human, Altered, Synthetic, Hybrid]
