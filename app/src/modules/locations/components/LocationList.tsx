@@ -13,19 +13,13 @@ interface LocationListProps {
 export function LocationList({ locations }: LocationListProps) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
-
-  // Get unique location types from the list
-  const locationTypes = Array.from(new Set(locations.map(loc => loc.location_type)));
 
   // Filter locations
   const filteredLocations = locations.filter((loc) => {
     const matchesSearch =
       loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (loc.description && loc.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType =
-      filterType === 'all' || loc.location_type === filterType;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
 
   // Helper to find parent location name
@@ -56,23 +50,6 @@ export function LocationList({ locations }: LocationListProps) {
             className="pl-8"
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filterType === 'all' ? 'default' : 'outline'}
-            onClick={() => setFilterType('all')}
-          >
-            All
-          </Button>
-          {locationTypes.map(type => (
-            <Button
-              key={type}
-              variant={filterType === type ? 'default' : 'outline'}
-              onClick={() => setFilterType(type)}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Button>
-          ))}
-        </div>
       </div>
 
       {/* Location Grid */}
@@ -81,11 +58,11 @@ export function LocationList({ locations }: LocationListProps) {
           <MapPin className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No locations found</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm || filterType !== 'all'
-              ? 'Try adjusting your filters'
+            {searchTerm
+              ? 'Try adjusting your search'
               : 'Get started by creating your first location'}
           </p>
-          {!searchTerm && filterType === 'all' && (
+          {!searchTerm && (
             <Button onClick={() => navigate('/locations/new')}>
               <Plus className="mr-2 h-4 w-4" />
               Create Location

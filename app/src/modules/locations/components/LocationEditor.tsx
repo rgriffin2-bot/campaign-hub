@@ -23,7 +23,6 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
     name: '',
     location_type: currentCampaign?.entity_types?.location_types?.[0]?.id || 'region',
     description: '',
-    atmosphere: '',
     tags: [],
     ...location,
   });
@@ -63,25 +62,8 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
     updateField('tags', tags);
   }
 
-  // Filter valid parent locations based on can_contain rules
-  const currentLocationType = currentCampaign?.entity_types?.location_types?.find(
-    (type) => type.id === formData.location_type
-  );
-
-  const validParents = allLocations.filter((loc) => {
-    // Don't allow selecting self as parent
-    if (loc.id === location?.id) return false;
-
-    const parentType = currentCampaign?.entity_types?.location_types?.find(
-      (type) => type.id === loc.location_type
-    );
-
-    // If can_contain is not defined, allow all
-    if (!parentType?.can_contain) return true;
-
-    // Check if parent type can contain current type
-    return parentType.can_contain.includes(formData.location_type || '');
-  });
+  // Filter valid parent locations (allow any location except self)
+  const validParents = allLocations.filter((loc) => loc.id !== location?.id);
 
   return (
     <div className="space-y-6">
@@ -125,12 +107,14 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="location_type">Type</Label>
-              <select
+              <Input
                 id="location_type"
                 value={formData.location_type}
                 onChange={(e) => updateField('location_type', e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-              >
+                placeholder="Region, city, dungeon, etc."
+                list="location-type-options"
+              />
+              <datalist id="location-type-options">
                 {currentCampaign?.entity_types?.location_types?.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.label}
@@ -143,7 +127,7 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
                     <option value="city">City</option>
                   </>
                 )}
-              </select>
+              </datalist>
             </div>
 
             <div className="space-y-2">
@@ -161,11 +145,6 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
                   </option>
                 ))}
               </select>
-              {currentLocationType?.can_contain && (
-                <p className="text-xs text-muted-foreground">
-                  Only showing locations that can contain a {formData.location_type}
-                </p>
-              )}
             </div>
           </div>
 
@@ -199,17 +178,6 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="atmosphere">Atmosphere</Label>
-            <Textarea
-              id="atmosphere"
-              value={formData.atmosphere || ''}
-              onChange={(e) => updateField('atmosphere', e.target.value)}
-              placeholder="The feel and mood of this location"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="features">Notable Features</Label>
             <Textarea
               id="features"
@@ -218,21 +186,6 @@ export function LocationEditor({ location, allLocations, onSave }: LocationEdito
               placeholder="Key landmarks, resources, or points of interest"
               rows={4}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="secrets">Secrets (DM Only)</Label>
-            <Textarea
-              id="secrets"
-              value={(formData as any).secrets || ''}
-              onChange={(e) => updateField('secrets' as any, e.target.value)}
-              placeholder="Hidden information players don't know"
-              rows={4}
-              className="border-destructive/50"
-            />
-            <p className="text-xs text-muted-foreground">
-              This information will be marked as DM-only
-            </p>
           </div>
 
           <div className="space-y-2">

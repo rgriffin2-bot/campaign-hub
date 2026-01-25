@@ -6,15 +6,8 @@ name: "The Undercity"
 parent: haven-station
 tags: [visited, dangerous, criminal]
 description: "The lawless lower levels of Haven Station"
-atmosphere: "Dark, cramped, dangerous"
 features: "Black markets, smuggler dens, fight clubs, hidden passages"
 visibility: public
-secrets: >-
-  The Undercity contains several sealed sections of the original Precursor
-  station. The Silence operates a hidden base in one of these sections, using
-  ancient Precursor technology to coordinate their operations. Only a few
-  people know about this - Maven suspects it exists but hasn't confirmed the
-  location.
 created: "2026-01-24"
 modified: "2026-01-24"
 ---

@@ -127,51 +127,31 @@ export function LocationSheet({ location, allLocations, onDelete }: LocationShee
                 </button>
               </div>
             )}
-            {(location as any).faction_control && (
+            {location.description && (
               <div>
-                <span className="text-sm font-medium">Controlled By:</span>
-                <span className="ml-2">{(location as any).faction_control}</span>
+                <span className="text-sm font-medium">Description:</span>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                  {location.description}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Description */}
-        {location.description && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Description</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap">{location.description}</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Atmosphere */}
-      {location.atmosphere && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Atmosphere</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap">{location.atmosphere}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Features */}
-      {(location as any).features && (
+        {/* Features */}
         <Card>
           <CardHeader>
             <CardTitle>Notable Features</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap">{(location as any).features}</p>
+            {(location as any).features ? (
+              <p className="whitespace-pre-wrap">{(location as any).features}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">No notable features listed.</p>
+            )}
           </CardContent>
         </Card>
-      )}
+      </div>
 
       {/* Sub-Locations */}
       {children.length > 0 && (
@@ -194,18 +174,6 @@ export function LocationSheet({ location, allLocations, onDelete }: LocationShee
                 </button>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Secrets (DM Only) */}
-      {(location as any).secrets && (
-        <Card className="border-destructive/50">
-          <CardHeader>
-            <CardTitle className="text-destructive">Secrets (DM Only)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap">{(location as any).secrets}</p>
           </CardContent>
         </Card>
       )}
