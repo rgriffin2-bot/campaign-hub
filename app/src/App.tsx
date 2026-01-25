@@ -7,6 +7,7 @@ import { LoreDashboard } from './modules/lore/components/LoreDashboard';
 import { SessionDashboard } from './modules/sessions/components/SessionDashboard';
 import { FactionDashboard } from './modules/factions/components/FactionDashboard';
 import { MapDashboard } from './modules/maps/components/MapDashboard';
+import { MapsLocationsDashboard } from './modules/maps-locations/components/MapsLocationsDashboard';
 
 function App() {
   return (
@@ -51,6 +52,12 @@ function App() {
             <Route
               path="/locations/:id/edit"
               element={<LocationDashboard mode="edit" />}
+            />
+
+            {/* Maps + Locations routes */}
+            <Route
+              path="/maps-locations"
+              element={<MapsLocationsDashboard />}
             />
 
             {/* Lore routes */}

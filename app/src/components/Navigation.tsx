@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Users, MapPin, BookOpen, Calendar, Shield, Compass } from 'lucide-react';
+import { Users, BookOpen, Calendar, Shield, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigationItems = [
@@ -9,9 +9,9 @@ const navigationItems = [
     icon: Users,
   },
   {
-    name: 'Locations',
-    href: '/locations',
-    icon: MapPin,
+    name: 'Maps + Locations',
+    href: '/maps-locations',
+    icon: Compass,
     disabled: false,
   },
   {
@@ -30,12 +30,6 @@ const navigationItems = [
     name: 'Factions',
     href: '/factions',
     icon: Shield,
-    disabled: false,
-  },
-  {
-    name: 'Maps',
-    href: '/maps',
-    icon: Compass,
     disabled: false,
   },
 ];
