@@ -4,6 +4,9 @@ import { Layout } from './components/Layout';
 import { CharacterDashboard } from './modules/characters/components/CharacterDashboard';
 import { LocationDashboard } from './modules/locations/components/LocationDashboard';
 import { LoreDashboard } from './modules/lore/components/LoreDashboard';
+import { SessionDashboard } from './modules/sessions/components/SessionDashboard';
+import { FactionDashboard } from './modules/factions/components/FactionDashboard';
+import { MapDashboard } from './modules/maps/components/MapDashboard';
 
 function App() {
   return (
@@ -68,10 +71,59 @@ function App() {
               element={<LoreDashboard mode="edit" />}
             />
 
-            {/* Placeholder routes for future modules */}
-            <Route path="/sessions" element={<ComingSoon module="Sessions" />} />
-            <Route path="/factions" element={<ComingSoon module="Factions" />} />
-            <Route path="/maps" element={<ComingSoon module="Maps" />} />
+            {/* Sessions routes */}
+            <Route
+              path="/sessions"
+              element={<SessionDashboard mode="list" />}
+            />
+            <Route
+              path="/sessions/new"
+              element={<SessionDashboard mode="new" />}
+            />
+            <Route
+              path="/sessions/:id"
+              element={<SessionDashboard mode="detail" />}
+            />
+            <Route
+              path="/sessions/:id/edit"
+              element={<SessionDashboard mode="edit" />}
+            />
+
+            {/* Factions routes */}
+            <Route
+              path="/factions"
+              element={<FactionDashboard mode="list" />}
+            />
+            <Route
+              path="/factions/new"
+              element={<FactionDashboard mode="new" />}
+            />
+            <Route
+              path="/factions/:id"
+              element={<FactionDashboard mode="detail" />}
+            />
+            <Route
+              path="/factions/:id/edit"
+              element={<FactionDashboard mode="edit" />}
+            />
+
+            {/* Maps routes */}
+            <Route
+              path="/maps"
+              element={<MapDashboard mode="list" />}
+            />
+            <Route
+              path="/maps/new"
+              element={<MapDashboard mode="new" />}
+            />
+            <Route
+              path="/maps/:id"
+              element={<MapDashboard mode="detail" />}
+            />
+            <Route
+              path="/maps/:id/edit"
+              element={<MapDashboard mode="edit" />}
+            />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
@@ -79,15 +131,6 @@ function App() {
         </Layout>
       </CampaignProvider>
     </BrowserRouter>
-  );
-}
-
-function ComingSoon({ module }: { module: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-64">
-      <h2 className="text-2xl font-bold mb-2">{module} Module</h2>
-      <p className="text-muted-foreground">Coming in Phase 2</p>
-    </div>
   );
 }
 

@@ -24,19 +24,19 @@ const navigationItems = [
     name: 'Sessions',
     href: '/sessions',
     icon: Calendar,
-    disabled: true,
+    disabled: false,
   },
   {
     name: 'Factions',
     href: '/factions',
     icon: Shield,
-    disabled: true,
+    disabled: false,
   },
   {
     name: 'Maps',
     href: '/maps',
     icon: Compass,
-    disabled: true,
+    disabled: false,
   },
 ];
 
