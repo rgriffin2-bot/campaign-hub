@@ -6,9 +6,7 @@ name: "Haven Station"
 parent: haven-sector
 tags: [visited, hub, neutral-territory]
 description: "The largest independent station in the sector"
-atmosphere: "Crowded, diverse, energetic"
 features: "Massive docking bays, market districts, residential rings, the Undercity"
-faction_control: haven-station-council
 visibility: public
 created: "2026-01-24"
 modified: "2026-01-24"

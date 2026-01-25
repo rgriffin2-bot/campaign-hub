@@ -13,14 +13,11 @@ interface CharacterListProps {
 export function CharacterList({ characters }: CharacterListProps) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
 
   // Filter characters
   const filteredCharacters = characters.filter((char) => {
     const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType =
-      filterType === 'all' || char.character_type === filterType;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
 
   return (
@@ -44,26 +41,6 @@ export function CharacterList({ characters }: CharacterListProps) {
             className="pl-8"
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filterType === 'all' ? 'default' : 'outline'}
-            onClick={() => setFilterType('all')}
-          >
-            All
-          </Button>
-          <Button
-            variant={filterType === 'pc' ? 'default' : 'outline'}
-            onClick={() => setFilterType('pc')}
-          >
-            PCs
-          </Button>
-          <Button
-            variant={filterType === 'npc' ? 'default' : 'outline'}
-            onClick={() => setFilterType('npc')}
-          >
-            NPCs
-          </Button>
-        </div>
       </div>
 
       {/* Character Grid */}
@@ -72,11 +49,11 @@ export function CharacterList({ characters }: CharacterListProps) {
           <Users className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No characters found</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm || filterType !== 'all'
-              ? 'Try adjusting your filters'
+            {searchTerm
+              ? 'Try adjusting your search'
               : 'Get started by creating your first character'}
           </p>
-          {!searchTerm && filterType === 'all' && (
+          {!searchTerm && (
             <Button onClick={() => navigate('/characters/new')}>
               <Plus className="mr-2 h-4 w-4" />
               Create Character
@@ -95,13 +72,13 @@ export function CharacterList({ characters }: CharacterListProps) {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle>{character.name}</CardTitle>
-                    <CardDescription>
-                      {character.character_type === 'pc'
-                        ? `PC ${character.player ? `(${character.player})` : ''}`
-                        : character.character_type === 'npc'
-                        ? 'NPC'
-                        : 'Historical Figure'}
-                    </CardDescription>
+                    {(character.character_type === 'pc' || character.character_type === 'historical') && (
+                      <CardDescription>
+                        {character.character_type === 'pc'
+                          ? `PC ${character.player ? `(${character.player})` : ''}`
+                          : 'Historical Figure'}
+                      </CardDescription>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground capitalize">
                     {character.status || 'unknown'}

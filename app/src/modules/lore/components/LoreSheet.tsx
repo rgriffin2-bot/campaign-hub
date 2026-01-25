@@ -76,20 +76,6 @@ export function LoreSheet({ loreEntry, onDelete }: LoreSheetProps) {
         </Card>
       )}
 
-      {/* Main Content */}
-      {(loreEntry as any)._content && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Content</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none prose-invert">
-              <ReactMarkdown>{(loreEntry as any)._content}</ReactMarkdown>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Related Entities */}
       <div className="grid gap-6 md:grid-cols-2">
         {loreEntry.related_factions && loreEntry.related_factions.length > 0 && (
@@ -159,6 +145,19 @@ export function LoreSheet({ loreEntry, onDelete }: LoreSheetProps) {
         )}
       </div>
 
+      {/* Main Content */}
+      {(loreEntry as any)._content && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Content</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none prose-invert">
+              <ReactMarkdown>{(loreEntry as any)._content}</ReactMarkdown>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Relationships */}
       {loreEntry.relationships && loreEntry.relationships.length > 0 && (

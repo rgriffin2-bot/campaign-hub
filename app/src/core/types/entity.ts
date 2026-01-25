@@ -48,10 +48,7 @@ export interface Location extends Entity {
   location_type: string;
   parent?: string;
   children?: string[];
-  faction_control?: string;
-  atmosphere?: string;
   features?: string;
-  secrets?: string;
   maps?: MapData[];
 }
 

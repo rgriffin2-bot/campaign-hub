@@ -171,28 +171,6 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
         </CardContent>
       </Card>
 
-      {/* Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Content</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="content">Main Content</Label>
-            <Textarea
-              id="content"
-              value={(formData as any)._content || ''}
-              onChange={(e) => updateField('_content' as any, e.target.value)}
-              placeholder="Full lore content (supports markdown formatting)"
-              rows={12}
-            />
-            <p className="text-xs text-muted-foreground">
-              Use markdown formatting for rich text
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* References */}
       <Card>
         <CardHeader>
@@ -229,6 +207,28 @@ export function LoreEditor({ loreEntry, onSave }: LoreEditorProps) {
             />
           </div>
 
+        </CardContent>
+      </Card>
+
+      {/* Content */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Content</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="content">Main Content</Label>
+            <Textarea
+              id="content"
+              value={(formData as any)._content || ''}
+              onChange={(e) => updateField('_content' as any, e.target.value)}
+              placeholder="Full lore content (supports markdown formatting)"
+              rows={12}
+            />
+            <p className="text-xs text-muted-foreground">
+              Use markdown formatting for rich text
+            </p>
+          </div>
         </CardContent>
       </Card>
 

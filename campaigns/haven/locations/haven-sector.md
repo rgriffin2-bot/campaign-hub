@@ -5,7 +5,6 @@ location_type: system
 name: "Haven Sector"
 tags: [hub, neutral-territory, trade]
 description: "The crossroads of the Shattered Expanse"
-atmosphere: "Busy, lawless, opportunity-filled"
 features: "Multiple stations, asteroid fields, ancient artifacts"
 visibility: public
 created: "2026-01-24"
