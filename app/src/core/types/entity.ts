@@ -64,6 +64,15 @@ export interface MapHotspot {
   label?: string;
 }
 
+export interface MapEntry extends Entity {
+  type: 'map';
+  map_type?: string;
+  file?: string;
+  location?: string;
+  scale?: string;
+  notes?: string;
+}
+
 export interface Faction extends Entity {
   type: 'faction';
   faction_type: string;
