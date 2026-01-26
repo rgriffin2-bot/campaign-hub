@@ -2,6 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, BookOpen } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { MarkdownContent } from '../../components/MarkdownContent';
+import { CopyableId } from '../../components/CopyableId';
 import type { LoreType, LoreFrontmatter } from '@shared/schemas/lore';
 
 const typeLabels: Record<LoreType, string> = {
@@ -91,6 +92,9 @@ export function LoreDetail() {
               ))}
             </div>
           )}
+          <div className="mt-3">
+            <CopyableId moduleType="lore" id={fileId || ''} />
+          </div>
         </div>
 
         <div className="flex gap-2">
