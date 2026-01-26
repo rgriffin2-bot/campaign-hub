@@ -24,6 +24,11 @@ export const config = {
     credentials: process.env.GOOGLE_DRIVE_CREDENTIALS,
   },
 
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+  },
+
   isDev: process.env.NODE_ENV !== 'production',
 };
 
