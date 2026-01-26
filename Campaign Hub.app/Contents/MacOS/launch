@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Campaign Hub Launcher
+# Double-click this app to start the development servers
+
+APP_DIR="$(dirname "$(dirname "$(dirname "$0")")")"
+PROJECT_DIR="$(dirname "$APP_DIR")"
+
+# If the app is inside the project directory, use that
+if [ -f "$PROJECT_DIR/package.json" ]; then
+    cd "$PROJECT_DIR"
+else
+    # Otherwise look for the project in common locations
+    if [ -f "/Users/robertgriffin/Documents/Claude/CampaignHub/package.json" ]; then
+        cd "/Users/robertgriffin/Documents/Claude/CampaignHub"
+    else
+        osascript -e 'display alert "Campaign Hub" message "Could not find the Campaign Hub project directory."'
+        exit 1
+    fi
+fi
+
+# Kill any existing processes on our ports
+lsof -ti:3001 | xargs kill -9 2>/dev/null
+lsof -ti:5173 | xargs kill -9 2>/dev/null
+sleep 1
+
+# Check if node_modules exists
+if [ ! -d "node_modules" ]; then
+    osascript -e 'display alert "Campaign Hub" message "Installing dependencies... This may take a minute."'
+    npm install
+fi
+
+# Open Terminal with the dev server
+osascript <<EOF
+tell application "Terminal"
+    activate
+    do script "cd '$(pwd)' && npm run dev"
+end tell
+EOF
+
+# Wait for server to start, then open browser
+sleep 4
+open http://localhost:5173
