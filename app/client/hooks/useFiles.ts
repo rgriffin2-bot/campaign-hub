@@ -67,10 +67,30 @@ async function deleteFile(
 ): Promise<void> {
   const res = await fetch(
     `/api/campaigns/${campaignId}/files/${moduleId}/${fileId}`,
-    { method: 'DELETE' }
+    { method: 'DELETE', credentials: 'include' }
   );
   const data: ApiResponse<void> = await res.json();
   if (!data.success) throw new Error(data.error);
+}
+
+async function toggleVisibility(
+  campaignId: string,
+  moduleId: string,
+  fileId: string,
+  hidden: boolean
+): Promise<ParsedFile> {
+  const res = await fetch(
+    `/api/campaigns/${campaignId}/files/${moduleId}/${fileId}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frontmatter: { hidden } }),
+      credentials: 'include',
+    }
+  );
+  const data: ApiResponse<ParsedFile> = await res.json();
+  if (!data.success) throw new Error(data.error);
+  return data.data!;
 }
 
 export function useFiles(moduleId: string) {
@@ -118,11 +138,23 @@ export function useFiles(moduleId: string) {
     },
   });
 
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: ({ fileId, hidden }: { fileId: string; hidden: boolean }) =>
+      toggleVisibility(campaignId, moduleId, fileId, hidden),
+    onSuccess: (_, { fileId }) => {
+      queryClient.invalidateQueries({ queryKey: ['files', campaignId, moduleId] });
+      queryClient.invalidateQueries({
+        queryKey: ['file', campaignId, moduleId, fileId],
+      });
+    },
+  });
+
   return {
     list: listQuery,
     get: useFileQuery,
     create: createMutation,
     update: updateMutation,
     delete: deleteMutation,
+    toggleVisibility: toggleVisibilityMutation,
   };
 }

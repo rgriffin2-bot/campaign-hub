@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  /** Base path for [[module:id]] links. Defaults to '/modules' */
+  linkBasePath?: string;
 }
 
 // Apply inline formatting (bold, italic, inline code) to text
@@ -62,7 +64,7 @@ function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.E
 }
 
 // Parse [[module:id]] links and apply inline formatting
-function parseLinks(text: string, keyPrefix: string = 'link'): (string | JSX.Element)[] {
+function parseLinks(text: string, keyPrefix: string = 'link', linkBasePath: string = '/modules'): (string | JSX.Element)[] {
   const linkRegex = /\[\[(\w+):([^\]]+)\]\]/g;
   const parts: (string | JSX.Element)[] = [];
   let lastIndex = 0;
@@ -83,7 +85,7 @@ function parseLinks(text: string, keyPrefix: string = 'link'): (string | JSX.Ele
     parts.push(
       <Link
         key={`${keyPrefix}-${module}-${id}-${linkCount}`}
-        to={`/modules/${module}/${id}`}
+        to={`${linkBasePath}/${module}/${id}`}
         className="text-primary hover:underline"
       >
         {displayName}
@@ -108,7 +110,7 @@ function parseLinks(text: string, keyPrefix: string = 'link'): (string | JSX.Ele
 }
 
 // Simple markdown-to-JSX converter
-function renderMarkdown(content: string): JSX.Element[] {
+function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX.Element[] {
   const lines = content.split('\n');
   const elements: JSX.Element[] = [];
   let inCodeBlock = false;
@@ -127,7 +129,7 @@ function renderMarkdown(content: string): JSX.Element[] {
         >
           {listItems.map((item, i) => (
             <li key={i} className="text-foreground">
-              {parseLinks(item, `list-${listKey}-${i}`)}
+              {parseLinks(item, `list-${listKey}-${i}`, linkBasePath)}
             </li>
           ))}
         </ListTag>
@@ -177,7 +179,7 @@ function renderMarkdown(content: string): JSX.Element[] {
       const key = elements.length;
       elements.push(
         <h1 key={key} className="mb-4 mt-6 text-2xl font-bold text-foreground first:mt-0">
-          {parseLinks(line.slice(2), `h1-${key}`)}
+          {parseLinks(line.slice(2), `h1-${key}`, linkBasePath)}
         </h1>
       );
       continue;
@@ -187,7 +189,7 @@ function renderMarkdown(content: string): JSX.Element[] {
       const key = elements.length;
       elements.push(
         <h2 key={key} className="mb-3 mt-5 text-xl font-semibold text-foreground">
-          {parseLinks(line.slice(3), `h2-${key}`)}
+          {parseLinks(line.slice(3), `h2-${key}`, linkBasePath)}
         </h2>
       );
       continue;
@@ -197,7 +199,7 @@ function renderMarkdown(content: string): JSX.Element[] {
       const key = elements.length;
       elements.push(
         <h3 key={key} className="mb-2 mt-4 text-lg font-semibold text-foreground">
-          {parseLinks(line.slice(4), `h3-${key}`)}
+          {parseLinks(line.slice(4), `h3-${key}`, linkBasePath)}
         </h3>
       );
       continue;
@@ -239,7 +241,7 @@ function renderMarkdown(content: string): JSX.Element[] {
           key={key}
           className="my-4 border-l-4 border-primary/50 pl-4 italic text-muted-foreground"
         >
-          {parseLinks(line.slice(2), `quote-${key}`)}
+          {parseLinks(line.slice(2), `quote-${key}`, linkBasePath)}
         </blockquote>
       );
       continue;
@@ -251,7 +253,7 @@ function renderMarkdown(content: string): JSX.Element[] {
 
     elements.push(
       <p key={key} className="my-2 text-foreground">
-        {parseLinks(line, `p-${key}`)}
+        {parseLinks(line, `p-${key}`, linkBasePath)}
       </p>
     );
   }
@@ -261,8 +263,8 @@ function renderMarkdown(content: string): JSX.Element[] {
   return elements;
 }
 
-export function MarkdownContent({ content, className = '' }: MarkdownContentProps) {
-  const rendered = useMemo(() => renderMarkdown(content), [content]);
+export function MarkdownContent({ content, className = '', linkBasePath = '/modules' }: MarkdownContentProps) {
+  const rendered = useMemo(() => renderMarkdown(content, linkBasePath), [content, linkBasePath]);
 
   return <div className={`prose prose-invert max-w-none ${className}`}>{rendered}</div>;
 }

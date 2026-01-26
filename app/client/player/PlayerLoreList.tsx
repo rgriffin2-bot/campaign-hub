@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, BookOpen, Users, Clock, Sparkles, Globe, MoreHorizontal, Eye, EyeOff } from 'lucide-react';
-import { useFiles } from '../../hooks/useFiles';
+import { Search, BookOpen, Users, Clock, Sparkles, Globe, MoreHorizontal } from 'lucide-react';
+import { usePlayerFiles } from './hooks/usePlayerFiles';
 import type { LoreType } from '@shared/schemas/lore';
-import type { FileMetadata } from '@shared/types/file';
 
 const typeIcons: Record<LoreType, React.ReactNode> = {
   world: <Globe className="h-4 w-4" />,
@@ -23,68 +22,8 @@ const typeLabels: Record<LoreType, string> = {
   other: 'Other',
 };
 
-function LoreCard({ item }: { item: FileMetadata }) {
-  const { toggleVisibility } = useFiles('lore');
-  const isHidden = item.hidden === true;
-
-  const handleToggleVisibility = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleVisibility.mutate({ fileId: item.id, hidden: !isHidden });
-  };
-
-  return (
-    <Link
-      to={`/modules/lore/${item.id}`}
-      className={`group relative rounded-lg border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent ${
-        isHidden ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'
-      }`}
-    >
-      {/* Hidden indicator badge */}
-      {isHidden && (
-        <div className="absolute -right-2 -top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
-          <EyeOff className="h-3 w-3" />
-          <span>Hidden</span>
-        </div>
-      )}
-
-      <div className="flex items-start justify-between gap-2">
-        <h3 className={`font-medium group-hover:text-primary ${isHidden ? 'text-muted-foreground' : 'text-foreground'}`}>
-          {item.name}
-        </h3>
-
-        {/* Visibility toggle button */}
-        <button
-          onClick={handleToggleVisibility}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
-            isHidden
-              ? 'text-amber-500 hover:bg-amber-500/20'
-              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-          }`}
-          title={isHidden ? 'Show to players' : 'Hide from players'}
-        >
-          {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-
-      {(item.tags as string[] | undefined)?.length ? (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {(item.tags as string[]).slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </Link>
-  );
-}
-
-export function LoreList() {
-  const { list } = useFiles('lore');
+export function PlayerLoreList() {
+  const { list } = usePlayerFiles('lore');
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<LoreType | 'all'>('all');
 
@@ -125,18 +64,9 @@ export function LoreList() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <BookOpen className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Lore</h1>
-        </div>
-        <Link
-          to="/modules/lore/new"
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Add Lore
-        </Link>
+      <div className="flex items-center gap-3">
+        <BookOpen className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold text-foreground">Lore</h1>
       </div>
 
       {/* Search and Filter */}
@@ -174,7 +104,7 @@ export function LoreList() {
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {loreItems.length === 0
-              ? 'Add your first lore entry to get started.'
+              ? 'The DM hasn\'t added any lore entries yet.'
               : 'Try adjusting your search or filter.'}
           </p>
         </div>
@@ -195,7 +125,27 @@ export function LoreList() {
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {items.map((item) => (
-                    <LoreCard key={item.id} item={item} />
+                    <Link
+                      key={item.id}
+                      to={`/player/modules/lore/${item.id}`}
+                      className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent"
+                    >
+                      <h3 className="font-medium text-foreground group-hover:text-primary">
+                        {item.name}
+                      </h3>
+                      {(item.tags as string[] | undefined)?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(item.tags as string[]).slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </Link>
                   ))}
                 </div>
               </div>

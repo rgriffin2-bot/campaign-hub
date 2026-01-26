@@ -29,6 +29,23 @@ export const config = {
     model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
   },
 
+  // Authentication - set these in .env to enable password protection
+  auth: {
+    dmPassword: process.env.DM_PASSWORD,
+    playerPassword: process.env.PLAYER_PASSWORD,
+  },
+
+  // Security settings
+  security: {
+    // Rate limiting: max requests per window
+    rateLimit: {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    },
+    // Allowed origins for CORS (comma-separated, or * for all local)
+    allowedOrigins: process.env.ALLOWED_ORIGINS,
+  },
+
   isDev: process.env.NODE_ENV !== 'production',
 };
 

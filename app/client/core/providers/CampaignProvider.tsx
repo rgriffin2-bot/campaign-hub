@@ -9,6 +9,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CampaignConfig, CampaignMeta } from '@shared/types/campaign';
 import type { ModuleInfo } from '@shared/types/module';
+import { useAuth } from './AuthProvider';
 
 interface CampaignContextValue {
   campaign: CampaignConfig | null;
@@ -23,20 +24,29 @@ interface CampaignContextValue {
 
 const CampaignContext = createContext<CampaignContextValue | null>(null);
 
-async function fetchCampaigns(): Promise<CampaignMeta[]> {
-  const res = await fetch('/api/campaigns');
+// Fetch functions that use the appropriate API base path
+async function fetchCampaigns(isDm: boolean): Promise<CampaignMeta[]> {
+  // Only DMs can list all campaigns
+  if (!isDm) return [];
+  const res = await fetch('/api/campaigns', { credentials: 'include' });
+  if (!res.ok) return [];
   const data = await res.json();
   return data.data || [];
 }
 
-async function fetchActiveCampaign(): Promise<CampaignConfig | null> {
-  const res = await fetch('/api/active-campaign');
+async function fetchActiveCampaign(isDm: boolean): Promise<CampaignConfig | null> {
+  // Use player endpoint for players, DM endpoint for DMs
+  const endpoint = isDm ? '/api/active-campaign' : '/api/player/active-campaign';
+  const res = await fetch(endpoint, { credentials: 'include' });
+  if (!res.ok) return null;
   const data = await res.json();
   return data.data || null;
 }
 
-async function fetchModules(): Promise<ModuleInfo[]> {
-  const res = await fetch('/api/modules');
+async function fetchModules(isDm: boolean): Promise<ModuleInfo[]> {
+  const endpoint = isDm ? '/api/modules' : '/api/player/modules';
+  const res = await fetch(endpoint, { credentials: 'include' });
+  if (!res.ok) return [];
   const data = await res.json();
   return data.data || [];
 }
@@ -44,6 +54,7 @@ async function fetchModules(): Promise<ModuleInfo[]> {
 async function activateCampaign(campaignId: string): Promise<CampaignConfig> {
   const res = await fetch(`/api/campaigns/${campaignId}/activate`, {
     method: 'POST',
+    credentials: 'include',
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.error);
@@ -57,6 +68,7 @@ async function createCampaignApi(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
+    credentials: 'include',
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.error);
@@ -69,21 +81,28 @@ interface CampaignProviderProps {
 
 export function CampaignProvider({ children }: CampaignProviderProps) {
   const queryClient = useQueryClient();
+  const { role, authenticated, authEnabled } = useAuth();
   const [campaign, setCampaign] = useState<CampaignConfig | null>(null);
 
+  // Determine if user has DM access
+  const isDm = !authEnabled || role === 'dm';
+
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
-    queryKey: ['campaigns'],
-    queryFn: fetchCampaigns,
+    queryKey: ['campaigns', isDm],
+    queryFn: () => fetchCampaigns(isDm),
+    enabled: authenticated || !authEnabled,
   });
 
   const { data: activeCampaign, isLoading: activeLoading } = useQuery({
-    queryKey: ['active-campaign'],
-    queryFn: fetchActiveCampaign,
+    queryKey: ['active-campaign', isDm],
+    queryFn: () => fetchActiveCampaign(isDm),
+    enabled: authenticated || !authEnabled,
   });
 
   const { data: allModules = [] } = useQuery({
-    queryKey: ['modules'],
-    queryFn: fetchModules,
+    queryKey: ['modules', isDm],
+    queryFn: () => fetchModules(isDm),
+    enabled: authenticated || !authEnabled,
   });
 
   const activateMutation = useMutation({
