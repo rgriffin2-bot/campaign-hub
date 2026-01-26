@@ -16,6 +16,7 @@ export function App() {
               <Route index element={<Dashboard />} />
               <Route path="modules/:moduleId" element={<ModuleRouter />} />
               <Route path="modules/:moduleId/:fileId" element={<ModuleRouter />} />
+              <Route path="modules/:moduleId/:fileId/edit" element={<ModuleRouter />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

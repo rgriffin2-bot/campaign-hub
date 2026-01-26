@@ -7,6 +7,10 @@ import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
 
+// Import modules (registers them automatically)
+import './modules/lore/index.js';
+import './modules/npcs/index.js';
+
 const app = express();
 
 // Middleware
