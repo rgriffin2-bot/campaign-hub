@@ -132,14 +132,27 @@ export const fileStore = {
     const raw = await fs.readFile(filePath, 'utf-8');
     const existing = markdownParser.parse(raw);
 
-    const newFrontmatter = {
+    // Start with existing frontmatter and merge in updates
+    const newFrontmatter: Record<string, unknown> = {
       ...existing.frontmatter,
-      ...data.frontmatter,
-      id: fileId, // Preserve ID
+      id: fileId, // id is always preserved
     };
 
+    // If name is provided, use it; otherwise keep existing
     if (data.name !== undefined) {
-      (newFrontmatter as Record<string, unknown>).name = data.name;
+      newFrontmatter.name = data.name;
+    }
+
+    // Merge frontmatter fields - only update fields that are explicitly provided
+    if (data.frontmatter) {
+      for (const [key, value] of Object.entries(data.frontmatter)) {
+        if (value !== undefined) {
+          newFrontmatter[key] = value;
+        } else if (key in data.frontmatter) {
+          // If explicitly set to undefined, remove the field
+          delete newFrontmatter[key];
+        }
+      }
     }
 
     const newContent = data.content !== undefined ? data.content : existing.content;

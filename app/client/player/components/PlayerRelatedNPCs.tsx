@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { useFiles } from '../../../hooks/useFiles';
+import { usePlayerFiles } from '../hooks/usePlayerFiles';
 import type { RelatedCharacter } from '@shared/schemas/npc';
 
-interface RelatedNPCsProps {
+interface PlayerRelatedNPCsProps {
   characters: (string | RelatedCharacter)[];
 }
 
@@ -14,8 +14,8 @@ function normalizeCharacter(char: string | RelatedCharacter): RelatedCharacter {
   return char;
 }
 
-export function RelatedNPCs({ characters }: RelatedNPCsProps) {
-  const { list } = useFiles('npcs');
+export function PlayerRelatedNPCs({ characters }: PlayerRelatedNPCsProps) {
+  const { list } = usePlayerFiles('npcs');
   const allNPCs = list.data || [];
 
   const normalizedChars = characters.map(normalizeCharacter);
@@ -43,7 +43,7 @@ export function RelatedNPCs({ characters }: RelatedNPCsProps) {
       {relatedData.map((char) => (
         <li key={char.id} className="flex items-start gap-2">
           <Link
-            to={`/modules/npcs/${char.id}`}
+            to={`/player/modules/npcs/${char.id}`}
             className="text-primary hover:underline font-medium shrink-0"
           >
             {char.name}

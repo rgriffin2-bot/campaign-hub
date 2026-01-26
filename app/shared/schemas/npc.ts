@@ -6,6 +6,14 @@ export const npcDmOnlySchema = z.object({
   notes: z.string().optional(),
 });
 
+// Related character entry: "[[npcs:id]] - description"
+export const relatedCharacterSchema = z.object({
+  id: z.string(), // The NPC id (without [[npcs:]] wrapper)
+  description: z.string().optional(), // Optional description of the relationship
+});
+
+export type RelatedCharacter = z.infer<typeof relatedCharacterSchema>;
+
 export const npcSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -15,8 +23,18 @@ export const npcSchema = z.object({
   personality: z.string().optional(),
   goals: z.string().optional(),
   dmOnly: npcDmOnlySchema.optional(),
-  relatedCharacters: z.array(z.string()).optional().default([]),
+  // Support both old format (string[]) and new format (RelatedCharacter[])
+  relatedCharacters: z.array(
+    z.union([z.string(), relatedCharacterSchema])
+  ).optional().default([]),
   tags: z.array(z.string()).optional().default([]),
+  portrait: z.string().optional(), // Path to portrait image
+  portraitPosition: z.object({
+    x: z.number(),
+    y: z.number(),
+    scale: z.number(),
+  }).optional(), // Position/zoom for circular crop
+  hidden: z.boolean().optional().default(false), // Hidden from players until revealed
 });
 
 export type NPCFrontmatter = z.infer<typeof npcSchema>;

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Settings, Scroll, Plus } from 'lucide-react';
+import { ChevronDown, Settings, Scroll, Plus, LogOut } from 'lucide-react';
 import { useCampaign } from './providers/CampaignProvider';
+import { useAuth } from './providers/AuthProvider';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 
 export function Header() {
   const { campaign, campaigns, switchCampaign } = useCampaign();
+  const { authEnabled, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
@@ -87,6 +89,17 @@ export function Header() {
         >
           <Settings className="h-5 w-5" />
         </Link>
+
+        {/* Logout Button (only show if auth is enabled) */}
+        {authEnabled && (
+          <button
+            onClick={logout}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            title="Sign out"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <CreateCampaignDialog

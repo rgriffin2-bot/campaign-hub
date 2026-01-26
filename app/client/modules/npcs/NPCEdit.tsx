@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
-import type { NPCFrontmatter, NPCDmOnly } from '@shared/schemas/npc';
+import { RelatedCharacterInput, normalizeRelatedCharacters } from '../../components/RelatedCharacterInput';
+import { PortraitUpload } from '../../components/PortraitUpload';
+import type { NPCFrontmatter, NPCDmOnly, RelatedCharacter } from '@shared/schemas/npc';
 
 export function NPCEdit() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
-  const { get, list, create, update } = useFiles('npcs');
+  const { get, create, update } = useFiles('npcs');
 
   const isNew = fileId === 'new';
   const { data: existingNPC, isLoading } = get(isNew ? '' : fileId || '');
@@ -22,14 +24,13 @@ export function NPCEdit() {
   const [secrets, setSecrets] = useState('');
   const [voice, setVoice] = useState('');
   const [dmNotes, setDmNotes] = useState('');
-  const [relatedCharacters, setRelatedCharacters] = useState<string[]>([]);
+  const [relatedCharacters, setRelatedCharacters] = useState<RelatedCharacter[]>([]);
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
+  const [portrait, setPortrait] = useState<string | undefined>();
+  const [portraitPosition, setPortraitPosition] = useState<{ x: number; y: number; scale: number } | undefined>();
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load all NPCs for related character picker
-  const allNPCs = list.data || [];
-  const availableNPCs = allNPCs.filter((npc) => npc.id !== fileId);
 
   useEffect(() => {
     if (existingNPC && !isNew) {
@@ -44,9 +45,11 @@ export function NPCEdit() {
       setSecrets(dmOnlyData?.secrets || '');
       setVoice(dmOnlyData?.voice || '');
       setDmNotes(dmOnlyData?.notes || '');
-      setRelatedCharacters(fm.relatedCharacters || []);
+      setRelatedCharacters(normalizeRelatedCharacters(fm.relatedCharacters || []));
       setTags((fm.tags || []).join(', '));
       setContent(existingNPC.content);
+      setPortrait(fm.portrait);
+      setPortraitPosition(fm.portraitPosition);
     }
   }, [existingNPC, isNew]);
 
@@ -78,6 +81,8 @@ export function NPCEdit() {
         dmOnly,
         relatedCharacters: relatedCharacters.length > 0 ? relatedCharacters : undefined,
         tags: tagsArray.length > 0 ? tagsArray : undefined,
+        portrait: portrait || undefined,
+        portraitPosition: portraitPosition || undefined,
       };
 
       if (isNew) {
@@ -105,13 +110,6 @@ export function NPCEdit() {
     }
   };
 
-  const toggleRelatedCharacter = (npcId: string) => {
-    setRelatedCharacters((prev) =>
-      prev.includes(npcId)
-        ? prev.filter((id) => id !== npcId)
-        : [...prev, npcId]
-    );
-  };
 
   if (!isNew && isLoading) {
     return (
@@ -146,6 +144,22 @@ export function NPCEdit() {
           {isSaving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {/* Portrait */}
+      {!isNew && fileId && (
+        <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+          <h2 className="font-semibold text-foreground">Portrait</h2>
+          <PortraitUpload
+            currentPortrait={portrait}
+            portraitPosition={portraitPosition}
+            npcId={fileId}
+            onUploadComplete={(path, position) => {
+              setPortrait(path);
+              setPortraitPosition(position);
+            }}
+          />
+        </div>
+      )}
 
       {/* Basic Info */}
       <div className="space-y-4 rounded-lg border border-border bg-card p-6">
@@ -301,32 +315,14 @@ export function NPCEdit() {
       </div>
 
       {/* Related Characters */}
-      {availableNPCs.length > 0 && (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-6">
-          <h2 className="font-semibold text-foreground">Related Characters</h2>
-          <div className="max-h-48 space-y-2 overflow-auto">
-            {availableNPCs.map((npc) => (
-              <label
-                key={npc.id}
-                className="flex cursor-pointer items-center gap-2 rounded border border-border p-2 transition-colors hover:bg-accent"
-              >
-                <input
-                  type="checkbox"
-                  checked={relatedCharacters.includes(npc.id)}
-                  onChange={() => toggleRelatedCharacter(npc.id)}
-                  className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
-                />
-                <span className="text-sm text-foreground">{npc.name}</span>
-                {npc.occupation ? (
-                  <span className="text-xs text-muted-foreground">
-                    — {String(npc.occupation)}
-                  </span>
-                ) : null}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+        <h2 className="font-semibold text-foreground">Related Characters</h2>
+        <RelatedCharacterInput
+          value={relatedCharacters}
+          onChange={setRelatedCharacters}
+          currentNpcId={fileId}
+        />
+      </div>
 
       {/* Additional Notes */}
       <div className="space-y-4 rounded-lg border border-border bg-card p-6">

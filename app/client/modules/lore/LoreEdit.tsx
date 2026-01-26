@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ImageUpload } from '../../components/ImageUpload';
 import { loreTypes, type LoreType, type LoreFrontmatter } from '@shared/schemas/lore';
 
 const typeLabels: Record<LoreType, string> = {
@@ -25,6 +26,7 @@ export function LoreEdit() {
   const [type, setType] = useState<LoreType>('world');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
+  const [image, setImage] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export function LoreEdit() {
       setType(fm.type);
       setTags((fm.tags || []).join(', '));
       setContent(existingLore.content);
+      setImage(fm.image);
     }
   }, [existingLore, isNew]);
 
@@ -54,6 +57,7 @@ export function LoreEdit() {
           frontmatter: {
             type,
             tags: tagsArray,
+            image: image || undefined,
           },
         });
         navigate(`/modules/lore/${newLore.frontmatter.id}`);
@@ -66,6 +70,7 @@ export function LoreEdit() {
             frontmatter: {
               type,
               tags: tagsArray,
+              image: image || undefined,
             },
           },
         });
@@ -111,6 +116,20 @@ export function LoreEdit() {
           {isSaving ? 'Saving...' : 'Save'}
         </button>
       </div>
+
+      {/* Header Image */}
+      {!isNew && fileId && (
+        <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+          <h2 className="font-semibold text-foreground">Header Image</h2>
+          <ImageUpload
+            currentImage={image}
+            entityId={fileId}
+            uploadEndpoint="lore-images"
+            onUploadComplete={(path) => setImage(path)}
+            onRemove={() => setImage(undefined)}
+          />
+        </div>
+      )}
 
       {/* Form */}
       <div className="space-y-4 rounded-lg border border-border bg-card p-6">

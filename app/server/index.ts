@@ -1,11 +1,18 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
 import { config } from './config.js';
 import { campaignManager } from './core/campaign-manager.js';
 import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage } from './core/upload-handler.js';
+import { playerRoutes } from './routes/player-routes.js';
+import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 
 // Import modules (registers them automatically)
 import './modules/lore/index.js';
@@ -13,16 +20,151 @@ import './modules/npcs/index.js';
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// =============================================================================
+// Security Middleware
+// =============================================================================
+
+// Helmet for security headers (disable some that conflict with local dev)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Vite dev server needs inline scripts
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// Rate limiting to prevent brute force attacks
+const limiter = rateLimit({
+  windowMs: config.security.rateLimit.windowMs,
+  max: config.security.rateLimit.maxRequests,
+  message: { success: false, error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Stricter rate limit for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per 15 minutes
+  message: { success: false, error: 'Too many login attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// CORS configuration - restrict to local network
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // Check if origin is from local network
+    const isLocalNetwork =
+      origin.startsWith('http://localhost') ||
+      origin.startsWith('http://127.0.0.1') ||
+      origin.startsWith('http://192.168.') ||
+      origin.startsWith('http://10.') ||
+      origin.startsWith('http://172.16.') ||
+      origin.startsWith('http://172.17.') ||
+      origin.startsWith('http://172.18.') ||
+      origin.startsWith('http://172.19.') ||
+      origin.startsWith('http://172.20.') ||
+      origin.startsWith('http://172.21.') ||
+      origin.startsWith('http://172.22.') ||
+      origin.startsWith('http://172.23.') ||
+      origin.startsWith('http://172.24.') ||
+      origin.startsWith('http://172.25.') ||
+      origin.startsWith('http://172.26.') ||
+      origin.startsWith('http://172.27.') ||
+      origin.startsWith('http://172.28.') ||
+      origin.startsWith('http://172.29.') ||
+      origin.startsWith('http://172.30.') ||
+      origin.startsWith('http://172.31.');
+
+    if (isLocalNetwork) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS: Origin not allowed'));
+    }
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
+// Initialize auth middleware
+const auth = createAuthMiddleware(config.auth.dmPassword, config.auth.playerPassword);
+
 // =============================================================================
-// Campaign Routes
+// Auth Routes
+// =============================================================================
+
+// Login endpoint
+app.post('/api/auth/login', authLimiter, (req, res) => {
+  const { password } = req.body;
+
+  if (!password || typeof password !== 'string') {
+    res.status(400).json({ success: false, error: 'Password required' });
+    return;
+  }
+
+  const result = login(password, config.auth.dmPassword, config.auth.playerPassword);
+
+  if (result.success) {
+    // Set cookie for browser clients
+    res.setHeader(
+      'Set-Cookie',
+      `session=${result.token}; HttpOnly; SameSite=Strict; Max-Age=${24 * 60 * 60}; Path=/`
+    );
+    res.json({ success: true, role: result.role });
+  } else {
+    res.status(401).json(result);
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const match = cookies.match(/session=([^;]+)/);
+    if (match) {
+      logout(match[1]);
+    }
+  }
+  res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
+  res.json({ success: true });
+});
+
+// Check session endpoint
+app.get('/api/auth/session', (req, res) => {
+  // If auth is not enabled, return dm role
+  if (!auth.authEnabled) {
+    res.json({ success: true, authenticated: true, role: 'dm', authEnabled: false });
+    return;
+  }
+
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const match = cookies.match(/session=([^;]+)/);
+    if (match) {
+      const session = validateSession(match[1]);
+      if (session) {
+        res.json({ success: true, authenticated: true, role: session.role, authEnabled: true });
+        return;
+      }
+    }
+  }
+  res.json({ success: true, authenticated: false, authEnabled: true });
+});
+
+// =============================================================================
+// Campaign Routes (DM Only)
 // =============================================================================
 
 // List all campaigns
-app.get('/api/campaigns', async (_req, res) => {
+app.get('/api/campaigns', auth.requireDm, async (_req, res) => {
   try {
     const campaigns = await campaignManager.list();
     res.json({ success: true, data: campaigns });
@@ -33,7 +175,7 @@ app.get('/api/campaigns', async (_req, res) => {
 });
 
 // Create a campaign
-app.post('/api/campaigns', async (req, res) => {
+app.post('/api/campaigns', auth.requireDm, async (req, res) => {
   try {
     const campaign = await campaignManager.create(req.body);
     res.status(201).json({ success: true, data: campaign });
@@ -44,7 +186,7 @@ app.post('/api/campaigns', async (req, res) => {
 });
 
 // Get a campaign
-app.get('/api/campaigns/:id', async (req, res) => {
+app.get('/api/campaigns/:id', auth.requireDm, async (req, res) => {
   try {
     const campaign = await campaignManager.load(req.params.id);
     if (!campaign) {
@@ -59,7 +201,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
 });
 
 // Update a campaign
-app.put('/api/campaigns/:id', async (req, res) => {
+app.put('/api/campaigns/:id', auth.requireDm, async (req, res) => {
   try {
     const campaign = await campaignManager.update(req.params.id, req.body);
     if (!campaign) {
@@ -74,7 +216,7 @@ app.put('/api/campaigns/:id', async (req, res) => {
 });
 
 // Delete a campaign
-app.delete('/api/campaigns/:id', async (req, res) => {
+app.delete('/api/campaigns/:id', auth.requireDm, async (req, res) => {
   try {
     const success = await campaignManager.delete(req.params.id);
     if (!success) {
@@ -89,7 +231,7 @@ app.delete('/api/campaigns/:id', async (req, res) => {
 });
 
 // Activate a campaign
-app.post('/api/campaigns/:id/activate', async (req, res) => {
+app.post('/api/campaigns/:id/activate', auth.requireDm, async (req, res) => {
   try {
     const campaign = await campaignManager.setActive(req.params.id);
     if (!campaign) {
@@ -106,23 +248,23 @@ app.post('/api/campaigns/:id/activate', async (req, res) => {
 });
 
 // Get active campaign
-app.get('/api/active-campaign', (_req, res) => {
+app.get('/api/active-campaign', auth.requireDm, (_req, res) => {
   const campaign = campaignManager.getActive();
   res.json({ success: true, data: campaign });
 });
 
 // =============================================================================
-// Module Routes
+// Module Routes (DM Only)
 // =============================================================================
 
 // List all registered modules
-app.get('/api/modules', (_req, res) => {
+app.get('/api/modules', auth.requireDm, (_req, res) => {
   const modules = moduleRegistry.getAllInfo();
   res.json({ success: true, data: modules });
 });
 
 // Get a specific module
-app.get('/api/modules/:moduleId', (req, res) => {
+app.get('/api/modules/:moduleId', auth.requireDm, (req, res) => {
   const module = moduleRegistry.getInfo(req.params.moduleId);
   if (!module) {
     res.status(404).json({ success: false, error: 'Module not found' });
@@ -132,11 +274,11 @@ app.get('/api/modules/:moduleId', (req, res) => {
 });
 
 // =============================================================================
-// Generic File Routes
+// Generic File Routes (DM Only)
 // =============================================================================
 
 // List files for a module
-app.get('/api/campaigns/:campaignId/files/:moduleId', async (req, res) => {
+app.get('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, moduleId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -155,7 +297,7 @@ app.get('/api/campaigns/:campaignId/files/:moduleId', async (req, res) => {
 });
 
 // Get a specific file
-app.get('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) => {
+app.get('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, moduleId, fileId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -180,7 +322,7 @@ app.get('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) =
 });
 
 // Create a file
-app.post('/api/campaigns/:campaignId/files/:moduleId', async (req, res) => {
+app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, moduleId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -199,7 +341,7 @@ app.post('/api/campaigns/:campaignId/files/:moduleId', async (req, res) => {
 });
 
 // Update a file
-app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) => {
+app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, moduleId, fileId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -224,7 +366,7 @@ app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) =
 });
 
 // Delete a file
-app.delete('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) => {
+app.delete('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, moduleId, fileId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -249,11 +391,11 @@ app.delete('/api/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res
 });
 
 // =============================================================================
-// Relationship Routes
+// Relationship Routes (DM Only)
 // =============================================================================
 
 // Get relationships for a file
-app.get('/api/campaigns/:campaignId/relationships/:fileId', async (req, res) => {
+app.get('/api/campaigns/:campaignId/relationships/:fileId', auth.requireDm, async (req, res) => {
   try {
     const { campaignId, fileId } = req.params;
     const related = await relationshipIndex.getRelated(campaignId, fileId);
@@ -265,8 +407,91 @@ app.get('/api/campaigns/:campaignId/relationships/:fileId', async (req, res) => 
 });
 
 // =============================================================================
+// Portrait Upload Routes (DM Only)
+// =============================================================================
+
+// Upload a portrait for an NPC
+app.post(
+  '/api/campaigns/:campaignId/portraits/:npcId',
+  auth.requireDm,
+  upload.single('portrait'),
+  async (req, res) => {
+    try {
+      const { campaignId, npcId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      // Get crop position from request body (sent as JSON string in form data)
+      let cropPosition;
+      if (req.body.cropPosition) {
+        try {
+          cropPosition = JSON.parse(req.body.cropPosition);
+        } catch {
+          // Ignore invalid JSON
+        }
+      }
+
+      const portraitPath = await processAndSavePortrait(
+        campaignId,
+        npcId,
+        req.file.buffer,
+        cropPosition
+      );
+
+      res.json({ success: true, data: { path: portraitPath } });
+    } catch (error) {
+      console.error('Error uploading portrait:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload portrait';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload an image for a lore entry
+app.post(
+  '/api/campaigns/:campaignId/lore-images/:loreId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, loreId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveLoreImage(
+        campaignId,
+        loreId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading lore image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Serve static assets from campaigns directory
+app.use('/api/campaigns/:campaignId/assets', (req, res, next) => {
+  const { campaignId } = req.params;
+  const assetsPath = path.join(config.campaignsDir, campaignId, 'assets');
+  express.static(assetsPath)(req, res, next);
+});
+
+// =============================================================================
 // Mount Module Routes & Start Server
 // =============================================================================
+
+// Mount player routes (read-only, filtered, requires player or DM auth)
+app.use('/api/player', auth.requirePlayer, playerRoutes);
 
 // Mount module-specific routes
 moduleRegistry.mountRoutes(app);
@@ -274,11 +499,16 @@ moduleRegistry.mountRoutes(app);
 // Start file watcher
 fileWatcher.start();
 
-// Start server
-app.listen(config.port, () => {
+// Start server - listen on all interfaces for network access
+app.listen(config.port, '0.0.0.0', () => {
   console.log(`Campaign Hub server running on http://localhost:${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`Campaigns directory: ${config.campaignsDir}`);
+  console.log(`Authentication: ${auth.authEnabled ? 'ENABLED' : 'DISABLED (set DM_PASSWORD and PLAYER_PASSWORD in .env)'}`);
+  if (auth.authEnabled) {
+    console.log(`  - DM password: ${config.auth.dmPassword ? 'SET' : 'NOT SET'}`);
+    console.log(`  - Player password: ${config.auth.playerPassword ? 'SET' : 'NOT SET'}`);
+  }
 });
 
 // Graceful shutdown

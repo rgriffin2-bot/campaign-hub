@@ -1,6 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, BookOpen } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, BookOpen, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
 import type { LoreType, LoreFrontmatter } from '@shared/schemas/lore';
@@ -17,7 +18,8 @@ const typeLabels: Record<LoreType, string> = {
 export function LoreDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
-  const { get, delete: deleteMutation } = useFiles('lore');
+  const { campaign } = useCampaign();
+  const { get, delete: deleteMutation, toggleVisibility } = useFiles('lore');
 
   const { data: lore, isLoading } = get(fileId || '');
 
@@ -57,6 +59,12 @@ export function LoreDetail() {
   const { content } = lore;
   const frontmatter = lore.frontmatter as unknown as LoreFrontmatter;
   const type = frontmatter.type;
+  const isHidden = frontmatter.hidden === true;
+
+  const handleToggleVisibility = () => {
+    if (!fileId) return;
+    toggleVisibility.mutate({ fileId, hidden: !isHidden });
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -98,6 +106,28 @@ export function LoreDetail() {
         </div>
 
         <div className="flex gap-2">
+          {/* Visibility toggle */}
+          <button
+            onClick={handleToggleVisibility}
+            className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              isHidden
+                ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30'
+                : 'bg-secondary text-foreground hover:bg-accent'
+            }`}
+            title={isHidden ? 'Show to players' : 'Hide from players'}
+          >
+            {isHidden ? (
+              <>
+                <EyeOff className="h-4 w-4" />
+                Hidden
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4" />
+                Visible
+              </>
+            )}
+          </button>
           <Link
             to={`/modules/lore/${fileId}/edit`}
             className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
@@ -114,6 +144,17 @@ export function LoreDetail() {
           </button>
         </div>
       </div>
+
+      {/* Header Image */}
+      {frontmatter.image && campaign && (
+        <div className="overflow-hidden rounded-lg border border-border">
+          <img
+            src={`/api/campaigns/${campaign.id}/assets/${frontmatter.image.replace('assets/', '')}`}
+            alt={frontmatter.name}
+            className="h-64 w-full object-cover"
+          />
+        </div>
+      )}
 
       {/* Content */}
       <div className="rounded-lg border border-border bg-card p-6">

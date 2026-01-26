@@ -1,6 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, User, MapPin, Target, Eye, MessageSquare, Lock } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
 import { RelatedNPCs } from './components/RelatedNPCs';
@@ -9,7 +10,8 @@ import type { NPCFrontmatter } from '@shared/schemas/npc';
 export function NPCDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
-  const { get, delete: deleteMutation } = useFiles('npcs');
+  const { campaign } = useCampaign();
+  const { get, delete: deleteMutation, toggleVisibility } = useFiles('npcs');
 
   const { data: npc, isLoading } = get(fileId || '');
 
@@ -49,9 +51,15 @@ export function NPCDetail() {
   const { content } = npc;
   const frontmatter = npc.frontmatter as unknown as NPCFrontmatter;
   const dmOnly = frontmatter.dmOnly;
+  const isHidden = frontmatter.hidden === true;
+
+  const handleToggleVisibility = () => {
+    if (!fileId) return;
+    toggleVisibility.mutate({ fileId, hidden: !isHidden });
+  };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       {/* Back link */}
       <Link
         to="/modules/npcs"
@@ -61,99 +69,112 @@ export function NPCDetail() {
         Back to NPCs
       </Link>
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <User className="h-8 w-8" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              {frontmatter.name}
-            </h1>
-            {frontmatter.occupation && (
-              <p className="text-lg text-muted-foreground">
-                {frontmatter.occupation}
-              </p>
-            )}
-            {frontmatter.tags && frontmatter.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {frontmatter.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
-                  >
-                    {tag}
-                  </span>
-                ))}
+      {/* Header Card - Name, Occupation, Location, Tags, ID */}
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            {/* Portrait */}
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-primary/10">
+              {frontmatter.portrait && campaign ? (
+                <div
+                  className="absolute h-full w-full"
+                  style={{
+                    backgroundImage: `url(/api/campaigns/${campaign.id}/assets/${frontmatter.portrait.replace('assets/', '')})`,
+                    backgroundSize: frontmatter.portraitPosition
+                      ? `${100 * frontmatter.portraitPosition.scale}%`
+                      : '100%',
+                    backgroundPosition: frontmatter.portraitPosition
+                      ? `${50 + frontmatter.portraitPosition.x}% ${50 + frontmatter.portraitPosition.y}%`
+                      : 'center',
+                    backgroundRepeat: 'no-repeat',
+                  }}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-primary">
+                  <User className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-foreground">
+                {frontmatter.name}
+              </h1>
+              {frontmatter.occupation && (
+                <p className="text-lg text-muted-foreground">
+                  {frontmatter.occupation}
+                </p>
+              )}
+              {frontmatter.location && (
+                <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>{frontmatter.location}</span>
+                </div>
+              )}
+              {frontmatter.tags && frontmatter.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {frontmatter.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3">
+                <CopyableId moduleType="npcs" id={fileId || ''} />
               </div>
-            )}
-            <div className="mt-3">
-              <CopyableId moduleType="npcs" id={fileId || ''} />
             </div>
           </div>
-        </div>
 
-        <div className="flex gap-2">
-          <Link
-            to={`/modules/npcs/${fileId}/edit`}
-            className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            <Edit className="h-4 w-4" />
-            Edit
-          </Link>
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
+          <div className="flex gap-2 shrink-0">
+            {/* Visibility toggle */}
+            <button
+              onClick={handleToggleVisibility}
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                isHidden
+                  ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30'
+                  : 'bg-secondary text-foreground hover:bg-accent'
+              }`}
+              title={isHidden ? 'Show to players' : 'Hide from players'}
+            >
+              {isHidden ? (
+                <>
+                  <EyeOff className="h-4 w-4" />
+                  Hidden
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" />
+                  Visible
+                </>
+              )}
+            </button>
+            <Link
+              to={`/modules/npcs/${fileId}/edit`}
+              className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <Edit className="h-4 w-4" />
+              Edit
+            </Link>
+            <button
+              onClick={handleDelete}
+              className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Info Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {frontmatter.location && (
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              Location
-            </div>
-            <p className="mt-1 text-foreground">{frontmatter.location}</p>
-          </div>
-        )}
-
-        {frontmatter.goals && (
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Target className="h-4 w-4" />
-              Goals
-            </div>
-            <p className="mt-1 text-foreground">{frontmatter.goals}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Appearance */}
-      {frontmatter.appearance && (
+      {/* Related Characters */}
+      {frontmatter.relatedCharacters && frontmatter.relatedCharacters.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Eye className="h-4 w-4" />
-            Appearance
-          </div>
-          <p className="mt-2 text-foreground">{frontmatter.appearance}</p>
-        </div>
-      )}
-
-      {/* Personality */}
-      {frontmatter.personality && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <MessageSquare className="h-4 w-4" />
-            Personality
-          </div>
-          <p className="mt-2 text-foreground">{frontmatter.personality}</p>
+          <h3 className="mb-3 font-medium text-foreground">Related Characters</h3>
+          <RelatedNPCs characters={frontmatter.relatedCharacters} />
         </div>
       )}
 
@@ -194,11 +215,35 @@ export function NPCDetail() {
         </div>
       )}
 
-      {/* Related Characters */}
-      {frontmatter.relatedCharacters && frontmatter.relatedCharacters.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="mb-3 font-medium text-foreground">Related Characters</h3>
-          <RelatedNPCs npcIds={frontmatter.relatedCharacters} />
+      {/* Goals, Personality, Appearance - Three columns */}
+      {(frontmatter.goals || frontmatter.personality || frontmatter.appearance) && (
+        <div className="grid gap-4 md:grid-cols-3">
+          {frontmatter.goals && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Goals
+              </h4>
+              <p className="mt-2 text-sm text-foreground">{frontmatter.goals}</p>
+            </div>
+          )}
+
+          {frontmatter.personality && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Personality
+              </h4>
+              <p className="mt-2 text-sm text-foreground">{frontmatter.personality}</p>
+            </div>
+          )}
+
+          {frontmatter.appearance && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Appearance
+              </h4>
+              <p className="mt-2 text-sm text-foreground">{frontmatter.appearance}</p>
+            </div>
+          )}
         </div>
       )}
 
