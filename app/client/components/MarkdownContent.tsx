@@ -6,31 +6,49 @@ interface MarkdownContentProps {
   className?: string;
 }
 
-// Parse [[module:id]] links and render them as React Router Links
-function parseLinks(text: string): (string | JSX.Element)[] {
-  const linkRegex = /\[\[(\w+):([^\]]+)\]\]/g;
+// Apply inline formatting (bold, italic, inline code) to text
+function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.Element)[] {
   const parts: (string | JSX.Element)[] = [];
+
+  // Combined regex for inline formatting
+  // Order matters: check bold (**) before italic (*), and bold italic (***) first
+  const inlineRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+
   let lastIndex = 0;
   let match;
+  let matchCount = 0;
 
-  while ((match = linkRegex.exec(text)) !== null) {
+  while ((match = inlineRegex.exec(text)) !== null) {
     // Add text before the match
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    const [fullMatch, module, id] = match;
-    const displayName = id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const fullMatch = match[1];
+    matchCount++;
+    const key = `${keyPrefix}-${matchCount}`;
 
-    parts.push(
-      <Link
-        key={`${module}-${id}-${match.index}`}
-        to={`/modules/${module}/${id}`}
-        className="text-primary hover:underline"
-      >
-        {displayName}
-      </Link>
-    );
+    if (match[2]) {
+      // Bold italic (***)
+      parts.push(
+        <strong key={key} className="font-bold italic">{match[2]}</strong>
+      );
+    } else if (match[3]) {
+      // Bold (**)
+      parts.push(
+        <strong key={key} className="font-bold">{match[3]}</strong>
+      );
+    } else if (match[4]) {
+      // Italic (*)
+      parts.push(
+        <em key={key} className="italic">{match[4]}</em>
+      );
+    } else if (match[5]) {
+      // Inline code (`)
+      parts.push(
+        <code key={key} className="rounded bg-secondary px-1.5 py-0.5 font-mono text-sm">{match[5]}</code>
+      );
+    }
 
     lastIndex = match.index + fullMatch.length;
   }
@@ -41,6 +59,52 @@ function parseLinks(text: string): (string | JSX.Element)[] {
   }
 
   return parts.length > 0 ? parts : [text];
+}
+
+// Parse [[module:id]] links and apply inline formatting
+function parseLinks(text: string, keyPrefix: string = 'link'): (string | JSX.Element)[] {
+  const linkRegex = /\[\[(\w+):([^\]]+)\]\]/g;
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+  let linkCount = 0;
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    // Add text before the match (with inline formatting)
+    if (match.index > lastIndex) {
+      const textBefore = text.slice(lastIndex, match.index);
+      parts.push(...applyInlineFormatting(textBefore, `${keyPrefix}-pre-${linkCount}`));
+    }
+
+    const [fullMatch, module, id] = match;
+    const displayName = id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    linkCount++;
+
+    parts.push(
+      <Link
+        key={`${keyPrefix}-${module}-${id}-${linkCount}`}
+        to={`/modules/${module}/${id}`}
+        className="text-primary hover:underline"
+      >
+        {displayName}
+      </Link>
+    );
+
+    lastIndex = match.index + fullMatch.length;
+  }
+
+  // Add remaining text (with inline formatting)
+  if (lastIndex < text.length) {
+    const textAfter = text.slice(lastIndex);
+    parts.push(...applyInlineFormatting(textAfter, `${keyPrefix}-post`));
+  }
+
+  // If no links were found, still apply inline formatting
+  if (parts.length === 0) {
+    return applyInlineFormatting(text, keyPrefix);
+  }
+
+  return parts;
 }
 
 // Simple markdown-to-JSX converter
@@ -55,14 +119,15 @@ function renderMarkdown(content: string): JSX.Element[] {
   const flushList = () => {
     if (listItems.length > 0 && listType) {
       const ListTag = listType;
+      const listKey = elements.length;
       elements.push(
         <ListTag
-          key={elements.length}
+          key={listKey}
           className={listType === 'ul' ? 'list-disc pl-6 my-2' : 'list-decimal pl-6 my-2'}
         >
           {listItems.map((item, i) => (
             <li key={i} className="text-foreground">
-              {parseLinks(item)}
+              {parseLinks(item, `list-${listKey}-${i}`)}
             </li>
           ))}
         </ListTag>
@@ -109,27 +174,30 @@ function renderMarkdown(content: string): JSX.Element[] {
     // Headers
     if (line.startsWith('# ')) {
       flushList();
+      const key = elements.length;
       elements.push(
-        <h1 key={elements.length} className="mb-4 mt-6 text-2xl font-bold text-foreground first:mt-0">
-          {parseLinks(line.slice(2))}
+        <h1 key={key} className="mb-4 mt-6 text-2xl font-bold text-foreground first:mt-0">
+          {parseLinks(line.slice(2), `h1-${key}`)}
         </h1>
       );
       continue;
     }
     if (line.startsWith('## ')) {
       flushList();
+      const key = elements.length;
       elements.push(
-        <h2 key={elements.length} className="mb-3 mt-5 text-xl font-semibold text-foreground">
-          {parseLinks(line.slice(3))}
+        <h2 key={key} className="mb-3 mt-5 text-xl font-semibold text-foreground">
+          {parseLinks(line.slice(3), `h2-${key}`)}
         </h2>
       );
       continue;
     }
     if (line.startsWith('### ')) {
       flushList();
+      const key = elements.length;
       elements.push(
-        <h3 key={elements.length} className="mb-2 mt-4 text-lg font-semibold text-foreground">
-          {parseLinks(line.slice(4))}
+        <h3 key={key} className="mb-2 mt-4 text-lg font-semibold text-foreground">
+          {parseLinks(line.slice(4), `h3-${key}`)}
         </h3>
       );
       continue;
@@ -165,12 +233,13 @@ function renderMarkdown(content: string): JSX.Element[] {
     // Blockquote
     if (line.startsWith('> ')) {
       flushList();
+      const key = elements.length;
       elements.push(
         <blockquote
-          key={elements.length}
+          key={key}
           className="my-4 border-l-4 border-primary/50 pl-4 italic text-muted-foreground"
         >
-          {parseLinks(line.slice(2))}
+          {parseLinks(line.slice(2), `quote-${key}`)}
         </blockquote>
       );
       continue;
@@ -178,13 +247,11 @@ function renderMarkdown(content: string): JSX.Element[] {
 
     // Regular paragraph
     flushList();
-
-    // Apply inline formatting
-    let formattedLine = line;
+    const key = elements.length;
 
     elements.push(
-      <p key={elements.length} className="my-2 text-foreground">
-        {parseLinks(formattedLine)}
+      <p key={key} className="my-2 text-foreground">
+        {parseLinks(line, `p-${key}`)}
       </p>
     );
   }
