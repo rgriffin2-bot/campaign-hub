@@ -5,6 +5,7 @@ import { DynamicIcon } from '../components/ui/DynamicIcon';
 // Import module views
 import { LoreList, LoreDetail, LoreEdit } from '../modules/lore';
 import { NPCList, NPCDetail, NPCEdit, NPCGenerate } from '../modules/npcs';
+import { LocationList, LocationDetail, LocationEdit } from '../modules/locations';
 
 // Module view registry - maps moduleId to view components
 const moduleViews: Record<
@@ -26,6 +27,11 @@ const moduleViews: Record<
     detail: NPCDetail,
     edit: NPCEdit,
     generate: NPCGenerate,
+  },
+  locations: {
+    list: LocationList,
+    detail: LocationDetail,
+    edit: LocationEdit,
   },
 };
 

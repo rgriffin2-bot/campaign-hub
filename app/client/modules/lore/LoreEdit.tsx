@@ -6,12 +6,14 @@ import { ImageUpload } from '../../components/ImageUpload';
 import { loreTypes, type LoreType, type LoreFrontmatter } from '@shared/schemas/lore';
 
 const typeLabels: Record<LoreType, string> = {
-  world: 'World',
-  faction: 'Faction',
-  history: 'History',
-  religion: 'Religion',
-  magic: 'Magic',
-  other: 'Other',
+  'cosmology-and-origins': 'Cosmology and Origins',
+  'makers': 'Makers',
+  'stewards': 'Stewards',
+  'human-polities-and-power': 'Human Polities and Power',
+  'faiths-and-ideologies': 'Faiths and Ideologies',
+  'the-breath-and-paraphysics': 'The Breath and Paraphysics',
+  'relics-and-artifacts': 'Relics and Artifacts',
+  'life-in-haven': 'Life in Haven',
 };
 
 export function LoreEdit() {
@@ -23,7 +25,7 @@ export function LoreEdit() {
   const { data: existingLore, isLoading } = get(isNew ? '' : fileId || '');
 
   const [name, setName] = useState('');
-  const [type, setType] = useState<LoreType>('world');
+  const [type, setType] = useState<LoreType>('life-in-haven');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
   const [image, setImage] = useState<string | undefined>();

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { User, Eye, EyeOff } from 'lucide-react';
+import { User, Eye, EyeOff, MapPin } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { useFiles } from '../../../hooks/useFiles';
 import type { FileMetadata } from '@shared/types/file';
@@ -21,6 +21,8 @@ export function NPCCard({ npc }: NPCCardProps) {
     ? `/api/campaigns/${campaign.id}/assets/${portrait.replace('assets/', '')}`
     : null;
 
+  const location = npc.location as string | undefined;
+
   const handleToggleVisibility = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -30,7 +32,7 @@ export function NPCCard({ npc }: NPCCardProps) {
   return (
     <Link
       to={`/modules/npcs/${npc.id}`}
-      className={`group relative flex flex-col rounded-lg border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent ${
+      className={`group relative rounded-lg border bg-card transition-colors hover:border-primary/50 hover:bg-accent ${
         isHidden ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'
       }`}
     >
@@ -42,8 +44,9 @@ export function NPCCard({ npc }: NPCCardProps) {
         </div>
       )}
 
-      <div className="flex items-start gap-3">
-        <div className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-full ${isHidden ? 'opacity-60' : ''} bg-primary/10`}>
+      <div className="flex items-start gap-3 p-4">
+        {/* Portrait */}
+        <div className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-full ${isHidden ? 'opacity-60' : ''} bg-primary/10`}>
           {portraitUrl ? (
             <div
               className="absolute h-full w-full"
@@ -60,10 +63,11 @@ export function NPCCard({ npc }: NPCCardProps) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-primary">
-              <User className="h-5 w-5" />
+              <User className="h-7 w-7" />
             </div>
           )}
         </div>
+
         <div className="min-w-0 flex-1">
           <h3 className={`truncate font-medium group-hover:text-primary ${isHidden ? 'text-muted-foreground' : 'text-foreground'}`}>
             {npc.name}
@@ -73,6 +77,12 @@ export function NPCCard({ npc }: NPCCardProps) {
               {String(npc.occupation)}
             </p>
           ) : null}
+          {location && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" />
+              <span className="truncate">{location}</span>
+            </div>
+          )}
         </div>
 
         {/* Visibility toggle button */}
@@ -88,30 +98,6 @@ export function NPCCard({ npc }: NPCCardProps) {
           {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
-
-      {npc.personality ? (
-        <p className={`mt-3 line-clamp-2 text-sm ${isHidden ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-          {String(npc.personality)}
-        </p>
-      ) : null}
-
-      {(npc.tags as string[] | undefined)?.length ? (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {(npc.tags as string[]).slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
-          {(npc.tags as string[]).length > 3 && (
-            <span className="text-xs text-muted-foreground">
-              +{(npc.tags as string[]).length - 3}
-            </span>
-          )}
-        </div>
-      ) : null}
     </Link>
   );
 }

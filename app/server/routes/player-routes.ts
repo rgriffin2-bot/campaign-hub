@@ -1,11 +1,20 @@
 import { Router } from 'express';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { fileStore } from '../core/file-store.js';
 import { relationshipIndex } from '../core/relationship-index.js';
 import { campaignManager } from '../core/campaign-manager.js';
 import { moduleRegistry } from '../modules/registry.js';
 import { filterDmOnlyContent, filterDmOnlyMetadataList, isHiddenFromPlayers } from '../core/content-filter.js';
+import { config } from '../config.js';
+import { generateStarSystemMap } from '../modules/locations/map-generator.js';
 
 const router = Router();
+
+// Helper to filter out system files (IDs starting with _)
+function filterSystemFiles<T extends { id: string }>(files: T[]): T[] {
+  return files.filter((f) => !f.id.startsWith('_'));
+}
 
 // =============================================================================
 // Player Campaign & Module Routes (Read-Only)
@@ -32,7 +41,9 @@ router.get('/campaigns/:campaignId/files/:moduleId', async (req, res) => {
   try {
     const { campaignId, moduleId } = req.params;
     const files = await fileStore.list(campaignId, moduleId);
-    const filtered = filterDmOnlyMetadataList(files);
+    // Filter out system files (like _map-config) and DM-only content
+    const nonSystemFiles = filterSystemFiles(files);
+    const filtered = filterDmOnlyMetadataList(nonSystemFiles);
     res.json({ success: true, data: filtered });
   } catch (error) {
     console.error('Error listing files for player:', error);
@@ -108,7 +119,9 @@ router.get('/campaigns/:campaignId/search', async (req, res) => {
     }> = [];
 
     for (const moduleId of modules) {
-      const files = await fileStore.list(campaignId, moduleId.trim());
+      const allFiles = await fileStore.list(campaignId, moduleId.trim());
+      // Filter out system files
+      const files = filterSystemFiles(allFiles);
 
       for (const file of files) {
         // Skip hidden items
@@ -154,6 +167,58 @@ router.get('/campaigns/:campaignId/search', async (req, res) => {
   } catch (error) {
     console.error('Error searching for player:', error);
     res.status(500).json({ success: false, error: 'Search failed' });
+  }
+});
+
+// =============================================================================
+// Player Map Route (Read-Only, Filtered)
+// =============================================================================
+
+// Get the generated map HTML for players (hidden celestial bodies filtered)
+router.get('/campaigns/:campaignId/map', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const campaignPath = path.join(config.campaignsDir, campaignId);
+    const playerMapPath = path.join(campaignPath, 'player-system-map.html');
+
+    // Try to read existing player map
+    try {
+      const html = await fs.readFile(playerMapPath, 'utf-8');
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch {
+      // Player map doesn't exist, generate it from filtered locations
+      const allLocations = await fileStore.list(campaignId, 'locations');
+
+      // Filter out system files and hidden locations
+      const nonSystemLocations = filterSystemFiles(allLocations);
+      const visibleLocations = nonSystemLocations.filter(
+        (loc) => !isHiddenFromPlayers(loc)
+      );
+
+      if (visibleLocations.length === 0) {
+        res.status(404).json({ success: false, error: 'No visible map data' });
+        return;
+      }
+
+      // Generate player-specific map
+      const result = await generateStarSystemMap({
+        campaignPath,
+        locations: visibleLocations,
+        outputPath: playerMapPath,
+      });
+
+      if (result.success) {
+        const html = await fs.readFile(playerMapPath, 'utf-8');
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+      } else {
+        res.status(404).json({ success: false, error: result.error || 'Map not found' });
+      }
+    }
+  } catch (error) {
+    console.error('Error reading player map:', error);
+    res.status(500).json({ success: false, error: 'Failed to read map' });
   }
 });
 

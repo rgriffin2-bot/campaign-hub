@@ -5,9 +5,10 @@ import { useCampaign } from '../core/providers/CampaignProvider';
 interface ImageUploadProps {
   currentImage?: string;
   entityId: string;
-  uploadEndpoint: 'lore-images'; // Could extend for other entity types
+  uploadEndpoint: 'lore-images' | 'location-images';
   onUploadComplete: (path: string) => void;
   onRemove?: () => void;
+  autoSave?: (newPath: string) => Promise<void>; // Optional: trigger a save after upload with the new path
 }
 
 export function ImageUpload({
@@ -16,6 +17,7 @@ export function ImageUpload({
   uploadEndpoint,
   onUploadComplete,
   onRemove,
+  autoSave,
 }: ImageUploadProps) {
   const { campaign } = useCampaign();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -75,9 +77,14 @@ export function ImageUpload({
         throw new Error(data.error || 'Upload failed');
       }
 
-      onUploadComplete(data.data.path);
+      const newPath = data.data.path;
+      onUploadComplete(newPath);
       setSelectedFile(null);
-      // Keep showing the preview until the page refreshes
+
+      // Auto-save if callback provided, passing the new path
+      if (autoSave) {
+        await autoSave(newPath);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {

@@ -7,12 +7,14 @@ import { CopyableId } from '../../components/CopyableId';
 import type { LoreType, LoreFrontmatter } from '@shared/schemas/lore';
 
 const typeLabels: Record<LoreType, string> = {
-  world: 'World',
-  faction: 'Faction',
-  history: 'History',
-  religion: 'Religion',
-  magic: 'Magic',
-  other: 'Other',
+  'cosmology-and-origins': 'Cosmology and Origins',
+  'makers': 'Makers',
+  'stewards': 'Stewards',
+  'human-polities-and-power': 'Human Polities and Power',
+  'faiths-and-ideologies': 'Faiths and Ideologies',
+  'the-breath-and-paraphysics': 'The Breath and Paraphysics',
+  'relics-and-artifacts': 'Relics and Artifacts',
+  'life-in-haven': 'Life in Haven',
 };
 
 export function LoreDetail() {

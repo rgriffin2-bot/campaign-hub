@@ -1,11 +1,104 @@
 import { Link } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, createContext, useContext } from 'react';
+import { useFiles } from '../hooks/useFiles';
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
   /** Base path for [[module:id]] links. Defaults to '/modules' */
   linkBasePath?: string;
+}
+
+// Context to hold valid IDs for each module
+interface LinkValidationContextValue {
+  validIds: Map<string, Set<string>>; // module -> set of valid IDs
+  isLoading: boolean;
+}
+
+const LinkValidationContext = createContext<LinkValidationContextValue>({
+  validIds: new Map(),
+  isLoading: true,
+});
+
+// Provider that loads all module data for link validation
+function LinkValidationProvider({ children }: { children: React.ReactNode }) {
+  const { list: npcList } = useFiles('npcs');
+  const { list: loreList } = useFiles('lore');
+
+  const validIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+
+    // NPCs - support both 'npcs' and 'npc' module names
+    const npcIds = new Set((npcList.data || []).map((item) => item.id));
+    map.set('npcs', npcIds);
+    map.set('npc', npcIds); // Alias
+
+    // Lore
+    const loreIds = new Set((loreList.data || []).map((item) => item.id));
+    map.set('lore', loreIds);
+
+    return map;
+  }, [npcList.data, loreList.data]);
+
+  const isLoading = npcList.isLoading || loreList.isLoading;
+
+  return (
+    <LinkValidationContext.Provider value={{ validIds, isLoading }}>
+      {children}
+    </LinkValidationContext.Provider>
+  );
+}
+
+// Hook to check if a link target exists
+function useLinkExists(module: string, id: string): boolean | null {
+  const { validIds, isLoading } = useContext(LinkValidationContext);
+
+  if (isLoading) return null; // Still loading
+
+  const moduleIds = validIds.get(module);
+  if (!moduleIds) return null; // Unknown module
+
+  return moduleIds.has(id);
+}
+
+// Validated link component
+function ValidatedLink({
+  module,
+  id,
+  displayName,
+  linkBasePath,
+  linkKey,
+}: {
+  module: string;
+  id: string;
+  displayName: string;
+  linkBasePath: string;
+  linkKey: string;
+}) {
+  const exists = useLinkExists(module, id);
+
+  // If we can't determine validity or entry doesn't exist, show as deleted
+  if (exists === false) {
+    return (
+      <span
+        key={linkKey}
+        className="text-muted-foreground line-through"
+        title="Entry no longer exists"
+      >
+        {displayName}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      key={linkKey}
+      to={`${linkBasePath}/${module}/${id}`}
+      className="text-primary hover:underline"
+    >
+      {displayName}
+    </Link>
+  );
 }
 
 // Apply inline formatting (bold, italic, inline code) to text
@@ -63,10 +156,27 @@ function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.E
   return parts.length > 0 ? parts : [text];
 }
 
+// Parsed link info for deferred rendering
+interface ParsedLink {
+  type: 'link';
+  module: string;
+  id: string;
+  displayName: string;
+  key: string;
+}
+
+interface ParsedText {
+  type: 'text';
+  content: (string | JSX.Element)[];
+}
+
+type ParsedContent = ParsedLink | ParsedText;
+
 // Parse [[module:id]] links and apply inline formatting
-function parseLinks(text: string, keyPrefix: string = 'link', linkBasePath: string = '/modules'): (string | JSX.Element)[] {
+// Returns parsed content that can be rendered with validation
+function parseLinksToContent(text: string, keyPrefix: string = 'link'): ParsedContent[] {
   const linkRegex = /\[\[(\w+):([^\]]+)\]\]/g;
-  const parts: (string | JSX.Element)[] = [];
+  const parts: ParsedContent[] = [];
   let lastIndex = 0;
   let match;
   let linkCount = 0;
@@ -75,22 +185,23 @@ function parseLinks(text: string, keyPrefix: string = 'link', linkBasePath: stri
     // Add text before the match (with inline formatting)
     if (match.index > lastIndex) {
       const textBefore = text.slice(lastIndex, match.index);
-      parts.push(...applyInlineFormatting(textBefore, `${keyPrefix}-pre-${linkCount}`));
+      parts.push({
+        type: 'text',
+        content: applyInlineFormatting(textBefore, `${keyPrefix}-pre-${linkCount}`),
+      });
     }
 
     const [fullMatch, module, id] = match;
     const displayName = id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     linkCount++;
 
-    parts.push(
-      <Link
-        key={`${keyPrefix}-${module}-${id}-${linkCount}`}
-        to={`${linkBasePath}/${module}/${id}`}
-        className="text-primary hover:underline"
-      >
-        {displayName}
-      </Link>
-    );
+    parts.push({
+      type: 'link',
+      module,
+      id,
+      displayName,
+      key: `${keyPrefix}-${module}-${id}-${linkCount}`,
+    });
 
     lastIndex = match.index + fullMatch.length;
   }
@@ -98,24 +209,59 @@ function parseLinks(text: string, keyPrefix: string = 'link', linkBasePath: stri
   // Add remaining text (with inline formatting)
   if (lastIndex < text.length) {
     const textAfter = text.slice(lastIndex);
-    parts.push(...applyInlineFormatting(textAfter, `${keyPrefix}-post`));
+    parts.push({
+      type: 'text',
+      content: applyInlineFormatting(textAfter, `${keyPrefix}-post`),
+    });
   }
 
-  // If no links were found, still apply inline formatting
+  // If no content was parsed, still apply inline formatting
   if (parts.length === 0) {
-    return applyInlineFormatting(text, keyPrefix);
+    return [{
+      type: 'text',
+      content: applyInlineFormatting(text, keyPrefix),
+    }];
   }
 
   return parts;
 }
 
+// Render parsed content with validated links
+function RenderParsedContent({
+  content,
+  linkBasePath
+}: {
+  content: ParsedContent[];
+  linkBasePath: string;
+}): JSX.Element {
+  return (
+    <>
+      {content.map((part, i) => {
+        if (part.type === 'text') {
+          return <span key={i}>{part.content}</span>;
+        }
+        return (
+          <ValidatedLink
+            key={part.key}
+            module={part.module}
+            id={part.id}
+            displayName={part.displayName}
+            linkBasePath={linkBasePath}
+            linkKey={part.key}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 // Simple markdown-to-JSX converter
-function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX.Element[] {
+function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBasePath: string }) {
   const lines = content.split('\n');
   const elements: JSX.Element[] = [];
   let inCodeBlock = false;
   let codeBlockContent: string[] = [];
-  let listItems: string[] = [];
+  let listItems: ParsedContent[][] = [];
   let listType: 'ul' | 'ol' | null = null;
 
   const flushList = () => {
@@ -129,7 +275,7 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
         >
           {listItems.map((item, i) => (
             <li key={i} className="text-foreground">
-              {parseLinks(item, `list-${listKey}-${i}`, linkBasePath)}
+              <RenderParsedContent content={item} linkBasePath={linkBasePath} />
             </li>
           ))}
         </ListTag>
@@ -179,7 +325,10 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
       const key = elements.length;
       elements.push(
         <h1 key={key} className="mb-4 mt-6 text-2xl font-bold text-foreground first:mt-0">
-          {parseLinks(line.slice(2), `h1-${key}`, linkBasePath)}
+          <RenderParsedContent
+            content={parseLinksToContent(line.slice(2), `h1-${key}`)}
+            linkBasePath={linkBasePath}
+          />
         </h1>
       );
       continue;
@@ -189,7 +338,10 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
       const key = elements.length;
       elements.push(
         <h2 key={key} className="mb-3 mt-5 text-xl font-semibold text-foreground">
-          {parseLinks(line.slice(3), `h2-${key}`, linkBasePath)}
+          <RenderParsedContent
+            content={parseLinksToContent(line.slice(3), `h2-${key}`)}
+            linkBasePath={linkBasePath}
+          />
         </h2>
       );
       continue;
@@ -199,7 +351,10 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
       const key = elements.length;
       elements.push(
         <h3 key={key} className="mb-2 mt-4 text-lg font-semibold text-foreground">
-          {parseLinks(line.slice(4), `h3-${key}`, linkBasePath)}
+          <RenderParsedContent
+            content={parseLinksToContent(line.slice(4), `h3-${key}`)}
+            linkBasePath={linkBasePath}
+          />
         </h3>
       );
       continue;
@@ -218,7 +373,7 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
         flushList();
         listType = 'ul';
       }
-      listItems.push(line.replace(/^[-*+]\s/, ''));
+      listItems.push(parseLinksToContent(line.replace(/^[-*+]\s/, ''), `list-${elements.length}-${listItems.length}`));
       continue;
     }
 
@@ -228,7 +383,7 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
         flushList();
         listType = 'ol';
       }
-      listItems.push(line.replace(/^\d+\.\s/, ''));
+      listItems.push(parseLinksToContent(line.replace(/^\d+\.\s/, ''), `list-${elements.length}-${listItems.length}`));
       continue;
     }
 
@@ -241,7 +396,10 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
           key={key}
           className="my-4 border-l-4 border-primary/50 pl-4 italic text-muted-foreground"
         >
-          {parseLinks(line.slice(2), `quote-${key}`, linkBasePath)}
+          <RenderParsedContent
+            content={parseLinksToContent(line.slice(2), `quote-${key}`)}
+            linkBasePath={linkBasePath}
+          />
         </blockquote>
       );
       continue;
@@ -253,18 +411,25 @@ function renderMarkdown(content: string, linkBasePath: string = '/modules'): JSX
 
     elements.push(
       <p key={key} className="my-2 text-foreground">
-        {parseLinks(line, `p-${key}`, linkBasePath)}
+        <RenderParsedContent
+          content={parseLinksToContent(line, `p-${key}`)}
+          linkBasePath={linkBasePath}
+        />
       </p>
     );
   }
 
   flushList();
 
-  return elements;
+  return <>{elements}</>;
 }
 
 export function MarkdownContent({ content, className = '', linkBasePath = '/modules' }: MarkdownContentProps) {
-  const rendered = useMemo(() => renderMarkdown(content, linkBasePath), [content, linkBasePath]);
-
-  return <div className={`prose prose-invert max-w-none ${className}`}>{rendered}</div>;
+  return (
+    <LinkValidationProvider>
+      <div className={`prose prose-invert max-w-none ${className}`}>
+        <MarkdownRenderer content={content} linkBasePath={linkBasePath} />
+      </div>
+    </LinkValidationProvider>
+  );
 }
