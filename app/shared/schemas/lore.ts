@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
 export const loreTypes = [
-  'world',
-  'faction',
-  'history',
-  'religion',
-  'magic',
-  'other',
+  'cosmology-and-origins',
+  'makers',
+  'stewards',
+  'human-polities-and-power',
+  'faiths-and-ideologies',
+  'the-breath-and-paraphysics',
+  'relics-and-artifacts',
+  'life-in-haven',
 ] as const;
 
 export type LoreType = (typeof loreTypes)[number];

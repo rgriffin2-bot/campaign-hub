@@ -4,19 +4,22 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import * as fs from 'fs/promises';
 import { config } from './config.js';
 import { campaignManager } from './core/campaign-manager.js';
 import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
+import { generateStarSystemMap } from './modules/locations/map-generator.js';
 
 // Import modules (registers them automatically)
 import './modules/lore/index.js';
 import './modules/npcs/index.js';
+import './modules/locations/index.js';
 
 const app = express();
 
@@ -289,7 +292,9 @@ app.get('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (req
     }
 
     const files = await fileStore.list(campaignId, module.dataFolder);
-    res.json({ success: true, data: files });
+    // Filter out system files (IDs starting with _) like _map-config
+    const filteredFiles = files.filter((f) => !f.id.startsWith('_'));
+    res.json({ success: true, data: filteredFiles });
   } catch (error) {
     console.error('Error listing files:', error);
     res.status(500).json({ success: false, error: 'Failed to list files' });
@@ -321,6 +326,19 @@ app.get('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, as
   }
 });
 
+// Helper to invalidate cached player map when locations change
+async function invalidatePlayerMapCache(campaignId: string, moduleId: string) {
+  if (moduleId === 'locations') {
+    const campaignPath = path.join(config.campaignsDir, campaignId);
+    const playerMapPath = path.join(campaignPath, 'player-system-map.html');
+    try {
+      await fs.unlink(playerMapPath);
+    } catch {
+      // Player map doesn't exist yet, that's fine
+    }
+  }
+}
+
 // Create a file
 app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (req, res) => {
   try {
@@ -333,6 +351,7 @@ app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (re
     }
 
     const file = await fileStore.create(campaignId, module.dataFolder, req.body);
+    await invalidatePlayerMapCache(campaignId, moduleId);
     res.status(201).json({ success: true, data: file });
   } catch (error) {
     console.error('Error creating file:', error);
@@ -358,6 +377,7 @@ app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, as
       return;
     }
 
+    await invalidatePlayerMapCache(campaignId, moduleId);
     res.json({ success: true, data: file });
   } catch (error) {
     console.error('Error updating file:', error);
@@ -383,6 +403,7 @@ app.delete('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm,
       return;
     }
 
+    await invalidatePlayerMapCache(campaignId, moduleId);
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting file:', error);
@@ -479,11 +500,128 @@ app.post(
   }
 );
 
+// Upload an image for a location
+app.post(
+  '/api/campaigns/:campaignId/location-images/:locationId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, locationId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveLocationImage(
+        campaignId,
+        locationId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading location image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload a map image for a celestial body (used on star system map)
+app.post(
+  '/api/campaigns/:campaignId/map-images/:locationId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, locationId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveMapImage(
+        campaignId,
+        locationId,
+        req.file.buffer,
+        req.file.originalname
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading map image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
 // Serve static assets from campaigns directory
 app.use('/api/campaigns/:campaignId/assets', (req, res, next) => {
   const { campaignId } = req.params;
   const assetsPath = path.join(config.campaignsDir, campaignId, 'assets');
   express.static(assetsPath)(req, res, next);
+});
+
+// =============================================================================
+// Map Generation Routes (DM Only)
+// =============================================================================
+
+// Generate the star system map for a campaign
+app.post('/api/campaigns/:campaignId/map/generate', auth.requireDm, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const locations = await fileStore.list(campaignId, 'locations');
+    const campaignPath = path.join(config.campaignsDir, campaignId);
+    const outputPath = path.join(campaignPath, 'system-map.html');
+
+    // Delete the cached player map so it regenerates on next player access
+    const playerMapPath = path.join(campaignPath, 'player-system-map.html');
+    try {
+      await fs.unlink(playerMapPath);
+    } catch {
+      // Player map doesn't exist yet, that's fine
+    }
+
+    const result = await generateStarSystemMap({
+      campaignPath,
+      locations,
+      outputPath,
+    });
+
+    if (result.success) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error('Error generating map:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate map' });
+  }
+});
+
+// Get the generated map HTML (DM version)
+app.get('/api/campaigns/:campaignId/map', auth.requireDm, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const campaignPath = path.join(config.campaignsDir, campaignId);
+    const mapPath = path.join(campaignPath, 'system-map.html');
+
+    try {
+      const html = await fs.readFile(mapPath, 'utf-8');
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch {
+      res.status(404).json({ success: false, error: 'Map not found' });
+    }
+  } catch (error) {
+    console.error('Error reading map:', error);
+    res.status(500).json({ success: false, error: 'Failed to read map' });
+  }
 });
 
 // =============================================================================

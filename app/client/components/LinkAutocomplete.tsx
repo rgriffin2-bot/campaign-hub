@@ -3,7 +3,7 @@ import { useFiles } from '../hooks/useFiles';
 import type { FileMetadata } from '@shared/types/file';
 
 interface LinkAutocompleteProps {
-  moduleType: 'npcs' | 'lore';
+  moduleType: 'npcs' | 'lore' | 'locations';
   value: string;
   onChange: (value: string) => void;
   onSelect: (id: string, name: string) => void;

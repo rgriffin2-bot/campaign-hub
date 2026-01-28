@@ -16,6 +16,8 @@ import { PlayerNPCList } from './player/PlayerNPCList';
 import { PlayerNPCDetail } from './player/PlayerNPCDetail';
 import { PlayerLoreList } from './player/PlayerLoreList';
 import { PlayerLoreDetail } from './player/PlayerLoreDetail';
+import { PlayerLocationList } from './player/PlayerLocationList';
+import { PlayerLocationDetail } from './player/PlayerLocationDetail';
 
 // Auth guard component
 function RequireAuth({ children, requiredRole }: { children: React.ReactNode; requiredRole?: 'dm' | 'player' }) {
@@ -83,6 +85,8 @@ function AppRoutes() {
           <Route path="modules/npcs/:fileId" element={<PlayerNPCDetail />} />
           <Route path="modules/lore" element={<PlayerLoreList />} />
           <Route path="modules/lore/:fileId" element={<PlayerLoreDetail />} />
+          <Route path="modules/locations" element={<PlayerLocationList />} />
+          <Route path="modules/locations/:fileId" element={<PlayerLocationDetail />} />
         </Route>
       </Routes>
     </ModeProvider>

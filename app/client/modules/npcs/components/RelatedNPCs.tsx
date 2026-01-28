@@ -42,12 +42,18 @@ export function RelatedNPCs({ characters }: RelatedNPCsProps) {
     <ul className="space-y-2">
       {relatedData.map((char) => (
         <li key={char.id} className="flex items-start gap-2">
-          <Link
-            to={`/modules/npcs/${char.id}`}
-            className="text-primary hover:underline font-medium shrink-0"
-          >
-            {char.name}
-          </Link>
+          {char.found ? (
+            <Link
+              to={`/modules/npcs/${char.id}`}
+              className="text-primary hover:underline font-medium shrink-0"
+            >
+              {char.name}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground font-medium shrink-0 line-through" title="Character no longer exists">
+              {char.name}
+            </span>
+          )}
           {char.description && (
             <span className="text-muted-foreground">
               — {char.description}

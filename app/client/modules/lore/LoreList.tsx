@@ -1,26 +1,30 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, BookOpen, Users, Clock, Sparkles, Globe, MoreHorizontal, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, BookOpen, Globe, Hammer, Shield, Crown, Heart, Wind, Gem, Home, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import type { LoreType } from '@shared/schemas/lore';
 import type { FileMetadata } from '@shared/types/file';
 
 const typeIcons: Record<LoreType, React.ReactNode> = {
-  world: <Globe className="h-4 w-4" />,
-  faction: <Users className="h-4 w-4" />,
-  history: <Clock className="h-4 w-4" />,
-  religion: <Sparkles className="h-4 w-4" />,
-  magic: <Sparkles className="h-4 w-4" />,
-  other: <MoreHorizontal className="h-4 w-4" />,
+  'cosmology-and-origins': <Globe className="h-4 w-4" />,
+  'makers': <Hammer className="h-4 w-4" />,
+  'stewards': <Shield className="h-4 w-4" />,
+  'human-polities-and-power': <Crown className="h-4 w-4" />,
+  'faiths-and-ideologies': <Heart className="h-4 w-4" />,
+  'the-breath-and-paraphysics': <Wind className="h-4 w-4" />,
+  'relics-and-artifacts': <Gem className="h-4 w-4" />,
+  'life-in-haven': <Home className="h-4 w-4" />,
 };
 
 const typeLabels: Record<LoreType, string> = {
-  world: 'World',
-  faction: 'Faction',
-  history: 'History',
-  religion: 'Religion',
-  magic: 'Magic',
-  other: 'Other',
+  'cosmology-and-origins': 'Cosmology and Origins',
+  'makers': 'Makers',
+  'stewards': 'Stewards',
+  'human-polities-and-power': 'Human Polities and Power',
+  'faiths-and-ideologies': 'Faiths and Ideologies',
+  'the-breath-and-paraphysics': 'The Breath and Paraphysics',
+  'relics-and-artifacts': 'Relics and Artifacts',
+  'life-in-haven': 'Life in Haven',
 };
 
 function LoreCard({ item }: { item: FileMetadata }) {

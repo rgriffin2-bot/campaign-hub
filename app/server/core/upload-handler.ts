@@ -113,3 +113,103 @@ export async function deleteLoreImage(
     // Ignore if file doesn't exist
   }
 }
+
+// Ensure location images directory exists
+async function ensureLocationImageDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'locations');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSaveLocationImage(
+  campaignId: string,
+  locationId: string,
+  buffer: Buffer
+): Promise<string> {
+  const uploadDir = await ensureLocationImageDir(campaignId);
+  const filename = `${locationId}.jpg`;
+  const filepath = path.join(uploadDir, filename);
+
+  // Resize to landscape dimensions for location images
+  // Max width 1200px, height 600px, maintaining aspect ratio
+  await sharp(buffer)
+    .resize(1200, 600, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({ quality: 85 })
+    .toFile(filepath);
+
+  // Return relative path from campaign root
+  return `assets/locations/${filename}`;
+}
+
+export async function deleteLocationImage(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
+
+// Ensure map images directory exists
+async function ensureMapImageDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'map-images');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSaveMapImage(
+  campaignId: string,
+  locationId: string,
+  buffer: Buffer,
+  originalFilename: string
+): Promise<string> {
+  const uploadDir = await ensureMapImageDir(campaignId);
+
+  // Preserve original extension for transparency support (PNG, GIF)
+  const ext = path.extname(originalFilename).toLowerCase() || '.png';
+
+  // Get image metadata to determine processing
+  const metadata = await sharp(buffer).metadata();
+
+  // For GIFs, preserve the original file to keep animation
+  // Sharp doesn't handle animated GIFs well, so we save as-is
+  if (ext === '.gif' || metadata.format === 'gif') {
+    const gifFilename = `${locationId}.gif`;
+    const gifFilepath = path.join(uploadDir, gifFilename);
+    await fs.writeFile(gifFilepath, buffer);
+    return `assets/map-images/${gifFilename}`;
+  }
+
+  // For other formats, resize and convert to PNG
+  let sharpInstance = sharp(buffer).resize(200, 200, {
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
+
+  sharpInstance = sharpInstance.png({ quality: 90 });
+
+  const pngFilename = `${locationId}.png`;
+  const pngFilepath = path.join(uploadDir, pngFilename);
+  await sharpInstance.toFile(pngFilepath);
+
+  // Return relative path from campaign root
+  return `assets/map-images/${pngFilename}`;
+}
+
+export async function deleteMapImage(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
