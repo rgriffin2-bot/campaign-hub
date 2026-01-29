@@ -101,13 +101,14 @@ function ValidatedLink({
   );
 }
 
-// Apply inline formatting (bold, italic, inline code) to text
+// Apply inline formatting (bold, italic, inline code, line breaks) to text
 function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.Element)[] {
   const parts: (string | JSX.Element)[] = [];
 
   // Combined regex for inline formatting
   // Order matters: check bold (**) before italic (*), and bold italic (***) first
-  const inlineRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  // Also handles <br>, <br/>, and <br /> for line breaks
+  const inlineRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|<br\s*\/?>)/g;
 
   let lastIndex = 0;
   let match;
@@ -143,6 +144,9 @@ function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.E
       parts.push(
         <code key={key} className="rounded bg-secondary px-1.5 py-0.5 font-mono text-sm">{match[5]}</code>
       );
+    } else if (fullMatch.match(/^<br\s*\/?>$/)) {
+      // Line break (<br>, <br/>, <br />)
+      parts.push(<br key={key} />);
     }
 
     lastIndex = match.index + fullMatch.length;
@@ -263,6 +267,8 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
   let codeBlockContent: string[] = [];
   let listItems: ParsedContent[][] = [];
   let listType: 'ul' | 'ol' | null = null;
+  let tableRows: string[][] = [];
+  let tableHasHeader = false;
 
   const flushList = () => {
     if (listItems.length > 0 && listType) {
@@ -283,6 +289,83 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
       listItems = [];
       listType = null;
     }
+  };
+
+  const flushTable = () => {
+    if (tableRows.length > 0) {
+      const tableKey = elements.length;
+      const headerRow = tableHasHeader ? tableRows[0] : null;
+      const bodyRows = tableHasHeader ? tableRows.slice(1) : tableRows;
+
+      // Calculate equal column width based on number of columns
+      const numCols = headerRow?.length || bodyRows[0]?.length || 1;
+      const colWidth = `${100 / numCols}%`;
+
+      elements.push(
+        <div key={tableKey} className="my-4 overflow-x-auto">
+          <table className="w-full table-fixed border-collapse border border-border">
+            {headerRow && (
+              <thead>
+                <tr className="bg-secondary/50">
+                  {headerRow.map((cell, cellIdx) => (
+                    <th
+                      key={cellIdx}
+                      style={{ width: colWidth }}
+                      className="border border-border px-4 py-2 text-left font-semibold text-foreground"
+                    >
+                      <RenderParsedContent
+                        content={parseLinksToContent(cell.trim(), `th-${tableKey}-${cellIdx}`)}
+                        linkBasePath={linkBasePath}
+                      />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {bodyRows.map((row, rowIdx) => (
+                <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-card' : 'bg-secondary/20'}>
+                  {row.map((cell, cellIdx) => (
+                    <td
+                      key={cellIdx}
+                      style={{ width: colWidth }}
+                      className="border border-border px-4 py-2 text-foreground align-top"
+                    >
+                      <RenderParsedContent
+                        content={parseLinksToContent(cell.trim(), `td-${tableKey}-${rowIdx}-${cellIdx}`)}
+                        linkBasePath={linkBasePath}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      tableRows = [];
+      tableHasHeader = false;
+    }
+  };
+
+  // Check if a line is a table separator (e.g., | --- | --- |)
+  const isTableSeparator = (line: string): boolean => {
+    return /^\|[\s\-:|]+\|$/.test(line.trim());
+  };
+
+  // Parse a table row into cells
+  const parseTableRow = (line: string): string[] => {
+    // Remove leading/trailing pipes and split by pipe
+    const trimmed = line.trim();
+    const withoutPipes = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+    const withoutEndPipe = withoutPipes.endsWith('|') ? withoutPipes.slice(0, -1) : withoutPipes;
+    return withoutEndPipe.split('|');
+  };
+
+  // Check if a line looks like a table row
+  const isTableRow = (line: string): boolean => {
+    const trimmed = line.trim();
+    return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.includes('|');
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -311,6 +394,31 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
     if (inCodeBlock) {
       codeBlockContent.push(line);
       continue;
+    }
+
+    // Table rows
+    if (isTableRow(line)) {
+      // If this is a separator line, mark that we have a header
+      if (isTableSeparator(line)) {
+        if (tableRows.length === 1) {
+          tableHasHeader = true;
+        }
+        // Skip the separator line itself
+        continue;
+      }
+
+      // First table row, flush any pending list
+      if (tableRows.length === 0) {
+        flushList();
+      }
+
+      tableRows.push(parseTableRow(line));
+      continue;
+    }
+
+    // If we were in a table and hit a non-table line, flush the table
+    if (tableRows.length > 0) {
+      flushTable();
     }
 
     // Empty line
@@ -420,6 +528,7 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
   }
 
   flushList();
+  flushTable();
 
   return <>{elements}</>;
 }

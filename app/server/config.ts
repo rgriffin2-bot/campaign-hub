@@ -38,9 +38,10 @@ export const config = {
   // Security settings
   security: {
     // Rate limiting: max requests per window
+    // Increased from 100 to 1000 to support Live Play polling (every 3s = 300 req/15min per user)
     rateLimit: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+      maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
     },
     // Allowed origins for CORS (comma-separated, or * for all local)
     allowedOrigins: process.env.ALLOWED_ORIGINS,

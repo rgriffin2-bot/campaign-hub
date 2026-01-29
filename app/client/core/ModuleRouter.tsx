@@ -6,6 +6,9 @@ import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { LoreList, LoreDetail, LoreEdit } from '../modules/lore';
 import { NPCList, NPCDetail, NPCEdit, NPCGenerate } from '../modules/npcs';
 import { LocationList, LocationDetail, LocationEdit } from '../modules/locations';
+import { RulesList, RulesDetail, RulesEdit } from '../modules/rules';
+import { PlayerCharacterList, PlayerCharacterDetail, PlayerCharacterEdit } from '../modules/player-characters';
+import { LivePlayDashboard } from '../modules/live-play';
 
 // Module view registry - maps moduleId to view components
 const moduleViews: Record<
@@ -32,6 +35,20 @@ const moduleViews: Record<
     list: LocationList,
     detail: LocationDetail,
     edit: LocationEdit,
+  },
+  rules: {
+    list: RulesList,
+    detail: RulesDetail,
+    edit: RulesEdit,
+  },
+  'player-characters': {
+    list: PlayerCharacterList,
+    detail: PlayerCharacterDetail,
+    edit: PlayerCharacterEdit,
+  },
+  'live-play': {
+    list: LivePlayDashboard, // Dashboard is the main view
+    detail: LivePlayDashboard, // No detail view, always show dashboard
   },
 };
 

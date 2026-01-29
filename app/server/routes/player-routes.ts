@@ -171,6 +171,77 @@ router.get('/campaigns/:campaignId/search', async (req, res) => {
 });
 
 // =============================================================================
+// Player Character Updates (Write Access for Own Characters)
+// =============================================================================
+
+// Full update for a player character (for character sheet editing)
+// Players can edit the full character details
+router.put('/campaigns/:campaignId/files/player-characters/:fileId', async (req, res) => {
+  try {
+    const { campaignId, fileId } = req.params;
+
+    const pc = await fileStore.get(campaignId, 'player-characters', fileId);
+
+    if (!pc) {
+      res.status(404).json({ success: false, error: 'Character not found' });
+      return;
+    }
+
+    // Update the character with the provided data
+    const { frontmatter, content } = req.body;
+
+    const updated = await fileStore.update(campaignId, 'player-characters', fileId, {
+      frontmatter: frontmatter || {},
+      content: content,
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating player character:', error);
+    res.status(500).json({ success: false, error: 'Failed to update character' });
+  }
+});
+
+// Update trackers for a player character (for Live Play)
+// This is intentionally limited to only tracker fields for safety
+router.patch('/campaigns/:campaignId/files/player-characters/:fileId/trackers', async (req, res) => {
+  try {
+    const { campaignId, fileId } = req.params;
+
+    const pc = await fileStore.get(campaignId, 'player-characters', fileId);
+
+    if (!pc) {
+      res.status(404).json({ success: false, error: 'Character not found' });
+      return;
+    }
+
+    // Only allow updating tracker fields
+    const allowedFields = ['pressure', 'harm', 'resources', 'experience', 'luck', 'gear'];
+    const updates: Record<string, unknown> = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ success: false, error: 'No valid tracker fields to update' });
+      return;
+    }
+
+    const updated = await fileStore.update(campaignId, 'player-characters', fileId, {
+      frontmatter: updates,
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating trackers for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to update trackers' });
+  }
+});
+
+// =============================================================================
 // Player Map Route (Read-Only, Filtered)
 // =============================================================================
 

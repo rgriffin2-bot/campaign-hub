@@ -67,7 +67,7 @@ export const moduleRegistry = {
     for (const [moduleId, module] of modules) {
       for (const route of module.routes) {
         const path = `/api/modules/${moduleId}${route.path}`;
-        const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete';
+        const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
         app[method](path, route.handler);
         console.log(`  Route mounted: ${route.method} ${path}`);
       }

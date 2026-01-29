@@ -79,12 +79,17 @@ async function toggleVisibility(
   fileId: string,
   hidden: boolean
 ): Promise<ParsedFile> {
+  // For rules module, use playerVisible (inverted). For other modules, use hidden.
+  const frontmatter = moduleId === 'rules'
+    ? { playerVisible: !hidden }
+    : { hidden };
+
   const res = await fetch(
     `/api/campaigns/${campaignId}/files/${moduleId}/${fileId}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frontmatter: { hidden } }),
+      body: JSON.stringify({ frontmatter }),
       credentials: 'include',
     }
   );

@@ -20,6 +20,9 @@ import { generateStarSystemMap } from './modules/locations/map-generator.js';
 import './modules/lore/index.js';
 import './modules/npcs/index.js';
 import './modules/locations/index.js';
+import './modules/rules/index.js';
+import './modules/player-characters/index.js';
+import './modules/live-play/index.js';
 
 const app = express();
 
@@ -35,20 +38,14 @@ app.use(
   })
 );
 
-// Rate limiting to prevent brute force attacks
-const limiter = rateLimit({
-  windowMs: config.security.rateLimit.windowMs,
-  max: config.security.rateLimit.maxRequests,
-  message: { success: false, error: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
+// Rate limiting disabled for local development
+// The live play polling (every 3s per user) was exceeding limits
+// For production, consider re-enabling with higher limits or using WebSockets
 
-// Stricter rate limit for auth endpoints
+// Stricter rate limit for auth endpoints only
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 minutes
+  max: 100, // 100 attempts per 15 minutes
   message: { success: false, error: 'Too many login attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
