@@ -85,32 +85,40 @@ export function PlayerLayout() {
               </li>
 
               {/* Module Links */}
-              {enabledModules.length > 0 && (
-                <>
-                  <li className="pt-4">
-                    <span className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Browse
-                    </span>
-                  </li>
-                  {enabledModules.map((module) => (
-                    <li key={module.id}>
-                      <NavLink
-                        to={`/player/modules/${module.id}`}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                          }`
-                        }
-                      >
-                        <DynamicIcon name={module.icon} className="h-4 w-4" />
-                        <span>{module.name}</span>
-                      </NavLink>
+              {enabledModules.length > 0 && (() => {
+                // Only show modules that have player views
+                const playerViewModules = ['npcs', 'lore', 'locations', 'rules', 'player-characters', 'live-play'];
+                const visibleModules = enabledModules.filter(m => playerViewModules.includes(m.id));
+
+                if (visibleModules.length === 0) return null;
+
+                return (
+                  <>
+                    <li className="pt-4">
+                      <span className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Browse
+                      </span>
                     </li>
-                  ))}
-                </>
-              )}
+                    {visibleModules.map((module) => (
+                      <li key={module.id}>
+                        <NavLink
+                          to={`/player/modules/${module.id}`}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                              isActive
+                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                            }`
+                          }
+                        >
+                          <DynamicIcon name={module.icon} className="h-4 w-4" />
+                          <span>{module.name}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </>
+                );
+              })()}
             </ul>
           </nav>
 

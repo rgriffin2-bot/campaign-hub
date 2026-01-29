@@ -2,17 +2,23 @@ import type { ParsedFile, FileMetadata } from '../../shared/types/file.js';
 
 /**
  * Check if a file/metadata is hidden from players.
+ * Supports both `hidden: true` (lore, NPCs, locations) and `playerVisible: false` (rules).
  */
 export function isHiddenFromPlayers(item: FileMetadata | ParsedFile['frontmatter']): boolean {
-  return (item as Record<string, unknown>).hidden === true;
+  const record = item as Record<string, unknown>;
+  // Check explicit hidden flag
+  if (record.hidden === true) return true;
+  // Check playerVisible flag (for rules module)
+  if (record.playerVisible === false) return true;
+  return false;
 }
 
 /**
  * Filter out DM-only content from a parsed file.
- * This removes the `dmOnly` and `hidden` fields from frontmatter.
+ * This removes the `dmOnly`, `hidden`, and `playerVisible` fields from frontmatter.
  */
 export function filterDmOnlyContent(file: ParsedFile): ParsedFile {
-  const { dmOnly, hidden, ...cleanedFrontmatter } = file.frontmatter as Record<string, unknown>;
+  const { dmOnly, hidden, playerVisible, ...cleanedFrontmatter } = file.frontmatter as Record<string, unknown>;
 
   return {
     ...file,
@@ -22,10 +28,10 @@ export function filterDmOnlyContent(file: ParsedFile): ParsedFile {
 
 /**
  * Filter out DM-only content from file metadata (list view).
- * Removes dmOnly and hidden fields from the metadata.
+ * Removes dmOnly, hidden, and playerVisible fields from the metadata.
  */
 export function filterDmOnlyMetadata(metadata: FileMetadata): FileMetadata {
-  const { dmOnly, hidden, ...cleaned } = metadata as Record<string, unknown>;
+  const { dmOnly, hidden, playerVisible, ...cleaned } = metadata as Record<string, unknown>;
   return cleaned as FileMetadata;
 }
 

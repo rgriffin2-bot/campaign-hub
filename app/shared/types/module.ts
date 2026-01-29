@@ -3,7 +3,7 @@ import type { ZodSchema } from 'zod';
 import type { ComponentType } from 'react';
 
 export interface ModuleRoute {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
   handler: RequestHandler;
 }
@@ -28,12 +28,12 @@ export interface ModuleDefinition {
   icon: string;
   description?: string;
   dataFolder: string;
-  schema: ZodSchema;
+  schema?: ZodSchema; // Optional for modules that don't have their own data
   routes: ModuleRoute[];
   views: {
     list: ComponentType<ModuleViewProps>;
-    detail: ComponentType<ModuleViewProps>;
-    [key: string]: ComponentType<ModuleViewProps>;
+    detail?: ComponentType<ModuleViewProps>;
+    [key: string]: ComponentType<ModuleViewProps> | undefined;
   };
   ai?: ModuleAIConfig;
   playerSite?: ModulePlayerSiteConfig;

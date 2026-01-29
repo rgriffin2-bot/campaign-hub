@@ -51,18 +51,28 @@ export const fileStore = {
     const metadata: FileMetadata[] = [];
 
     for (const file of mdFiles) {
-      const filePath = path.join(dirPath, file);
-      const stat = await fs.stat(filePath);
-      const content = await fs.readFile(filePath, 'utf-8');
-      const { frontmatter } = markdownParser.parse(content);
+      try {
+        const filePath = path.join(dirPath, file);
+        const stat = await fs.stat(filePath);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const { frontmatter } = markdownParser.parse(content);
 
-      metadata.push({
-        id: frontmatter.id as string,
-        name: frontmatter.name as string,
-        filePath: path.join(moduleFolder, file),
-        modified: stat.mtime.toISOString(),
-        ...frontmatter,
-      });
+        // Skip files without valid id and name in frontmatter
+        if (!frontmatter.id || !frontmatter.name) {
+          continue;
+        }
+
+        metadata.push({
+          id: frontmatter.id as string,
+          name: frontmatter.name as string,
+          filePath: path.join(moduleFolder, file),
+          modified: stat.mtime.toISOString(),
+          ...frontmatter,
+        });
+      } catch (error) {
+        // Skip files that can't be parsed
+        console.warn(`Skipping file ${file}: ${error}`);
+      }
     }
 
     return metadata.sort((a, b) => a.name.localeCompare(b.name));

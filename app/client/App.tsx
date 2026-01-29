@@ -18,6 +18,35 @@ import { PlayerLoreList } from './player/PlayerLoreList';
 import { PlayerLoreDetail } from './player/PlayerLoreDetail';
 import { PlayerLocationList } from './player/PlayerLocationList';
 import { PlayerLocationDetail } from './player/PlayerLocationDetail';
+import { PlayerRulesList } from './player/PlayerRulesList';
+import { PlayerRulesDetail } from './player/PlayerRulesDetail';
+import { PlayerLivePlay } from './player/PlayerLivePlay';
+import { PlayerCharacterList } from './player/PlayerCharacterList';
+import { PlayerCharacterDetail } from './player/PlayerCharacterDetail';
+import { PlayerCharacterEdit } from './player/PlayerCharacterEdit';
+import { AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+// Fallback for modules without player views
+function PlayerModuleNotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center p-12 text-center">
+      <AlertCircle className="h-12 w-12 text-muted-foreground" />
+      <h3 className="mt-4 text-lg font-semibold text-foreground">
+        Module not available
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        This module doesn't have a player view.
+      </p>
+      <Link
+        to="/player"
+        className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+      >
+        Go to Dashboard
+      </Link>
+    </div>
+  );
+}
 
 // Auth guard component
 function RequireAuth({ children, requiredRole }: { children: React.ReactNode; requiredRole?: 'dm' | 'player' }) {
@@ -87,6 +116,14 @@ function AppRoutes() {
           <Route path="modules/lore/:fileId" element={<PlayerLoreDetail />} />
           <Route path="modules/locations" element={<PlayerLocationList />} />
           <Route path="modules/locations/:fileId" element={<PlayerLocationDetail />} />
+          <Route path="modules/rules" element={<PlayerRulesList />} />
+          <Route path="modules/rules/:fileId" element={<PlayerRulesDetail />} />
+          <Route path="modules/player-characters" element={<PlayerCharacterList />} />
+          <Route path="modules/player-characters/:fileId" element={<PlayerCharacterDetail />} />
+          <Route path="modules/player-characters/:fileId/edit" element={<PlayerCharacterEdit />} />
+          <Route path="modules/live-play" element={<PlayerLivePlay />} />
+          {/* Catch-all for modules without player views */}
+          <Route path="modules/*" element={<PlayerModuleNotFound />} />
         </Route>
       </Routes>
     </ModeProvider>
