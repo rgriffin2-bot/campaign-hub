@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2 } from 'lucide-react';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
+import { SceneNPCPanel } from './components/SceneNPCPanel';
+import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
@@ -16,6 +18,7 @@ export function LivePlayDashboard() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('grid');
+  const { sceneNPCs, removeFromScene, clearScene, updateNPCStats, toggleVisibility } = useSceneNPCs();
 
   // Use a separate query with polling for live play
   const { data: characters = [], isLoading, error } = useQuery({
@@ -173,6 +176,40 @@ export function LivePlayDashboard() {
               />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Scene NPCs/Entities */}
+      {sceneNPCs.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>NPCs & Entities in Scene ({sceneNPCs.length})</span>
+            </div>
+            <button
+              onClick={clearScene}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              title="Clear all from scene"
+            >
+              <Trash2 className="h-3 w-3" />
+              Clear Scene
+            </button>
+          </div>
+
+          <div className={layoutClasses[layout]}>
+            {sceneNPCs.map((npc) => (
+              <div key={npc.id} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                <SceneNPCPanel
+                  npc={npc}
+                  onRemove={() => removeFromScene(npc.id)}
+                  onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
+                  onToggleVisibility={() => toggleVisibility(npc.id)}
+                  compact={layout === 'compact'}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

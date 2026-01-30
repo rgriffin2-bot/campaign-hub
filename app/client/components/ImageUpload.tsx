@@ -5,10 +5,11 @@ import { useCampaign } from '../core/providers/CampaignProvider';
 interface ImageUploadProps {
   currentImage?: string;
   entityId: string;
-  uploadEndpoint: 'lore-images' | 'location-images';
+  uploadEndpoint: 'lore-images' | 'location-images' | 'pc-portraits';
   onUploadComplete: (path: string) => void;
   onRemove?: () => void;
   autoSave?: (newPath: string) => Promise<void>; // Optional: trigger a save after upload with the new path
+  playerMode?: boolean; // Use player API endpoint for uploads
 }
 
 export function ImageUpload({
@@ -18,6 +19,7 @@ export function ImageUpload({
   onUploadComplete,
   onRemove,
   autoSave,
+  playerMode = false,
 }: ImageUploadProps) {
   const { campaign } = useCampaign();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -63,11 +65,14 @@ export function ImageUpload({
       const formData = new FormData();
       formData.append('image', selectedFile);
 
+      // Use player API endpoint if in player mode
+      const apiBase = playerMode ? '/api/player' : '/api';
       const response = await fetch(
-        `/api/campaigns/${campaign.id}/${uploadEndpoint}/${entityId}`,
+        `${apiBase}/campaigns/${campaign.id}/${uploadEndpoint}/${entityId}`,
         {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         }
       );
 

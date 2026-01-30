@@ -5,6 +5,7 @@ import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { StatsBlock } from '../modules/player-characters/components/StatsBlock';
 import { GearList } from '../modules/player-characters/components/GearList';
+import { ImageUpload } from '../components/ImageUpload';
 import type {
   PlayerCharacterFrontmatter,
   ResourceLevel,
@@ -50,6 +51,7 @@ export function PlayerCharacterEdit() {
   const [form, setForm] = useState<Partial<PlayerCharacterFrontmatter>>({
     name: '',
     player: '',
+    portrait: '',
     pronouns: '',
     species: '',
     age: '',
@@ -75,6 +77,7 @@ export function PlayerCharacterEdit() {
       setForm({
         name: fm.name || '',
         player: fm.player || '',
+        portrait: fm.portrait || '',
         pronouns: fm.pronouns || '',
         species: fm.species || '',
         age: fm.age || '',
@@ -217,6 +220,19 @@ export function PlayerCharacterEdit() {
             {error}
           </div>
         )}
+
+        {/* Portrait */}
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="mb-4 text-sm font-medium text-muted-foreground">Portrait</h2>
+          <ImageUpload
+            currentImage={form.portrait}
+            entityId={fileId || ''}
+            uploadEndpoint="pc-portraits"
+            playerMode
+            onUploadComplete={(path) => setForm((prev) => ({ ...prev, portrait: path }))}
+            onRemove={() => setForm((prev) => ({ ...prev, portrait: '' }))}
+          />
+        </div>
 
         {/* Basic Info */}
         <div className="rounded-lg border border-border bg-card p-4">

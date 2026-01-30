@@ -46,9 +46,9 @@ const customRoutes: ModuleRoute[] = [
 
 export const npcsModule: ModuleDefinition = {
   id: 'npcs',
-  name: 'NPCs',
+  name: 'NPCs + Entities',
   icon: 'Users',
-  description: 'Non-player characters for your campaign',
+  description: 'NPCs, creatures, monsters, robots, and other entities',
   dataFolder: 'npcs',
   schema: npcSchema,
   routes: [...baseRoutes, ...customRoutes],

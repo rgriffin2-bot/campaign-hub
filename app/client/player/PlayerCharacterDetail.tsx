@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Users, BookOpen } from 'lucide-react';
+import { ArrowLeft, Edit, Users } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { MarkdownContent } from '../components/MarkdownContent';
@@ -12,6 +12,7 @@ import {
   LuckTracker,
 } from '../modules/player-characters/components/TrackerRow';
 import { GearList } from '../modules/player-characters/components/GearList';
+import { PlaybookMoveGrid } from '../modules/player-characters/components/PlaybookMoveCard';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import { useQuery } from '@tanstack/react-query';
 
@@ -158,29 +159,11 @@ export function PlayerCharacterDetail() {
 
       {/* Playbook Moves */}
       {moves && moves.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <BookOpen className="h-4 w-4" />
-            Playbook Moves
-          </h2>
-          <div className="space-y-3">
-            {moves.map((move: { frontmatter: { id: string; name: string }; content: string }) => (
-              <div
-                key={move.frontmatter.id}
-                className="rounded-lg bg-secondary/50 p-3"
-              >
-                <h3 className="font-medium text-foreground">
-                  {move.frontmatter.name}
-                </h3>
-                {move.content && (
-                  <div className="mt-2 text-sm">
-                    <MarkdownContent content={move.content} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <PlaybookMoveGrid
+          moves={moves}
+          characterId={fileId || ''}
+          playerMode
+        />
       )}
 
       {/* Biography/Content */}

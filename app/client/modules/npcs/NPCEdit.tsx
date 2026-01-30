@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Swords } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { RelatedCharacterInput, normalizeRelatedCharacters } from '../../components/RelatedCharacterInput';
 import { PortraitUpload } from '../../components/PortraitUpload';
-import type { NPCFrontmatter, NPCDmOnly, RelatedCharacter } from '@shared/schemas/npc';
+import type { NPCFrontmatter, NPCDmOnly, RelatedCharacter, AntagonistStats } from '@shared/schemas/npc';
 
 export function NPCEdit() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -29,6 +29,13 @@ export function NPCEdit() {
   const [content, setContent] = useState('');
   const [portrait, setPortrait] = useState<string | undefined>();
   const [portraitPosition, setPortraitPosition] = useState<{ x: number; y: number; scale: number } | undefined>();
+  const [isAntagonist, setIsAntagonist] = useState(false);
+  const [antagonistStats, setAntagonistStats] = useState<AntagonistStats>({
+    damage: 0,
+    maxDamage: 10,
+    armor: 0,
+    moves: '',
+  });
   const [isSaving, setIsSaving] = useState(false);
 
 
@@ -50,6 +57,13 @@ export function NPCEdit() {
       setContent(existingNPC.content);
       setPortrait(fm.portrait);
       setPortraitPosition(fm.portraitPosition);
+      setIsAntagonist(fm.isAntagonist || false);
+      setAntagonistStats(fm.antagonistStats || {
+        damage: 0,
+        maxDamage: 10,
+        armor: 0,
+        moves: '',
+      });
     }
   }, [existingNPC, isNew]);
 
@@ -83,6 +97,8 @@ export function NPCEdit() {
         tags: tagsArray.length > 0 ? tagsArray : undefined,
         portrait: portrait || undefined,
         portraitPosition: portraitPosition || undefined,
+        isAntagonist: isAntagonist || undefined,
+        antagonistStats: isAntagonist ? antagonistStats : undefined,
       };
 
       if (isNew) {
@@ -265,6 +281,101 @@ export function NPCEdit() {
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
+      </div>
+
+      {/* Antagonist Section */}
+      <div className={`space-y-4 rounded-lg border p-6 ${isAntagonist ? 'border-red-500/30 bg-red-500/5' : 'border-border bg-card'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Swords className={`h-5 w-5 ${isAntagonist ? 'text-red-500' : 'text-muted-foreground'}`} />
+            <h2 className={`font-semibold ${isAntagonist ? 'text-red-500' : 'text-foreground'}`}>
+              Antagonist / Combat Entity
+            </h2>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isAntagonist}
+              onChange={(e) => setIsAntagonist(e.target.checked)}
+              className="h-4 w-4 rounded border-input bg-background text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">Potential Antagonist</span>
+          </label>
+        </div>
+
+        {isAntagonist && (
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Combat stats for encounters. Track damage during live play.
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Max Damage / Threshold
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={antagonistStats.maxDamage || 10}
+                  onChange={(e) => setAntagonistStats(prev => ({
+                    ...prev,
+                    maxDamage: parseInt(e.target.value) || 10,
+                  }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Current Damage
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={antagonistStats.damage || 0}
+                  onChange={(e) => setAntagonistStats(prev => ({
+                    ...prev,
+                    damage: parseInt(e.target.value) || 0,
+                  }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Armor Rating
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={antagonistStats.armor || 0}
+                  onChange={(e) => setAntagonistStats(prev => ({
+                    ...prev,
+                    armor: parseInt(e.target.value) || 0,
+                  }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Moves / Abilities
+              </label>
+              <textarea
+                value={antagonistStats.moves || ''}
+                onChange={(e) => setAntagonistStats(prev => ({
+                  ...prev,
+                  moves: e.target.value,
+                }))}
+                rows={4}
+                placeholder="Enemy moves, special abilities, attack patterns... (Markdown supported)"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* DM Only */}

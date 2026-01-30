@@ -8,6 +8,7 @@ import { moduleRegistry } from '../modules/registry.js';
 import { filterDmOnlyContent, filterDmOnlyMetadataList, isHiddenFromPlayers } from '../core/content-filter.js';
 import { config } from '../config.js';
 import { generateStarSystemMap } from '../modules/locations/map-generator.js';
+import { upload, processAndSavePCPortrait } from '../core/upload-handler.js';
 
 const router = Router();
 
@@ -40,11 +41,19 @@ router.get('/modules', (_req, res) => {
 router.get('/campaigns/:campaignId/files/:moduleId', async (req, res) => {
   try {
     const { campaignId, moduleId } = req.params;
+    const category = req.query.category as string | undefined;
+
     const files = await fileStore.list(campaignId, moduleId);
     // Filter out system files (like _map-config) and DM-only content
     const nonSystemFiles = filterSystemFiles(files);
     const filtered = filterDmOnlyMetadataList(nonSystemFiles);
-    res.json({ success: true, data: filtered });
+
+    // Apply category filter if specified (for playbook moves, etc.)
+    const result = category
+      ? filtered.filter((f) => (f as { category?: string }).category === category)
+      : filtered;
+
+    res.json({ success: true, data: result });
   } catch (error) {
     console.error('Error listing files for player:', error);
     res.status(500).json({ success: false, error: 'Failed to list files' });
@@ -242,6 +251,45 @@ router.patch('/campaigns/:campaignId/files/player-characters/:fileId/trackers', 
 });
 
 // =============================================================================
+// Player Character Portrait Upload
+// =============================================================================
+
+// Upload a portrait for a player character (players can upload their own portraits)
+router.post(
+  '/campaigns/:campaignId/pc-portraits/:pcId',
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, pcId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      // Verify the character exists
+      const pc = await fileStore.get(campaignId, 'player-characters', pcId);
+      if (!pc) {
+        res.status(404).json({ success: false, error: 'Character not found' });
+        return;
+      }
+
+      const portraitPath = await processAndSavePCPortrait(
+        campaignId,
+        pcId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: portraitPath } });
+    } catch (error) {
+      console.error('Error uploading PC portrait:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload portrait';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// =============================================================================
 // Player Map Route (Read-Only, Filtered)
 // =============================================================================
 
@@ -290,6 +338,72 @@ router.get('/campaigns/:campaignId/map', async (req, res) => {
   } catch (error) {
     console.error('Error reading player map:', error);
     res.status(500).json({ success: false, error: 'Failed to read map' });
+  }
+});
+
+// =============================================================================
+// Player Scene NPCs Route (Read-Only, Filtered by visibility)
+// =============================================================================
+
+// Get scene NPCs that are visible to players
+router.get('/scene-npcs', async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    // Read scene NPCs from the campaign's _scene-npcs.json file
+    const scenePath = path.join(config.campaignsDir, campaign.id, '_scene-npcs.json');
+    let allNPCs: Array<{
+      id: string;
+      name: string;
+      occupation?: string;
+      portrait?: string;
+      portraitPosition?: { x: number; y: number; scale: number };
+      isAntagonist?: boolean;
+      antagonistStats?: {
+        damage?: number;
+        maxDamage?: number;
+        armor?: number;
+        moves?: string;
+      };
+      visibleToPlayers?: boolean;
+    }> = [];
+
+    try {
+      const content = await fs.readFile(scenePath, 'utf-8');
+      allNPCs = JSON.parse(content);
+    } catch {
+      // File doesn't exist or is invalid - return empty array
+      allNPCs = [];
+    }
+
+    // Filter to only visible NPCs and strip sensitive data
+    const visibleNPCs = allNPCs
+      .filter(npc => npc.visibleToPlayers !== false)
+      .map(npc => ({
+        id: npc.id,
+        name: npc.name,
+        occupation: npc.occupation,
+        portrait: npc.portrait,
+        portraitPosition: npc.portraitPosition,
+        isAntagonist: npc.isAntagonist,
+        // Only include defeated status, not actual stats
+        antagonistStats: npc.isAntagonist && npc.antagonistStats ? {
+          // Calculate if defeated without exposing actual numbers
+          damage: (npc.antagonistStats.damage || 0) >= (npc.antagonistStats.maxDamage || 10)
+            ? (npc.antagonistStats.maxDamage || 10) // Just indicate "full damage" for defeated
+            : 0, // Otherwise show 0
+          maxDamage: npc.antagonistStats.maxDamage || 10,
+        } : undefined,
+      }));
+
+    res.json({ success: true, data: visibleNPCs });
+  } catch (error) {
+    console.error('Error getting scene NPCs for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to get scene NPCs' });
   }
 });
 

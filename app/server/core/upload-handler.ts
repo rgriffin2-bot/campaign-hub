@@ -213,3 +213,44 @@ export async function deleteMapImage(
     // Ignore if file doesn't exist
   }
 }
+
+// Ensure PC portraits directory exists
+async function ensurePCPortraitDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'pc-portraits');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSavePCPortrait(
+  campaignId: string,
+  pcId: string,
+  buffer: Buffer
+): Promise<string> {
+  const uploadDir = await ensurePCPortraitDir(campaignId);
+  const filename = `${pcId}.jpg`;
+  const filepath = path.join(uploadDir, filename);
+
+  // Resize to 500x500 square for character portraits
+  await sharp(buffer)
+    .resize(500, 500, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({ quality: 85 })
+    .toFile(filepath);
+
+  // Return relative path from campaign root
+  return `assets/pc-portraits/${filename}`;
+}
+
+export async function deletePCPortrait(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
