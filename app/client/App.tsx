@@ -3,11 +3,15 @@ import { QueryProvider } from './core/providers/QueryProvider';
 import { CampaignProvider } from './core/providers/CampaignProvider';
 import { ModeProvider } from './core/providers/ModeProvider';
 import { AuthProvider, useAuth } from './core/providers/AuthProvider';
+import { SceneNPCsProvider } from './core/providers/SceneNPCsProvider';
 import { Layout } from './core/Layout';
 import { Dashboard } from './core/Dashboard';
 import { ModuleRouter } from './core/ModuleRouter';
 import { Settings } from './core/Settings';
 import { LoginPage } from './core/LoginPage';
+
+// DM module-specific views
+import { PlaybookMoveDetail } from './modules/player-characters/PlaybookMoveDetail';
 
 // Player views
 import { PlayerLayout } from './player/PlayerLayout';
@@ -24,6 +28,7 @@ import { PlayerLivePlay } from './player/PlayerLivePlay';
 import { PlayerCharacterList } from './player/PlayerCharacterList';
 import { PlayerCharacterDetail } from './player/PlayerCharacterDetail';
 import { PlayerCharacterEdit } from './player/PlayerCharacterEdit';
+import { PlayerPlaybookMoveDetail } from './player/PlayerPlaybookMoveDetail';
 import { AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -97,6 +102,7 @@ function AppRoutes() {
           <Route path="modules/:moduleId" element={<ModuleRouter />} />
           <Route path="modules/:moduleId/:fileId" element={<ModuleRouter />} />
           <Route path="modules/:moduleId/:fileId/edit" element={<ModuleRouter />} />
+          <Route path="modules/player-characters/:fileId/moves/:moveId" element={<PlaybookMoveDetail />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
@@ -121,6 +127,7 @@ function AppRoutes() {
           <Route path="modules/player-characters" element={<PlayerCharacterList />} />
           <Route path="modules/player-characters/:fileId" element={<PlayerCharacterDetail />} />
           <Route path="modules/player-characters/:fileId/edit" element={<PlayerCharacterEdit />} />
+          <Route path="modules/player-characters/:fileId/moves/:moveId" element={<PlayerPlaybookMoveDetail />} />
           <Route path="modules/live-play" element={<PlayerLivePlay />} />
           {/* Catch-all for modules without player views */}
           <Route path="modules/*" element={<PlayerModuleNotFound />} />
@@ -136,7 +143,9 @@ export function App() {
       <AuthProvider>
         <CampaignProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <SceneNPCsProvider>
+              <AppRoutes />
+            </SceneNPCsProvider>
           </BrowserRouter>
         </CampaignProvider>
       </AuthProvider>

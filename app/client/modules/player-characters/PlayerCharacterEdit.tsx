@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Save, Users, Plus, X } from 'lucide-react';
+import { ArrowLeft, Save, Users, X } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { StatsBlock } from './components/StatsBlock';
 import { GearList } from './components/GearList';
+import { ImageUpload } from '../../components/ImageUpload';
 import type {
   PlayerCharacterFrontmatter,
-  Stats,
   ResourceLevel,
-  HarmState,
-  GearItem,
 } from '@shared/schemas/player-character';
 import { useQuery } from '@tanstack/react-query';
 
@@ -56,6 +54,7 @@ export function PlayerCharacterEdit() {
   const [form, setForm] = useState<Partial<PlayerCharacterFrontmatter>>({
     name: '',
     player: '',
+    portrait: '',
     pronouns: '',
     species: '',
     age: '',
@@ -80,6 +79,7 @@ export function PlayerCharacterEdit() {
       setForm({
         name: fm.name || '',
         player: fm.player || '',
+        portrait: fm.portrait || '',
         pronouns: fm.pronouns || '',
         species: fm.species || '',
         age: fm.age || '',
@@ -183,6 +183,20 @@ export function PlayerCharacterEdit() {
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
+
+        {/* Portrait */}
+        {!isNew && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h2 className="mb-4 text-sm font-medium text-muted-foreground">Portrait</h2>
+            <ImageUpload
+              currentImage={form.portrait}
+              entityId={fileId || ''}
+              uploadEndpoint="pc-portraits"
+              onUploadComplete={(path) => setForm((prev) => ({ ...prev, portrait: path }))}
+              onRemove={() => setForm((prev) => ({ ...prev, portrait: '' }))}
+            />
+          </div>
+        )}
 
         {/* Basic Info */}
         <div className="rounded-lg border border-border bg-card p-4">

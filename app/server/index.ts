@@ -11,7 +11,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -556,6 +556,35 @@ app.post(
   }
 );
 
+// Upload a portrait for a player character
+app.post(
+  '/api/campaigns/:campaignId/pc-portraits/:pcId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, pcId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const portraitPath = await processAndSavePCPortrait(
+        campaignId,
+        pcId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: portraitPath } });
+    } catch (error) {
+      console.error('Error uploading PC portrait:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload portrait';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
 // Serve static assets from campaigns directory
 app.use('/api/campaigns/:campaignId/assets', (req, res, next) => {
   const { campaignId } = req.params;
@@ -628,7 +657,9 @@ app.get('/api/campaigns/:campaignId/map', auth.requireDm, async (req, res) => {
 // Mount player routes (read-only, filtered, requires player or DM auth)
 app.use('/api/player', auth.requirePlayer, playerRoutes);
 
-// Mount module-specific routes
+// Mount module-specific routes (DM only)
+// Note: Module routes at /api/modules/* are protected by requireDm
+app.use('/api/modules', auth.requireDm);
 moduleRegistry.mountRoutes(app);
 
 // Start file watcher

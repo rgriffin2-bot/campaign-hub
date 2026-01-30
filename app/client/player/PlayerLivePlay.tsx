@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Lock } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Lock, Users } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { PCPanel } from '../modules/live-play/components/PCPanel';
+import { SceneNPCPanel } from '../modules/live-play/components/SceneNPCPanel';
+import { useSceneNPCs } from '../core/providers/SceneNPCsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
@@ -16,6 +18,7 @@ export function PlayerLivePlay() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('grid');
+  const { sceneNPCs } = useSceneNPCs();
 
   // For now, we'll allow editing of any PC in player mode
   // In a full implementation, you'd check the logged-in player against pc.player
@@ -197,6 +200,28 @@ export function PlayerLivePlay() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Scene NPCs/Entities (read-only view for players) */}
+      {sceneNPCs.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>NPCs & Entities in Scene ({sceneNPCs.length})</span>
+          </div>
+
+          <div className={layoutClasses[layout]}>
+            {sceneNPCs.map((npc) => (
+              <div key={npc.id} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                <SceneNPCPanel
+                  npc={npc}
+                  compact={layout === 'compact'}
+                  showStats={false}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

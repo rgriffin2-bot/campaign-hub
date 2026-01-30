@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff, Swords, Shield, Heart } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
@@ -175,6 +175,84 @@ export function NPCDetail() {
         <div className="rounded-lg border border-border bg-card p-4">
           <h3 className="mb-3 font-medium text-foreground">Related Characters</h3>
           <RelatedNPCs characters={frontmatter.relatedCharacters} />
+        </div>
+      )}
+
+      {/* Antagonist Stats Section */}
+      {frontmatter.isAntagonist && frontmatter.antagonistStats && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-500">
+            <Swords className="h-4 w-4" />
+            Antagonist / Combat Stats
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {/* Damage */}
+            <div className="rounded-lg border border-red-500/20 bg-background p-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Heart className="h-3.5 w-3.5" />
+                Damage
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-red-500">
+                  {frontmatter.antagonistStats.damage || 0}
+                </span>
+                <span className="text-muted-foreground">
+                  / {frontmatter.antagonistStats.maxDamage || 10}
+                </span>
+              </div>
+              {/* Damage bar */}
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-red-500 transition-all"
+                  style={{
+                    width: `${Math.min(100, ((frontmatter.antagonistStats.damage || 0) / (frontmatter.antagonistStats.maxDamage || 10)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Armor */}
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Shield className="h-3.5 w-3.5" />
+                Armor
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl font-bold text-foreground">
+                  {frontmatter.antagonistStats.armor || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Status
+              </div>
+              <div className="mt-2">
+                {(frontmatter.antagonistStats.damage || 0) >= (frontmatter.antagonistStats.maxDamage || 10) ? (
+                  <span className="text-lg font-bold text-red-500">Defeated</span>
+                ) : (frontmatter.antagonistStats.damage || 0) >= ((frontmatter.antagonistStats.maxDamage || 10) * 0.5) ? (
+                  <span className="text-lg font-bold text-amber-500">Wounded</span>
+                ) : (
+                  <span className="text-lg font-bold text-green-500">Active</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Moves / Abilities */}
+          {frontmatter.antagonistStats.moves && (
+            <div className="mt-4">
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Moves / Abilities
+              </h4>
+              <div className="mt-2 rounded-lg border border-border bg-background p-3">
+                <MarkdownContent content={frontmatter.antagonistStats.moves} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

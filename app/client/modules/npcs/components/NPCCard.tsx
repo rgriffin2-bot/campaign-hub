@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { User, Eye, EyeOff, MapPin } from 'lucide-react';
+import { User, Eye, EyeOff, MapPin, UserPlus, UserMinus, Swords } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { useFiles } from '../../../hooks/useFiles';
+import { useSceneNPCs } from '../../../core/providers/SceneNPCsProvider';
 import type { FileMetadata } from '@shared/types/file';
 
 interface NPCCardProps {
@@ -11,8 +12,11 @@ interface NPCCardProps {
 export function NPCCard({ npc }: NPCCardProps) {
   const { campaign } = useCampaign();
   const { toggleVisibility } = useFiles('npcs');
+  const { addToScene, removeFromScene, isInScene } = useSceneNPCs();
 
   const isHidden = npc.hidden === true;
+  const inScene = isInScene(npc.id);
+  const isAntagonist = npc.isAntagonist === true;
 
   // Get portrait URL if available
   const portrait = npc.portrait as string | undefined;
@@ -29,6 +33,30 @@ export function NPCCard({ npc }: NPCCardProps) {
     toggleVisibility.mutate({ fileId: npc.id, hidden: !isHidden });
   };
 
+  const handleToggleScene = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inScene) {
+      removeFromScene(npc.id);
+    } else {
+      addToScene({
+        id: npc.id,
+        name: npc.name,
+        occupation: npc.occupation as string | undefined,
+        portrait: portrait,
+        portraitPosition: portraitPosition,
+        isAntagonist: isAntagonist,
+        antagonistStats: npc.antagonistStats as {
+          damage?: number;
+          maxDamage?: number;
+          armor?: number;
+          moves?: string;
+        } | undefined,
+        visibleToPlayers: true, // Added as visible by default
+      });
+    }
+  };
+
   return (
     <Link
       to={`/modules/npcs/${npc.id}`}
@@ -36,13 +64,25 @@ export function NPCCard({ npc }: NPCCardProps) {
         isHidden ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'
       }`}
     >
-      {/* Hidden indicator badge */}
-      {isHidden && (
-        <div className="absolute -right-2 -top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
-          <EyeOff className="h-3 w-3" />
-          <span>Hidden</span>
-        </div>
-      )}
+      {/* Status badges */}
+      <div className="absolute -right-2 -top-2 flex gap-1">
+        {isAntagonist && (
+          <div className="flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
+            <Swords className="h-3 w-3" />
+          </div>
+        )}
+        {isHidden && (
+          <div className="flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
+            <EyeOff className="h-3 w-3" />
+            <span>Hidden</span>
+          </div>
+        )}
+        {inScene && (
+          <div className="flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
+            <span>In Scene</span>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-start gap-3 p-4">
         {/* Portrait */}
@@ -85,18 +125,33 @@ export function NPCCard({ npc }: NPCCardProps) {
           )}
         </div>
 
-        {/* Visibility toggle button */}
-        <button
-          onClick={handleToggleVisibility}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
-            isHidden
-              ? 'text-amber-500 hover:bg-amber-500/20'
-              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-          }`}
-          title={isHidden ? 'Show to players' : 'Hide from players'}
-        >
-          {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
+        <div className="flex shrink-0 gap-1">
+          {/* Add to scene button */}
+          <button
+            onClick={handleToggleScene}
+            className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+              inScene
+                ? 'text-green-500 hover:bg-green-500/20'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+            title={inScene ? 'Remove from scene' : 'Add to scene'}
+          >
+            {inScene ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+          </button>
+
+          {/* Visibility toggle button */}
+          <button
+            onClick={handleToggleVisibility}
+            className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+              isHidden
+                ? 'text-amber-500 hover:bg-amber-500/20'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+            title={isHidden ? 'Show to players' : 'Hide from players'}
+          >
+            {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
     </Link>
   );
