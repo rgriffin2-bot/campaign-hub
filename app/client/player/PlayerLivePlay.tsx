@@ -17,7 +17,7 @@ const POLL_INTERVAL = 3000;
 export function PlayerLivePlay() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
-  const [layout, setLayout] = useState<LayoutMode>('grid');
+  const [layout, setLayout] = useState<LayoutMode>('compact');
   const { sceneNPCs } = useSceneNPCs();
 
   // For now, we'll allow editing of any PC in player mode

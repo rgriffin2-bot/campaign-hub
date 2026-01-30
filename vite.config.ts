@@ -59,6 +59,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // Allow connections from other devices on the network
+    allowedHosts: true, // Allow ngrok and other tunnel services
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

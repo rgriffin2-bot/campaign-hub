@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff, Swords, Shield, Heart } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { useCampaign } from '../../core/providers/CampaignProvider';
@@ -9,8 +9,12 @@ import type { NPCFrontmatter } from '@shared/schemas/npc';
 
 export function NPCDetail() {
   const { fileId } = useParams<{ fileId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { campaign } = useCampaign();
+
+  // Check if we came from live-play
+  const fromLivePlay = searchParams.get('from') === 'live-play';
   const { get, delete: deleteMutation, toggleVisibility } = useFiles('npcs');
 
   const { data: npc, isLoading } = get(fileId || '');
@@ -62,11 +66,11 @@ export function NPCDetail() {
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Back link */}
       <Link
-        to="/modules/npcs"
+        to={fromLivePlay ? '/modules/live-play' : '/modules/npcs'}
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to NPCs
+        {fromLivePlay ? 'Back to Live Play' : 'Back to NPCs'}
       </Link>
 
       {/* Header Card - Name, Occupation, Location, Tags, ID */}
