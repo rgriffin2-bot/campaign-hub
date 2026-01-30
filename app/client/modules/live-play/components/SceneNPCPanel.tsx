@@ -1,4 +1,5 @@
-import { User, X, Shield, Heart, Minus, Plus, Eye, EyeOff } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { User, X, Shield, Heart, Minus, Plus, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { SceneNPC } from '../../../core/providers/SceneNPCsProvider';
 
@@ -177,6 +178,17 @@ export function SceneNPCPanel({
               Defeated
             </div>
           )}
+
+          {/* View Entry button - only show for DM (when showStats is true) */}
+          {showStats && (
+            <Link
+              to={`/modules/npcs/${npc.id}?from=live-play`}
+              className="mt-2 flex items-center justify-center gap-1 rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <ExternalLink className="h-3 w-3" />
+              View Entry
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -323,6 +335,17 @@ export function SceneNPCPanel({
           <div className="mt-3 rounded bg-red-500/20 px-2 py-1 text-center text-sm font-medium text-red-500">
             Defeated / Incapacitated
           </div>
+        )}
+
+        {/* View Entry button - only show for DM (when showStats is true) */}
+        {showStats && (
+          <Link
+            to={`/modules/npcs/${npc.id}?from=live-play`}
+            className="mt-3 flex items-center justify-center gap-1 rounded bg-secondary px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <ExternalLink className="h-4 w-4" />
+            View Entry
+          </Link>
         )}
       </div>
     </div>

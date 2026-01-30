@@ -17,7 +17,7 @@ const POLL_INTERVAL = 3000;
 export function LivePlayDashboard() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
-  const [layout, setLayout] = useState<LayoutMode>('grid');
+  const [layout, setLayout] = useState<LayoutMode>('compact');
   const { sceneNPCs, removeFromScene, clearScene, updateNPCStats, toggleVisibility } = useSceneNPCs();
 
   // Use a separate query with polling for live play

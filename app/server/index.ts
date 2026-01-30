@@ -51,7 +51,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// CORS configuration - restrict to local network
+// CORS configuration - allow local network and ngrok tunnels
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl)
@@ -60,8 +60,8 @@ const corsOptions: cors.CorsOptions = {
       return;
     }
 
-    // Check if origin is from local network
-    const isLocalNetwork =
+    // Check if origin is from local network or ngrok
+    const isAllowed =
       origin.startsWith('http://localhost') ||
       origin.startsWith('http://127.0.0.1') ||
       origin.startsWith('http://192.168.') ||
@@ -81,9 +81,12 @@ const corsOptions: cors.CorsOptions = {
       origin.startsWith('http://172.28.') ||
       origin.startsWith('http://172.29.') ||
       origin.startsWith('http://172.30.') ||
-      origin.startsWith('http://172.31.');
+      origin.startsWith('http://172.31.') ||
+      origin.includes('.ngrok-free.app') ||
+      origin.includes('.ngrok-free.dev') ||
+      origin.includes('.ngrok.io');
 
-    if (isLocalNetwork) {
+    if (isAllowed) {
       callback(null, true);
     } else {
       callback(new Error('CORS: Origin not allowed'));
@@ -135,6 +138,41 @@ app.post('/api/auth/logout', (req, res) => {
   }
   res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
   res.json({ success: true });
+});
+
+// Get ngrok tunnel URL (for sharing player link)
+app.get('/api/tunnel-url', auth.requireDm, async (_req, res) => {
+  try {
+    // First try reading from .ngrok-url file (set by launcher)
+    const urlFilePath = path.join(process.cwd(), '.ngrok-url');
+    try {
+      const url = await fs.readFile(urlFilePath, 'utf-8');
+      if (url.trim()) {
+        res.json({ success: true, data: { url: url.trim() } });
+        return;
+      }
+    } catch {
+      // File doesn't exist, try ngrok API
+    }
+
+    // Try getting URL from ngrok API directly
+    try {
+      const response = await fetch('http://localhost:4040/api/tunnels');
+      const data = await response.json() as { tunnels?: Array<{ public_url?: string }> };
+      const tunnel = data.tunnels?.find((t: { public_url?: string }) => t.public_url?.startsWith('https://'));
+      if (tunnel?.public_url) {
+        res.json({ success: true, data: { url: tunnel.public_url } });
+        return;
+      }
+    } catch {
+      // ngrok not running or API not available
+    }
+
+    res.json({ success: true, data: { url: null } });
+  } catch (error) {
+    console.error('Error getting tunnel URL:', error);
+    res.status(500).json({ success: false, error: 'Failed to get tunnel URL' });
+  }
 });
 
 // Check session endpoint

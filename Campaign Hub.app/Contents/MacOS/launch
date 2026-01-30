@@ -1,10 +1,13 @@
 #!/bin/bash
 
 # Campaign Hub Launcher
-# Double-click this app to start the development servers
+# Double-click this app to start the development servers and ngrok tunnel
 
 APP_DIR="$(dirname "$(dirname "$(dirname "$0")")")"
 PROJECT_DIR="$(dirname "$APP_DIR")"
+
+# Add Homebrew paths (for ngrok, node, npm)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # If the app is inside the project directory, use that
 if [ -f "$PROJECT_DIR/package.json" ]; then
@@ -22,12 +25,44 @@ fi
 # Kill any existing processes on our ports
 lsof -ti:3001 | xargs kill -9 2>/dev/null
 lsof -ti:5173 | xargs kill -9 2>/dev/null
+pkill -f "ngrok http" 2>/dev/null
 sleep 1
+
+# Remove old ngrok URL file
+rm -f .ngrok-url
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
     osascript -e 'display alert "Campaign Hub" message "Installing dependencies... This may take a minute."'
     npm install
+fi
+
+# Check if ngrok is installed
+if ! command -v ngrok &> /dev/null; then
+    osascript -e 'display alert "Campaign Hub" message "ngrok is not installed. Remote player access will not be available. Install with: brew install ngrok"'
+    NGROK_AVAILABLE=false
+else
+    NGROK_AVAILABLE=true
+fi
+
+# Start ngrok in the background if available
+if [ "$NGROK_AVAILABLE" = true ]; then
+    # Start ngrok and capture the URL
+    ngrok http 5173 --log=stdout > /tmp/ngrok.log 2>&1 &
+    NGROK_PID=$!
+
+    # Wait for ngrok to start and get the URL
+    sleep 3
+
+    # Get the public URL from ngrok API
+    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*' | head -1 | cut -d'"' -f4)
+
+    if [ -n "$NGROK_URL" ]; then
+        echo "$NGROK_URL" > .ngrok-url
+        echo "ngrok URL: $NGROK_URL"
+    else
+        echo "Could not get ngrok URL - check if ngrok is configured with an authtoken"
+    fi
 fi
 
 # Open Terminal with the dev server
