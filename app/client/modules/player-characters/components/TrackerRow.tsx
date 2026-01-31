@@ -80,23 +80,25 @@ export function HarmTracker({ harm, editable = false, compact = false, onChange 
       </div>
       <div className="space-y-1">
         {slots.map(({ key, label, shortLabel, color }) => (
-          <div key={key} className="flex items-center gap-2 min-w-0">
-            <span className={`${compact ? 'w-10' : 'w-20'} shrink-0 text-xs ${color.replace('border-', 'text-')}`}>
-              {compact ? shortLabel : label}:
-            </span>
-            {editable ? (
-              <input
-                type="text"
-                value={harm[key] || ''}
-                onChange={(e) => handleChange(key, e.target.value)}
-                className={`min-w-0 flex-1 rounded border ${color} bg-transparent px-1 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring`}
-                placeholder="—"
-              />
-            ) : (
-              <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-                {harm[key] || '—'}
+          <div key={key} className="min-w-0">
+            <div className="flex items-start gap-2">
+              <span className={`${compact ? 'w-10' : 'w-20'} shrink-0 text-xs ${color.replace('border-', 'text-')}`}>
+                {compact ? shortLabel : label}:
               </span>
-            )}
+              {editable ? (
+                <input
+                  type="text"
+                  value={harm[key] || ''}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className={`min-w-0 flex-1 rounded border ${color} bg-transparent px-1 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring`}
+                  placeholder="—"
+                />
+              ) : (
+                <span className="min-w-0 flex-1 text-xs text-foreground whitespace-normal break-words">
+                  {harm[key] || '—'}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

@@ -58,26 +58,25 @@ export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPa
   if (compact) {
     return (
       <div className="overflow-hidden rounded-lg border border-border bg-card">
-        {/* Header with Luck indicator */}
-        <div className="flex items-center gap-2 border-b border-border p-2">
-          {/* Portrait - smaller in compact mode */}
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-            {fm.portrait && campaign ? (
-              <img
-                src={`/api/campaigns/${campaign.id}/assets/${fm.portrait.replace('assets/', '')}`}
-                alt={fm.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
+        {/* Header with portrait, name below, and luck indicator */}
+        <div className="flex items-start gap-2 border-b border-border p-2">
+          {/* Portrait and name stacked vertically */}
+          <div className="flex flex-col items-start gap-1">
+            <div className="h-[120px] w-[120px] shrink-0 overflow-hidden rounded-md bg-muted">
+              {fm.portrait && campaign ? (
+                <img
+                  src={`/api/campaigns/${campaign.id}/assets/${fm.portrait.replace('assets/', '')}`}
+                  alt={fm.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Users className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-1">
-              <h3 className="truncate text-sm font-semibold text-foreground">{fm.name}</h3>
+              <h3 className="text-[18px] font-semibold text-foreground">{fm.name}</h3>
               <Link
                 to={`/modules/player-characters/${pc.id}`}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
@@ -87,12 +86,12 @@ export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPa
                 <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
-            <div className="text-xs text-muted-foreground">
-              {fm.player && <span>{fm.player}</span>}
-            </div>
           </div>
 
-          {/* Luck indicator in header */}
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Luck indicator */}
           <button
             onClick={(e) => {
               e.stopPropagation();
