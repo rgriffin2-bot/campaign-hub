@@ -7,12 +7,24 @@ import { useAuth } from './AuthProvider';
 // Polling interval for live updates (3 seconds)
 const POLL_INTERVAL = 3000;
 
+export type Disposition = 'hostile' | 'friendly' | 'neutral';
+
 export interface SceneNPC {
   id: string;
   name: string;
   occupation?: string;
   portrait?: string;
   portraitPosition?: { x: number; y: number; scale: number };
+  hasStats?: boolean;
+  disposition?: Disposition;
+  stats?: {
+    damage?: number;
+    maxDamage?: number;
+    armor?: number;
+    moves?: string;
+  };
+  visibleToPlayers?: boolean;
+  // Backwards compatibility
   isAntagonist?: boolean;
   antagonistStats?: {
     damage?: number;
@@ -20,7 +32,6 @@ export interface SceneNPC {
     armor?: number;
     moves?: string;
   };
-  visibleToPlayers?: boolean;
 }
 
 interface SceneNPCsContextValue {
@@ -30,7 +41,8 @@ interface SceneNPCsContextValue {
   removeFromScene: (npcId: string) => void;
   isInScene: (npcId: string) => boolean;
   clearScene: () => void;
-  updateNPCStats: (npcId: string, updates: Partial<SceneNPC['antagonistStats']>) => void;
+  updateNPCStats: (npcId: string, updates: Partial<SceneNPC['stats']>) => void;
+  updateDisposition: (npcId: string, disposition: Disposition) => void;
   toggleVisibility: (npcId: string) => void;
 }
 
@@ -162,11 +174,22 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
   }, [clearMutation, isDm]);
 
   const updateNPCStats = useCallback(
-    (npcId: string, updates: Partial<SceneNPC['antagonistStats']>) => {
+    (npcId: string, updates: Partial<SceneNPC['stats']>) => {
       if (!isDm) return; // Only DM can update
       updateMutation.mutate({
         npcId,
-        updates: { antagonistStats: updates },
+        updates: { stats: updates },
+      });
+    },
+    [updateMutation, isDm]
+  );
+
+  const updateDisposition = useCallback(
+    (npcId: string, disposition: Disposition) => {
+      if (!isDm) return; // Only DM can update disposition
+      updateMutation.mutate({
+        npcId,
+        updates: { disposition },
       });
     },
     [updateMutation, isDm]
@@ -196,6 +219,7 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
         isInScene,
         clearScene,
         updateNPCStats,
+        updateDisposition,
         toggleVisibility,
       }}
     >

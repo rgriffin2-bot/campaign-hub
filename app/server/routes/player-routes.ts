@@ -363,7 +363,15 @@ router.get('/scene-npcs', async (_req, res) => {
       portrait?: string;
       portraitPosition?: { x: number; y: number; scale: number };
       isAntagonist?: boolean;
+      hasStats?: boolean;
+      disposition?: string;
       antagonistStats?: {
+        damage?: number;
+        maxDamage?: number;
+        armor?: number;
+        moves?: string;
+      };
+      stats?: {
         damage?: number;
         maxDamage?: number;
         armor?: number;
@@ -383,27 +391,179 @@ router.get('/scene-npcs', async (_req, res) => {
     // Filter to only visible NPCs and strip sensitive data
     const visibleNPCs = allNPCs
       .filter(npc => npc.visibleToPlayers !== false)
-      .map(npc => ({
-        id: npc.id,
-        name: npc.name,
-        occupation: npc.occupation,
-        portrait: npc.portrait,
-        portraitPosition: npc.portraitPosition,
-        isAntagonist: npc.isAntagonist,
-        // Only include defeated status, not actual stats
-        antagonistStats: npc.isAntagonist && npc.antagonistStats ? {
-          // Calculate if defeated without exposing actual numbers
-          damage: (npc.antagonistStats.damage || 0) >= (npc.antagonistStats.maxDamage || 10)
-            ? (npc.antagonistStats.maxDamage || 10) // Just indicate "full damage" for defeated
-            : 0, // Otherwise show 0
-          maxDamage: npc.antagonistStats.maxDamage || 10,
-        } : undefined,
-      }));
+      .map(npc => {
+        // Support both old (antagonistStats) and new (stats) field names
+        const hasStats = npc.hasStats ?? npc.isAntagonist ?? false;
+        const stats = npc.stats ?? npc.antagonistStats;
+
+        return {
+          id: npc.id,
+          name: npc.name,
+          occupation: npc.occupation,
+          portrait: npc.portrait,
+          portraitPosition: npc.portraitPosition,
+          disposition: npc.disposition,
+          isAntagonist: npc.isAntagonist,
+          hasStats,
+          // Only include defeated status, not actual stats
+          antagonistStats: hasStats && stats ? {
+            // Calculate if defeated without exposing actual numbers
+            damage: (stats.damage || 0) >= (stats.maxDamage || 10)
+              ? (stats.maxDamage || 10) // Just indicate "full damage" for defeated
+              : 0, // Otherwise show 0
+            maxDamage: stats.maxDamage || 10,
+          } : undefined,
+          stats: hasStats && stats ? {
+            damage: (stats.damage || 0) >= (stats.maxDamage || 10)
+              ? (stats.maxDamage || 10)
+              : 0,
+            maxDamage: stats.maxDamage || 10,
+          } : undefined,
+        };
+      });
 
     res.json({ success: true, data: visibleNPCs });
   } catch (error) {
     console.error('Error getting scene NPCs for player:', error);
     res.status(500).json({ success: false, error: 'Failed to get scene NPCs' });
+  }
+});
+
+// =============================================================================
+// Player Scene Ships Route (Read-Only, Filtered by visibility)
+// =============================================================================
+
+// Get scene ships that are visible to players
+router.get('/scene-ships', async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const scenePath = path.join(config.campaignsDir, campaign.id, '_scene-ships.json');
+    let allShips: Array<{
+      id: string;
+      name: string;
+      type?: string;
+      class?: string;
+      image?: string;
+      isCrewShip?: boolean;
+      disposition?: string;
+      pressure?: number;
+      damage?: Record<string, { minor?: string; major?: string }>;
+      visibleToPlayers?: boolean;
+    }> = [];
+
+    try {
+      const content = await fs.readFile(scenePath, 'utf-8');
+      allShips = JSON.parse(content);
+    } catch {
+      allShips = [];
+    }
+
+    // Filter to only visible ships
+    const visibleShips = allShips
+      .filter(ship => ship.visibleToPlayers !== false)
+      .map(ship => ({
+        id: ship.id,
+        name: ship.name,
+        type: ship.type,
+        class: ship.class,
+        image: ship.image,
+        isCrewShip: ship.isCrewShip,
+        disposition: ship.disposition,
+        pressure: ship.pressure,
+        damage: ship.damage, // Players can see damage on visible ships
+      }));
+
+    res.json({ success: true, data: visibleShips });
+  } catch (error) {
+    console.error('Error getting scene ships for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to get scene ships' });
+  }
+});
+
+// Update crew ship (players can update crew ships)
+router.patch('/scene-ships/:shipId', async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { shipId } = req.params;
+    const updates = req.body;
+
+    const scenePath = path.join(config.campaignsDir, campaign.id, '_scene-ships.json');
+    let ships: Array<{
+      id: string;
+      name: string;
+      isCrewShip?: boolean;
+      [key: string]: unknown;
+    }> = [];
+
+    try {
+      const content = await fs.readFile(scenePath, 'utf-8');
+      ships = JSON.parse(content);
+    } catch {
+      res.status(404).json({ success: false, error: 'Ship not found' });
+      return;
+    }
+
+    const index = ships.findIndex(s => s.id === shipId);
+    if (index === -1) {
+      res.status(404).json({ success: false, error: 'Ship not found' });
+      return;
+    }
+
+    // Players can only update crew ships
+    if (!ships[index].isCrewShip) {
+      res.status(403).json({ success: false, error: 'Cannot update non-crew ships' });
+      return;
+    }
+
+    // Only allow updating certain fields
+    const allowedFields = ['pressure', 'damage'];
+    const safeUpdates: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        safeUpdates[field] = updates[field];
+      }
+    }
+
+    ships[index] = {
+      ...ships[index],
+      ...safeUpdates,
+      // Deep merge damage
+      damage: updates.damage
+        ? { ...(ships[index].damage as Record<string, unknown>), ...updates.damage }
+        : ships[index].damage,
+    };
+
+    await fs.writeFile(scenePath, JSON.stringify(ships, null, 2), 'utf-8');
+
+    // Return filtered list for players
+    const visibleShips = ships
+      .filter(ship => ship.visibleToPlayers !== false)
+      .map(ship => ({
+        id: ship.id,
+        name: ship.name,
+        type: ship.type,
+        class: ship.class,
+        image: ship.image,
+        isCrewShip: ship.isCrewShip,
+        disposition: ship.disposition,
+        pressure: ship.pressure,
+        damage: ship.damage,
+      }));
+
+    res.json({ success: true, data: visibleShips });
+  } catch (error) {
+    console.error('Error updating crew ship:', error);
+    res.status(500).json({ success: false, error: 'Failed to update ship' });
   }
 });
 

@@ -11,7 +11,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -22,6 +22,7 @@ import './modules/npcs/index.js';
 import './modules/locations/index.js';
 import './modules/rules/index.js';
 import './modules/player-characters/index.js';
+import './modules/ships/index.js';
 import './modules/live-play/index.js';
 
 const app = express();
@@ -618,6 +619,35 @@ app.post(
     } catch (error) {
       console.error('Error uploading PC portrait:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload portrait';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload an image for a ship
+app.post(
+  '/api/campaigns/:campaignId/ship-images/:shipId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, shipId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveShipImage(
+        campaignId,
+        shipId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading ship image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
       res.status(500).json({ success: false, error: message });
     }
   }

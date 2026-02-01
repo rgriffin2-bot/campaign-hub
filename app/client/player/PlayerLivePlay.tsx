@@ -1,24 +1,37 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Lock, Users } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Lock, Users, Rocket } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { PCPanel } from '../modules/live-play/components/PCPanel';
 import { SceneNPCPanel } from '../modules/live-play/components/SceneNPCPanel';
-import { useSceneNPCs } from '../core/providers/SceneNPCsProvider';
+import { SceneShipPanel } from '../modules/live-play/components/SceneShipPanel';
+import { CrewShipPanel } from '../modules/live-play/components/CrewShipPanel';
+import { useSceneNPCs, type SceneNPC } from '../core/providers/SceneNPCsProvider';
+import { useSceneShips, type SceneShip } from '../core/providers/SceneShipsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
+import type { ShipDamage } from '@shared/schemas/ship';
 
 type LayoutMode = 'grid' | 'list' | 'compact';
 
 // Polling interval for live updates (3 seconds)
 const POLL_INTERVAL = 3000;
 
+// Define disposition order for sorting
+const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 } as const;
+
+// Scene entity type for combined sorting
+type SceneEntity =
+  | { type: 'npc'; data: SceneNPC }
+  | { type: 'ship'; data: SceneShip };
+
 export function PlayerLivePlay() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('compact');
   const { sceneNPCs } = useSceneNPCs();
+  const { sceneShips, updateShip } = useSceneShips();
 
   // For now, we'll allow editing of any PC in player mode
   // In a full implementation, you'd check the logged-in player against pc.player
@@ -162,6 +175,28 @@ export function PlayerLivePlay() {
         <span>Click on a character panel to enable editing. Other panels are read-only.</span>
       </div>
 
+      {/* Crew Ships Section (editable for players) - appears above party */}
+      {sceneShips.filter(s => s.isCrewShip).length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Rocket className="h-4 w-4" />
+            <span>Crew Ship</span>
+          </div>
+
+          {sceneShips
+            .filter(s => s.isCrewShip)
+            .map(ship => (
+              <CrewShipPanel
+                key={ship.id}
+                ship={ship}
+                editable={true}
+                onUpdatePressure={(pressure) => updateShip(ship.id, { pressure })}
+                onUpdateDamage={(damage) => updateShip(ship.id, { damage: damage as ShipDamage })}
+              />
+            ))}
+        </div>
+      )}
+
       {/* Party Tracker */}
       {characters.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
@@ -203,27 +238,55 @@ export function PlayerLivePlay() {
         </div>
       )}
 
-      {/* Scene NPCs/Entities (read-only view for players) */}
-      {sceneNPCs.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>NPCs & Entities in Scene ({sceneNPCs.length})</span>
-          </div>
+      {/* Scene NPCs & Ships (read-only view for players, sorted by disposition) */}
+      {(() => {
+        // Filter non-crew ships and combine with NPCs
+        const nonCrewShips = sceneShips.filter(s => !s.isCrewShip);
 
-          <div className={layoutClasses[layout]}>
-            {sceneNPCs.map((npc) => (
-              <div key={npc.id} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
-                <SceneNPCPanel
-                  npc={npc}
-                  compact={layout === 'compact'}
-                  showStats={false}
-                />
-              </div>
-            ))}
+        // Combine NPCs and non-crew ships, sorted by disposition
+        const sceneEntities: SceneEntity[] = [
+          ...sceneNPCs.map(npc => ({ type: 'npc' as const, data: npc })),
+          ...nonCrewShips.map(ship => ({ type: 'ship' as const, data: ship })),
+        ].sort((a, b) => {
+          const aDisp = (a.data.disposition || 'neutral') as keyof typeof dispositionOrder;
+          const bDisp = (b.data.disposition || 'neutral') as keyof typeof dispositionOrder;
+          return dispositionOrder[aDisp] - dispositionOrder[bDisp];
+        });
+
+        if (sceneEntities.length === 0) return null;
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>NPCs & Entities in Scene ({sceneEntities.length})</span>
+            </div>
+
+            <div className={layoutClasses[layout]}>
+              {sceneEntities.map(entity => (
+                <div
+                  key={`${entity.type}-${entity.data.id}`}
+                  className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}
+                >
+                  {entity.type === 'npc' ? (
+                    <SceneNPCPanel
+                      npc={entity.data}
+                      compact={layout === 'compact'}
+                      showStats={false}
+                    />
+                  ) : (
+                    <SceneShipPanel
+                      ship={entity.data}
+                      compact={layout === 'compact'}
+                      showControls={false}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -254,3 +254,45 @@ export async function deletePCPortrait(
     // Ignore if file doesn't exist
   }
 }
+
+// Ensure ship images directory exists
+async function ensureShipImageDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'ships');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSaveShipImage(
+  campaignId: string,
+  shipId: string,
+  buffer: Buffer
+): Promise<string> {
+  const uploadDir = await ensureShipImageDir(campaignId);
+  const filename = `${shipId}.jpg`;
+  const filepath = path.join(uploadDir, filename);
+
+  // Resize to landscape dimensions for ship images (wider aspect ratio)
+  // Max width 800px, height 450px (16:9 ish), maintaining aspect ratio
+  await sharp(buffer)
+    .resize(800, 450, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({ quality: 85 })
+    .toFile(filepath);
+
+  // Return relative path from campaign root
+  return `assets/ships/${filename}`;
+}
+
+export async function deleteShipImage(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}

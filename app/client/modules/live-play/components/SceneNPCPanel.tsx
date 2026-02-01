@@ -1,21 +1,51 @@
 import { Link } from 'react-router-dom';
 import { User, X, Shield, Heart, Minus, Plus, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
-import type { SceneNPC } from '../../../core/providers/SceneNPCsProvider';
+import type { SceneNPC, Disposition } from '../../../core/providers/SceneNPCsProvider';
 
 interface SceneNPCPanelProps {
   npc: SceneNPC;
   onRemove?: () => void;
-  onUpdateStats?: (updates: Partial<SceneNPC['antagonistStats']>) => void;
+  onUpdateStats?: (updates: Partial<SceneNPC['stats']>) => void;
+  onUpdateDisposition?: (disposition: Disposition) => void;
   onToggleVisibility?: () => void;
   compact?: boolean;
   showStats?: boolean; // Whether to show health/armor (false for players)
+}
+
+// Get border color based on disposition
+function getDispositionBorderClass(disposition?: Disposition, isHidden?: boolean): string {
+  if (isHidden) return 'border-amber-500/50';
+  switch (disposition) {
+    case 'hostile':
+      return 'border-red-500/50';
+    case 'friendly':
+      return 'border-green-500/50';
+    case 'neutral':
+    default:
+      return 'border-border';
+  }
+}
+
+// Get background tint based on disposition
+function getDispositionBgClass(disposition?: Disposition, isHidden?: boolean): string {
+  if (isHidden) return 'bg-amber-500/5';
+  switch (disposition) {
+    case 'hostile':
+      return 'bg-red-500/5';
+    case 'friendly':
+      return 'bg-green-500/5';
+    case 'neutral':
+    default:
+      return 'bg-card';
+  }
 }
 
 export function SceneNPCPanel({
   npc,
   onRemove,
   onUpdateStats,
+  onUpdateDisposition,
   onToggleVisibility,
   compact = false,
   showStats = true,
@@ -26,11 +56,15 @@ export function SceneNPCPanel({
     ? `/api/campaigns/${campaign.id}/assets/${npc.portrait.replace('assets/', '')}`
     : null;
 
-  const damage = npc.antagonistStats?.damage || 0;
-  const maxDamage = npc.antagonistStats?.maxDamage || 10;
-  const armor = npc.antagonistStats?.armor || 0;
-  const isDefeated = npc.isAntagonist && damage >= maxDamage;
+  // Support both old and new field names
+  const hasStats = npc.hasStats ?? npc.isAntagonist ?? false;
+  const stats = npc.stats ?? npc.antagonistStats ?? {};
+  const damage = stats.damage || 0;
+  const maxDamage = stats.maxDamage || 10;
+  const armor = stats.armor || 0;
+  const isDefeated = hasStats && damage >= maxDamage;
   const isHiddenFromPlayers = npc.visibleToPlayers === false;
+  const disposition = npc.disposition || 'neutral';
 
   const handleDamageChange = (delta: number) => {
     if (onUpdateStats) {
@@ -39,12 +73,12 @@ export function SceneNPCPanel({
     }
   };
 
+  const borderClass = getDispositionBorderClass(disposition, isHiddenFromPlayers);
+  const bgClass = getDispositionBgClass(disposition, isHiddenFromPlayers);
+
   if (compact) {
     return (
-      <div className={`relative rounded-lg border bg-card overflow-hidden ${
-        isHiddenFromPlayers ? 'border-amber-500/50 bg-amber-500/5' :
-        npc.isAntagonist ? 'border-red-500/30' : 'border-border'
-      }`}>
+      <div className={`relative rounded-lg border-2 overflow-hidden ${borderClass} ${bgClass}`}>
         {/* Control buttons */}
         <div className="absolute right-1 top-1 z-10 flex gap-1">
           {onToggleVisibility && (
@@ -106,7 +140,7 @@ export function SceneNPCPanel({
             </div>
           )}
           {/* Armor badge - only show if showStats is true */}
-          {showStats && npc.isAntagonist && armor > 0 && (
+          {showStats && hasStats && armor > 0 && (
             <div className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs font-medium">
               <Shield className="h-3 w-3 text-muted-foreground" />
               <span>{armor}</span>
@@ -123,8 +157,47 @@ export function SceneNPCPanel({
             <p className="truncate text-xs text-muted-foreground">{npc.occupation}</p>
           )}
 
-          {/* Damage tracker for antagonists - only show if showStats is true */}
-          {showStats && npc.isAntagonist && (
+          {/* Disposition selector - only for DM */}
+          {showStats && onUpdateDisposition && (
+            <div className="mt-2 flex gap-1">
+              <button
+                onClick={() => onUpdateDisposition('hostile')}
+                className={`flex-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                  disposition === 'hostile'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-secondary text-muted-foreground hover:bg-red-500/20 hover:text-red-500'
+                }`}
+                title="Hostile"
+              >
+                H
+              </button>
+              <button
+                onClick={() => onUpdateDisposition('neutral')}
+                className={`flex-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                  disposition === 'neutral'
+                    ? 'bg-gray-500 text-white'
+                    : 'bg-secondary text-muted-foreground hover:bg-gray-500/20 hover:text-gray-500'
+                }`}
+                title="Neutral"
+              >
+                N
+              </button>
+              <button
+                onClick={() => onUpdateDisposition('friendly')}
+                className={`flex-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                  disposition === 'friendly'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-secondary text-muted-foreground hover:bg-green-500/20 hover:text-green-500'
+                }`}
+                title="Friendly"
+              >
+                F
+              </button>
+            </div>
+          )}
+
+          {/* Damage tracker for NPCs with stats - only show if showStats is true */}
+          {showStats && hasStats && (
             <div className="mt-2 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <Heart className="h-3 w-3 shrink-0 text-red-500" />
@@ -196,10 +269,7 @@ export function SceneNPCPanel({
 
   // Full layout with prominent portrait
   return (
-    <div className={`relative rounded-lg border bg-card overflow-hidden ${
-      isHiddenFromPlayers ? 'border-amber-500/50 bg-amber-500/5' :
-      npc.isAntagonist ? 'border-red-500/30' : 'border-border'
-    }`}>
+    <div className={`relative rounded-lg border-2 overflow-hidden ${borderClass} ${bgClass}`}>
       {/* Control buttons */}
       <div className="absolute right-2 top-2 z-10 flex gap-1">
         {onToggleVisibility && (
@@ -264,7 +334,7 @@ export function SceneNPCPanel({
         )}
 
         {/* Armor badge - only show if showStats is true */}
-        {showStats && npc.isAntagonist && armor > 0 && (
+        {showStats && hasStats && armor > 0 && (
           <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-xs font-medium">
             <Shield className="h-3 w-3 text-muted-foreground" />
             <span>{armor}</span>
@@ -281,8 +351,44 @@ export function SceneNPCPanel({
           <p className="text-sm text-muted-foreground">{npc.occupation}</p>
         )}
 
-        {/* Damage tracker for antagonists - only show if showStats is true */}
-        {showStats && npc.isAntagonist && (
+        {/* Disposition selector - only for DM */}
+        {showStats && onUpdateDisposition && (
+          <div className="mt-2 flex gap-1">
+            <button
+              onClick={() => onUpdateDisposition('hostile')}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                disposition === 'hostile'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-secondary text-muted-foreground hover:bg-red-500/20 hover:text-red-500'
+              }`}
+            >
+              Hostile
+            </button>
+            <button
+              onClick={() => onUpdateDisposition('neutral')}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                disposition === 'neutral'
+                  ? 'bg-gray-500 text-white'
+                  : 'bg-secondary text-muted-foreground hover:bg-gray-500/20 hover:text-gray-500'
+              }`}
+            >
+              Neutral
+            </button>
+            <button
+              onClick={() => onUpdateDisposition('friendly')}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                disposition === 'friendly'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-secondary text-muted-foreground hover:bg-green-500/20 hover:text-green-500'
+              }`}
+            >
+              Friendly
+            </button>
+          </div>
+        )}
+
+        {/* Damage tracker for NPCs with stats - only show if showStats is true */}
+        {showStats && hasStats && (
           <div className="mt-3 space-y-2">
             <div className="flex items-center gap-2">
               <Heart className="h-4 w-4 shrink-0 text-red-500" />

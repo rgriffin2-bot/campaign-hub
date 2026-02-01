@@ -18,12 +18,13 @@ portraitPosition: # Position/zoom for circular crop (optional)
   'y': 0
   scale: 1
 hidden: false # Set to true to hide from players until revealed
-isAntagonist: false # Set to true if this NPC can be fought/damaged
-antagonistStats: # Combat stats (only used if isAntagonist is true)
-  damage: 0 # Always set to zero to start
-  maxDamage: 10 # Scale with the threat level of the entity
-  armor: 0 # As appropriate given monster threat level and it's characteristics
-  moves: # Combat moves or abilities
+hasStats: false # Set to true if this NPC has a stat block (for combat or other purposes)
+disposition: neutral # hostile, friendly, or neutral - affects grouping in Live Play
+stats: # Combat stats (only used if hasStats is true)
+  damage: 0 # Current damage taken (start at zero)
+  maxDamage: 10 # Damage threshold - scale with threat level
+  armor: 0 # Armor rating as appropriate
+  moves: # Combat moves or abilities (markdown)
 tags:
   - tag1
   - tag2
