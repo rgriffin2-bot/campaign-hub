@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2 } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket } from 'lucide-react';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
 import { SceneNPCPanel } from './components/SceneNPCPanel';
+import { SceneShipPanel } from './components/SceneShipPanel';
+import { CrewShipPanel } from './components/CrewShipPanel';
 import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
+import { useSceneShips, type SceneShip } from '../../core/providers/SceneShipsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
+import type { ShipDamage, ShipDisposition } from '@shared/schemas/ship';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
 
@@ -14,11 +18,33 @@ type LayoutMode = 'grid' | 'list' | 'compact';
 // Polling interval for live updates (3 seconds)
 const POLL_INTERVAL = 3000;
 
+// Define disposition order for sorting (hostile first, then neutral, then friendly)
+const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 };
+
 export function LivePlayDashboard() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('compact');
-  const { sceneNPCs, removeFromScene, clearScene, updateNPCStats, toggleVisibility } = useSceneNPCs();
+  const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
+  const { sceneShips, removeFromScene: removeShipFromScene, clearScene: clearShipScene, updateShip, updateDisposition: updateShipDisposition, toggleVisibility: toggleShipVisibility } = useSceneShips();
+
+  // Separate crew ships from other ships
+  const crewShips = sceneShips.filter((ship: SceneShip) => ship.isCrewShip);
+  const nonCrewShips = sceneShips.filter((ship: SceneShip) => !ship.isCrewShip);
+
+  // Combine NPCs and non-crew ships, sorted by disposition
+  type SceneEntity =
+    | { type: 'npc'; data: typeof sceneNPCs[0] }
+    | { type: 'ship'; data: SceneShip };
+
+  const sceneEntities: SceneEntity[] = [
+    ...sceneNPCs.map(npc => ({ type: 'npc' as const, data: npc })),
+    ...nonCrewShips.map(ship => ({ type: 'ship' as const, data: ship })),
+  ].sort((a, b) => {
+    const aDisp = (a.data.disposition || 'neutral') as keyof typeof dispositionOrder;
+    const bDisp = (b.data.disposition || 'neutral') as keyof typeof dispositionOrder;
+    return dispositionOrder[aDisp] - dispositionOrder[bDisp];
+  });
 
   // Use a separate query with polling for live play
   const { data: characters = [], isLoading, error } = useQuery({
@@ -73,6 +99,11 @@ export function LivePlayDashboard() {
 
   const handleUpdatePC = (pcId: string, updates: Partial<PlayerCharacterFrontmatter>) => {
     updateTrackers.mutate({ pcId, updates });
+  };
+
+  const handleClearScene = () => {
+    clearNPCScene();
+    clearShipScene();
   };
 
   if (isLoading) {
@@ -150,6 +181,21 @@ export function LivePlayDashboard() {
         </div>
       </div>
 
+      {/* Crew Ship Section - Spans full width above party */}
+      {crewShips.length > 0 && (
+        <div className="space-y-2">
+          {crewShips.map((ship: SceneShip) => (
+            <CrewShipPanel
+              key={ship.id}
+              ship={ship}
+              editable
+              onUpdatePressure={(pressure) => updateShip(ship.id, { pressure })}
+              onUpdateDamage={(damage: ShipDamage) => updateShip(ship.id, { damage })}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Party Tracker */}
       {characters.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
@@ -179,16 +225,17 @@ export function LivePlayDashboard() {
         </div>
       )}
 
-      {/* Scene NPCs/Entities */}
-      {sceneNPCs.length > 0 && (
+      {/* Scene Entities (NPCs + Non-Crew Ships) - Sorted by disposition */}
+      {sceneEntities.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Users className="h-4 w-4" />
-              <span>NPCs & Entities in Scene ({sceneNPCs.length})</span>
+              <Rocket className="h-4 w-4" />
+              <span>NPCs & Entities in Scene ({sceneEntities.length})</span>
             </div>
             <button
-              onClick={clearScene}
+              onClick={handleClearScene}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               title="Clear all from scene"
             >
@@ -198,17 +245,36 @@ export function LivePlayDashboard() {
           </div>
 
           <div className={layoutClasses[layout]}>
-            {sceneNPCs.map((npc) => (
-              <div key={npc.id} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
-                <SceneNPCPanel
-                  npc={npc}
-                  onRemove={() => removeFromScene(npc.id)}
-                  onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
-                  onToggleVisibility={() => toggleVisibility(npc.id)}
-                  compact={layout === 'compact'}
-                />
-              </div>
-            ))}
+            {sceneEntities.map((entity) => {
+              if (entity.type === 'npc') {
+                const npc = entity.data;
+                return (
+                  <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                    <SceneNPCPanel
+                      npc={npc}
+                      onRemove={() => removeNPCFromScene(npc.id)}
+                      onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
+                      onUpdateDisposition={(disposition) => updateNPCDisposition(npc.id, disposition)}
+                      onToggleVisibility={() => toggleNPCVisibility(npc.id)}
+                      compact={layout === 'compact'}
+                    />
+                  </div>
+                );
+              } else {
+                const ship = entity.data;
+                return (
+                  <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                    <SceneShipPanel
+                      ship={ship}
+                      onRemove={() => removeShipFromScene(ship.id)}
+                      onUpdateDisposition={(disposition: ShipDisposition) => updateShipDisposition(ship.id, disposition)}
+                      onToggleVisibility={() => toggleShipVisibility(ship.id)}
+                      compact={layout === 'compact'}
+                    />
+                  </div>
+                );
+              }
+            })}
           </div>
         </div>
       )}

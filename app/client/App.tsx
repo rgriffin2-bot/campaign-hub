@@ -4,6 +4,7 @@ import { CampaignProvider } from './core/providers/CampaignProvider';
 import { ModeProvider } from './core/providers/ModeProvider';
 import { AuthProvider, useAuth } from './core/providers/AuthProvider';
 import { SceneNPCsProvider } from './core/providers/SceneNPCsProvider';
+import { SceneShipsProvider } from './core/providers/SceneShipsProvider';
 import { Layout } from './core/Layout';
 import { Dashboard } from './core/Dashboard';
 import { ModuleRouter } from './core/ModuleRouter';
@@ -29,6 +30,8 @@ import { PlayerCharacterList } from './player/PlayerCharacterList';
 import { PlayerCharacterDetail } from './player/PlayerCharacterDetail';
 import { PlayerCharacterEdit } from './player/PlayerCharacterEdit';
 import { PlayerPlaybookMoveDetail } from './player/PlayerPlaybookMoveDetail';
+import { PlayerShipList } from './player/PlayerShipList';
+import { PlayerShipDetail } from './player/PlayerShipDetail';
 import { AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -128,6 +131,8 @@ function AppRoutes() {
           <Route path="modules/player-characters/:fileId" element={<PlayerCharacterDetail />} />
           <Route path="modules/player-characters/:fileId/edit" element={<PlayerCharacterEdit />} />
           <Route path="modules/player-characters/:fileId/moves/:moveId" element={<PlayerPlaybookMoveDetail />} />
+          <Route path="modules/ships" element={<PlayerShipList />} />
+          <Route path="modules/ships/:fileId" element={<PlayerShipDetail />} />
           <Route path="modules/live-play" element={<PlayerLivePlay />} />
           {/* Catch-all for modules without player views */}
           <Route path="modules/*" element={<PlayerModuleNotFound />} />
@@ -144,7 +149,9 @@ export function App() {
         <CampaignProvider>
           <BrowserRouter>
             <SceneNPCsProvider>
-              <AppRoutes />
+              <SceneShipsProvider>
+                <AppRoutes />
+              </SceneShipsProvider>
             </SceneNPCsProvider>
           </BrowserRouter>
         </CampaignProvider>

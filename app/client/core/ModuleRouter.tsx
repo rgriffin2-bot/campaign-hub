@@ -8,6 +8,7 @@ import { NPCList, NPCDetail, NPCEdit, NPCGenerate } from '../modules/npcs';
 import { LocationList, LocationDetail, LocationEdit } from '../modules/locations';
 import { RulesList, RulesDetail, RulesEdit } from '../modules/rules';
 import { PlayerCharacterList, PlayerCharacterDetail, PlayerCharacterEdit } from '../modules/player-characters';
+import { ShipList, ShipDetail, ShipEdit } from '../modules/ships';
 import { LivePlayDashboard } from '../modules/live-play';
 
 // Module view registry - maps moduleId to view components
@@ -45,6 +46,11 @@ const moduleViews: Record<
     list: PlayerCharacterList,
     detail: PlayerCharacterDetail,
     edit: PlayerCharacterEdit,
+  },
+  ships: {
+    list: ShipList,
+    detail: ShipDetail,
+    edit: ShipEdit,
   },
   'live-play': {
     list: LivePlayDashboard, // Dashboard is the main view

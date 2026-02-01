@@ -6,13 +6,20 @@ export const npcDmOnlySchema = z.object({
   notes: z.string().optional(),
 });
 
-// Antagonist stats for combat/encounters
-export const antagonistStatsSchema = z.object({
+// Disposition for NPCs in scenes
+export const dispositionSchema = z.enum(['hostile', 'friendly', 'neutral']);
+export type Disposition = z.infer<typeof dispositionSchema>;
+
+// Combat/stat block for NPCs that need stats
+export const npcStatsSchema = z.object({
   damage: z.number().optional().default(0), // Current damage taken
   maxDamage: z.number().optional().default(10), // Damage threshold
   armor: z.number().optional().default(0), // Armor rating
   moves: z.string().optional(), // Enemy moves/abilities (markdown)
 });
+
+// Keep old name as alias for backwards compatibility
+export const antagonistStatsSchema = npcStatsSchema;
 
 // Related character entry: "[[npcs:id]] - description"
 export const relatedCharacterSchema = z.object({
@@ -43,13 +50,18 @@ export const npcSchema = z.object({
     scale: z.number(),
   }).optional(), // Position/zoom for circular crop
   hidden: z.boolean().optional().default(false), // Hidden from players until revealed
-  isAntagonist: z.boolean().optional().default(false), // Mark as potential antagonist/enemy
-  antagonistStats: antagonistStatsSchema.optional(), // Combat stats for antagonists
+  hasStats: z.boolean().optional().default(false), // Whether this NPC has combat/stat block
+  disposition: dispositionSchema.optional().default('neutral'), // Hostile, friendly, or neutral
+  stats: npcStatsSchema.optional(), // Combat stats (only used if hasStats is true)
+  // Keep old fields as aliases for backwards compatibility
+  isAntagonist: z.boolean().optional(), // Deprecated: use hasStats instead
+  antagonistStats: antagonistStatsSchema.optional(), // Deprecated: use stats instead
 });
 
 export type NPCFrontmatter = z.infer<typeof npcSchema>;
 export type NPCDmOnly = z.infer<typeof npcDmOnlySchema>;
-export type AntagonistStats = z.infer<typeof antagonistStatsSchema>;
+export type NPCStats = z.infer<typeof npcStatsSchema>;
+export type AntagonistStats = z.infer<typeof antagonistStatsSchema>; // Deprecated alias
 
 export interface NPCFile {
   frontmatter: NPCFrontmatter;
