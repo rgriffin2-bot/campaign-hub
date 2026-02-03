@@ -17,6 +17,7 @@ interface CampaignContextValue {
   campaigns: CampaignMeta[];
   switchCampaign: (campaignId: string) => Promise<void>;
   createCampaign: (config: Partial<CampaignConfig>) => Promise<void>;
+  reorderModules: (newOrder: string[]) => Promise<void>;
   enabledModules: ModuleInfo[];
   allModules: ModuleInfo[];
   getModuleSetting: <T>(moduleId: string, key: string) => T | undefined;
@@ -142,8 +143,46 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     [createMutation]
   );
 
+  // Reorder modules - updates the campaign's module order
+  const reorderModules = useCallback(
+    async (newOrder: string[]) => {
+      if (!campaign) return;
+
+      // Optimistically update local state
+      setCampaign((prev) => prev ? { ...prev, modules: newOrder } : null);
+
+      try {
+        const res = await fetch(`/api/campaigns/${campaign.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modules: newOrder }),
+          credentials: 'include',
+        });
+
+        const data = await res.json();
+        if (!data.success) {
+          // Revert on error
+          setCampaign((prev) => prev ? { ...prev, modules: campaign.modules } : null);
+          throw new Error(data.error);
+        }
+
+        // Update with server response
+        setCampaign(data.data);
+        queryClient.invalidateQueries({ queryKey: ['active-campaign'] });
+      } catch (error) {
+        // Revert on error
+        setCampaign((prev) => prev ? { ...prev, modules: campaign.modules } : null);
+        console.error('Failed to reorder modules:', error);
+      }
+    },
+    [campaign, queryClient]
+  );
+
+  // Sort modules by their order in campaign.modules
   const enabledModules = campaign
-    ? allModules.filter((m) => campaign.modules.includes(m.id))
+    ? campaign.modules
+        .map((id) => allModules.find((m) => m.id === id))
+        .filter((m): m is ModuleInfo => m !== undefined)
     : [];
 
   const getModuleSetting = useCallback(
@@ -159,6 +198,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     campaigns,
     switchCampaign,
     createCampaign: createCampaignFn,
+    reorderModules,
     enabledModules,
     allModules,
     getModuleSetting,

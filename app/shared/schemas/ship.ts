@@ -47,6 +47,7 @@ export const shipSchema = z.object({
   pressure: shipPressureSchema, // Pressure tracker (0-5)
   damage: shipDamageSchema.optional(), // Subsystem damage
   image: z.string().optional(), // Path to ship image
+  imagePosition: z.object({ x: z.number(), y: z.number(), scale: z.number() }).optional(), // Image crop position
   tags: z.array(z.string()).optional().default([]),
 });
 

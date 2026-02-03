@@ -34,6 +34,9 @@ import './modules/rules/index.js';
 import './modules/player-characters/index.js';
 import './modules/ships/index.js';
 import './modules/live-play/index.js';
+import './modules/session-notes/index.js';
+import './modules/factions/index.js';
+import './modules/projects/index.js';
 
 const app = express();
 

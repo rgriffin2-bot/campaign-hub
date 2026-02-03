@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Rocket, Sparkles, ExternalLink } from 'lucide-react';
-import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { SUBSYSTEM_SHORT_LABELS, type SubsystemKey, type ShipDamage } from '@shared/schemas/ship';
 
 interface CrewShipPanelProps {
@@ -11,6 +10,7 @@ interface CrewShipPanelProps {
     type?: string;
     class?: string;
     image?: string;
+    imagePosition?: { x: number; y: number; scale: number };
     pressure?: number;
     damage?: ShipDamage;
   };
@@ -34,12 +34,7 @@ export function CrewShipPanel({
   onUpdatePressure,
   onUpdateDamage,
 }: CrewShipPanelProps) {
-  const { campaign } = useCampaign();
-  const [expanded, setExpanded] = useState(true);
-
-  const imageUrl = ship.image && campaign
-    ? `/api/campaigns/${campaign.id}/assets/${ship.image.replace('assets/', '')}`
-    : null;
+  const [expanded, setExpanded] = useState(false);
 
   const pressure = ship.pressure || 0;
   const damage = ship.damage || {};
@@ -72,26 +67,30 @@ export function CrewShipPanel({
     onUpdateDamage(updated);
   };
 
+  // Collapsed view - just the name in a small box
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-secondary ${
+          hasDamage ? 'border-red-500/30' : 'border-primary/30'
+        }`}
+      >
+        <Rocket className="h-4 w-4 text-primary/70 shrink-0" />
+        <span className="font-medium text-foreground truncate">{ship.name}</span>
+        {hasDamage && (
+          <span className="shrink-0 rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-medium text-red-500">
+            Damaged
+          </span>
+        )}
+        <ChevronDown className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+      </button>
+    );
+  }
+
   return (
     <div className={`rounded-lg border-2 border-primary/30 bg-card overflow-hidden ${hasDamage ? 'border-red-500/30' : ''}`}>
-      <div className="flex">
-        {/* Large portrait on the left */}
-        <div className="w-48 shrink-0 bg-primary/10">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={ship.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full min-h-[180px] w-full items-center justify-center text-primary/50">
-              <Rocket className="h-16 w-16" />
-            </div>
-          )}
-        </div>
-
-        {/* Right side content */}
-        <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex flex-col">
           {/* Top row: Name/class/type, Pressure, View Entry */}
           <div className="flex items-center gap-4 border-b border-border px-4 py-3">
             {/* Name and type info */}
@@ -148,16 +147,12 @@ export function CrewShipPanel({
               onClick={() => setExpanded(!expanded)}
               className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
             >
-              {expanded ? (
-                <ChevronUp className="h-5 w-5" />
-              ) : (
-                <ChevronDown className="h-5 w-5" />
-              )}
+              <ChevronUp className="h-5 w-5" />
             </button>
           </div>
 
           {/* Damage section - expanded content */}
-          {expanded && (
+          {(
             <div className="flex-1 px-4 py-3">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[500px] text-sm">
@@ -230,7 +225,6 @@ export function CrewShipPanel({
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

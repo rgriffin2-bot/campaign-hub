@@ -6,6 +6,7 @@ import { PCPanel } from '../modules/live-play/components/PCPanel';
 import { SceneNPCPanel } from '../modules/live-play/components/SceneNPCPanel';
 import { SceneShipPanel } from '../modules/live-play/components/SceneShipPanel';
 import { CrewShipPanel } from '../modules/live-play/components/CrewShipPanel';
+import { DiceRoller } from '../modules/live-play/components/DiceRoller';
 import { useSceneNPCs, type SceneNPC } from '../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../core/providers/SceneShipsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
@@ -169,18 +170,17 @@ export function PlayerLivePlay() {
         </div>
       </div>
 
-      {/* Info banner */}
-      <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-4 py-2 text-sm text-muted-foreground">
-        <Lock className="h-4 w-4" />
-        <span>Click on a character panel to enable editing. Other panels are read-only.</span>
+      {/* Dice Roller - constrained width */}
+      <div className="max-w-[300px]">
+        <DiceRoller />
       </div>
 
-      {/* Crew Ships Section (editable for players) - appears above party */}
+      {/* Crew Ships + Vehicles Section (editable for players) - appears above party */}
       {sceneShips.filter(s => s.isCrewShip).length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Rocket className="h-4 w-4" />
-            <span>Crew Ship</span>
+            <span>Crew Ships + Vehicles</span>
           </div>
 
           {sceneShips
@@ -196,6 +196,12 @@ export function PlayerLivePlay() {
             ))}
         </div>
       )}
+
+      {/* Info banner - directly above character row */}
+      <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-4 py-2 text-sm text-muted-foreground">
+        <Lock className="h-4 w-4" />
+        <span>Click on a character panel to enable editing. Other panels are read-only.</span>
+      </div>
 
       {/* Party Tracker */}
       {characters.length === 0 ? (

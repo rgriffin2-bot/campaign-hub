@@ -87,7 +87,7 @@ export function PlayerLayout() {
               {/* Module Links */}
               {enabledModules.length > 0 && (() => {
                 // Only show modules that have player views
-                const playerViewModules = ['npcs', 'lore', 'locations', 'rules', 'player-characters', 'live-play'];
+                const playerViewModules = ['npcs', 'lore', 'locations', 'rules', 'player-characters', 'live-play', 'ships', 'session-notes', 'factions', 'projects'];
                 const visibleModules = enabledModules.filter(m => playerViewModules.includes(m.id));
 
                 if (visibleModules.length === 0) return null;

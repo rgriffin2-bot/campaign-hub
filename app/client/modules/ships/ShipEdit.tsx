@@ -28,6 +28,7 @@ export function ShipEdit() {
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
   const [image, setImage] = useState<string | undefined>(undefined);
+  const [imagePosition, setImagePosition] = useState<{ x: number; y: number; scale: number } | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function ShipEdit() {
       setDmNotes(dmOnlyData?.notes || '');
       setTags((fm.tags || []).join(', '));
       setImage(fm.image);
+      setImagePosition(fm.imagePosition);
       setContent(existingShip.content);
     }
   }, [existingShip, isNew]);
@@ -91,6 +93,7 @@ export function ShipEdit() {
         dmOnly,
         tags: tagsArray.length > 0 ? tagsArray : undefined,
         image,
+        imagePosition,
       };
 
       if (isNew) {
@@ -105,8 +108,9 @@ export function ShipEdit() {
     }
   };
 
-  const handleImageUpload = (path: string) => {
+  const handleImageUpload = (path: string, position: { x: number; y: number; scale: number }) => {
     setImage(path);
+    setImagePosition(position);
   };
 
   if (isLoading && !isNew) {
@@ -154,6 +158,7 @@ export function ShipEdit() {
             <h3 className="mb-4 font-medium text-foreground">Ship Image</h3>
             <ShipImageUpload
               currentImage={image}
+              imagePosition={imagePosition}
               shipId={fileId}
               onUploadComplete={handleImageUpload}
             />

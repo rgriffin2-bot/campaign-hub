@@ -6,6 +6,7 @@ import { PCPanel } from './components/PCPanel';
 import { SceneNPCPanel } from './components/SceneNPCPanel';
 import { SceneShipPanel } from './components/SceneShipPanel';
 import { CrewShipPanel } from './components/CrewShipPanel';
+import { DiceRoller } from './components/DiceRoller';
 import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../../core/providers/SceneShipsProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
@@ -181,9 +182,18 @@ export function LivePlayDashboard() {
         </div>
       </div>
 
-      {/* Crew Ship Section - Spans full width above party */}
+      {/* Dice Roller - constrained width */}
+      <div className="max-w-[300px]">
+        <DiceRoller isDM />
+      </div>
+
+      {/* Crew Ships + Vehicles Section - Spans full width above party */}
       {crewShips.length > 0 && (
         <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Rocket className="h-4 w-4" />
+            <span>Crew Ships + Vehicles</span>
+          </div>
           {crewShips.map((ship: SceneShip) => (
             <CrewShipPanel
               key={ship.id}
@@ -278,6 +288,7 @@ export function LivePlayDashboard() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

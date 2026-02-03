@@ -32,6 +32,13 @@ import { PlayerCharacterEdit } from './player/PlayerCharacterEdit';
 import { PlayerPlaybookMoveDetail } from './player/PlayerPlaybookMoveDetail';
 import { PlayerShipList } from './player/PlayerShipList';
 import { PlayerShipDetail } from './player/PlayerShipDetail';
+import { PlayerSessionNotesList } from './player/PlayerSessionNotesList';
+import { PlayerSessionNotesDetail } from './player/PlayerSessionNotesDetail';
+import { PlayerSessionNotesEdit } from './player/PlayerSessionNotesEdit';
+import { PlayerFactionList } from './player/PlayerFactionList';
+import { PlayerFactionDetail } from './player/PlayerFactionDetail';
+import { PlayerProjectList } from './player/PlayerProjectList';
+import { PlayerProjectDetail } from './player/PlayerProjectDetail';
 import { AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -133,6 +140,14 @@ function AppRoutes() {
           <Route path="modules/player-characters/:fileId/moves/:moveId" element={<PlayerPlaybookMoveDetail />} />
           <Route path="modules/ships" element={<PlayerShipList />} />
           <Route path="modules/ships/:fileId" element={<PlayerShipDetail />} />
+          <Route path="modules/session-notes" element={<PlayerSessionNotesList />} />
+          <Route path="modules/session-notes/new" element={<PlayerSessionNotesEdit />} />
+          <Route path="modules/session-notes/:fileId" element={<PlayerSessionNotesDetail />} />
+          <Route path="modules/session-notes/:fileId/edit" element={<PlayerSessionNotesEdit />} />
+          <Route path="modules/factions" element={<PlayerFactionList />} />
+          <Route path="modules/factions/:fileId" element={<PlayerFactionDetail />} />
+          <Route path="modules/projects" element={<PlayerProjectList />} />
+          <Route path="modules/projects/:fileId" element={<PlayerProjectDetail />} />
           <Route path="modules/live-play" element={<PlayerLivePlay />} />
           {/* Catch-all for modules without player views */}
           <Route path="modules/*" element={<PlayerModuleNotFound />} />

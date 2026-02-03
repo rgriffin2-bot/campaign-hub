@@ -3,10 +3,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { moduleRegistry } from '../registry.js';
 import { campaignManager } from '../../core/campaign-manager.js';
+import { fileStore } from '../../core/file-store.js';
 import { config } from '../../config.js';
 import { withFileLock } from '../../core/file-lock.js';
 import type { ModuleDefinition } from '../../../shared/types/module.js';
-import type { SceneNPC, SceneShip } from '../../../shared/types/scene.js';
+import type { SceneNPC, SceneShip, DiceRollState, DiceRoll } from '../../../shared/types/scene.js';
 import {
   validate,
   sceneNPCSchema,
@@ -203,7 +204,7 @@ async function writeSceneShips(campaignId: string, ships: SceneShip[]): Promise<
   });
 }
 
-// GET /scene-ships - Get all scene ships
+// GET /scene-ships - Get all scene ships (syncs pressure/damage from ship files)
 const getSceneShips: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -213,6 +214,39 @@ const getSceneShips: RequestHandler = async (_req, res) => {
     }
 
     const ships = await readSceneShips(campaign.id);
+
+    // Sync pressure and damage from actual ship files to scene copies
+    let hasChanges = false;
+    for (let i = 0; i < ships.length; i++) {
+      try {
+        const shipFile = await fileStore.get(campaign.id, 'ships', ships[i].id);
+        if (shipFile) {
+          const fm = shipFile.frontmatter as Record<string, unknown>;
+          // Sync pressure if different
+          if (fm.pressure !== undefined && fm.pressure !== ships[i].pressure) {
+            ships[i].pressure = fm.pressure as number;
+            hasChanges = true;
+          }
+          // Sync damage if different
+          if (fm.damage !== undefined) {
+            const fileDamage = JSON.stringify(fm.damage);
+            const sceneDamage = JSON.stringify(ships[i].damage);
+            if (fileDamage !== sceneDamage) {
+              ships[i].damage = fm.damage as typeof ships[0]['damage'];
+              hasChanges = true;
+            }
+          }
+        }
+      } catch {
+        // Ship file doesn't exist or error reading - skip sync for this ship
+      }
+    }
+
+    // Save updated scene ships if there were changes
+    if (hasChanges) {
+      await writeSceneShips(campaign.id, ships);
+    }
+
     res.json({ success: true, data: ships });
   } catch (error) {
     console.error('Error getting scene ships:', error);
@@ -273,16 +307,40 @@ const updateSceneShip: RequestHandler = async (req, res) => {
     }
 
     // Merge updates into existing ship
+    const mergedDamage = updates.damage
+      ? { ...ships[index].damage, ...updates.damage }
+      : ships[index].damage;
+
     ships[index] = {
       ...ships[index],
       ...updates,
       // Deep merge damage if present
-      damage: updates.damage
-        ? { ...ships[index].damage, ...updates.damage }
-        : ships[index].damage,
+      damage: mergedDamage,
     };
 
     await writeSceneShips(campaign.id, ships);
+
+    // Sync pressure and damage back to the actual ship file
+    if ('pressure' in updates || 'damage' in updates) {
+      try {
+        const shipFile = await fileStore.get(campaign.id, 'ships', shipId);
+        if (shipFile) {
+          const fileUpdates: Record<string, unknown> = {};
+          if ('pressure' in updates) {
+            fileUpdates.pressure = updates.pressure;
+          }
+          if ('damage' in updates) {
+            fileUpdates.damage = mergedDamage;
+          }
+          await fileStore.update(campaign.id, 'ships', shipId, {
+            frontmatter: fileUpdates,
+          });
+        }
+      } catch (syncError) {
+        // Log but don't fail the request if sync fails
+        console.error('Failed to sync ship updates to file:', syncError);
+      }
+    }
 
     res.json({ success: true, data: ships });
   } catch (error) {
@@ -332,6 +390,137 @@ const clearSceneShips: RequestHandler = async (_req, res) => {
   }
 };
 
+// ============================================================================
+// Dice Rolls
+// ============================================================================
+
+const MAX_ROLL_HISTORY = 5;
+
+function getDiceRollFilePath(campaignId: string): string {
+  return path.join(config.campaignsDir, campaignId, '_dice-rolls.json');
+}
+
+async function readDiceRollState(campaignId: string): Promise<DiceRollState> {
+  const filePath = getDiceRollFilePath(campaignId);
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return { rolls: [], visibleToPlayers: true };
+  }
+}
+
+async function writeDiceRollState(campaignId: string, state: DiceRollState): Promise<void> {
+  const filePath = getDiceRollFilePath(campaignId);
+  await withFileLock(filePath, async () => {
+    await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+  });
+}
+
+// GET /dice-rolls - Get the dice roll state with history
+const getDiceRolls: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state = await readDiceRollState(campaign.id);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error getting dice rolls:', error);
+    res.status(500).json({ success: false, error: 'Failed to get dice rolls' });
+  }
+};
+
+// POST /dice-rolls - Roll a dice (adds to history)
+const rollDice: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { diceType, rolledBy = 'dm', rollerName } = req.body;
+
+    // Validate dice type
+    const validDice = ['d4', 'd6', 'd8', 'd10', 'd12', 'd100'];
+    if (!validDice.includes(diceType)) {
+      res.status(400).json({ success: false, error: 'Invalid dice type' });
+      return;
+    }
+
+    // Generate random result based on dice type
+    const maxValue = diceType === 'd100' ? 100 : parseInt(diceType.substring(1));
+    const result = Math.floor(Math.random() * maxValue) + 1;
+
+    const roll: DiceRoll = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      diceType,
+      result,
+      rolledBy,
+      rollerName,
+      rolledAt: new Date().toISOString(),
+    };
+
+    const state = await readDiceRollState(campaign.id);
+
+    // Add new roll to the beginning and keep only last MAX_ROLL_HISTORY
+    state.rolls = [roll, ...state.rolls].slice(0, MAX_ROLL_HISTORY);
+
+    await writeDiceRollState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error rolling dice:', error);
+    res.status(500).json({ success: false, error: 'Failed to roll dice' });
+  }
+};
+
+// PATCH /dice-rolls/visibility - Toggle visibility of the dice roller
+const toggleDiceVisibility: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { visibleToPlayers } = req.body;
+
+    const state = await readDiceRollState(campaign.id);
+    state.visibleToPlayers = visibleToPlayers;
+    await writeDiceRollState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error toggling dice visibility:', error);
+    res.status(500).json({ success: false, error: 'Failed to toggle dice visibility' });
+  }
+};
+
+// DELETE /dice-rolls - Clear all roll history
+const clearDiceRolls: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state = await readDiceRollState(campaign.id);
+    state.rolls = [];
+    await writeDiceRollState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error clearing dice rolls:', error);
+    res.status(500).json({ success: false, error: 'Failed to clear dice rolls' });
+  }
+};
+
 // Live Play module
 export const livePlayModule: ModuleDefinition = {
   id: 'live-play',
@@ -352,6 +541,11 @@ export const livePlayModule: ModuleDefinition = {
     { method: 'PATCH', path: '/scene-ships/:shipId', handler: updateSceneShip, middleware: [validate({ body: updateSceneShipSchema })] },
     { method: 'DELETE', path: '/scene-ships/:shipId', handler: removeSceneShip },
     { method: 'DELETE', path: '/scene-ships', handler: clearSceneShips },
+    // Dice Rolls
+    { method: 'GET', path: '/dice-rolls', handler: getDiceRolls },
+    { method: 'POST', path: '/dice-rolls', handler: rollDice },
+    { method: 'PATCH', path: '/dice-rolls/visibility', handler: toggleDiceVisibility },
+    { method: 'DELETE', path: '/dice-rolls', handler: clearDiceRolls },
   ],
   views: {
     list: PlaceholderView, // Dashboard is the "list" view

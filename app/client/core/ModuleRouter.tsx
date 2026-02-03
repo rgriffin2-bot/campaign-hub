@@ -10,6 +10,9 @@ import { RulesList, RulesDetail, RulesEdit } from '../modules/rules';
 import { PlayerCharacterList, PlayerCharacterDetail, PlayerCharacterEdit } from '../modules/player-characters';
 import { ShipList, ShipDetail, ShipEdit } from '../modules/ships';
 import { LivePlayDashboard } from '../modules/live-play';
+import { SessionNotesList, SessionNotesDetail, SessionNotesEdit } from '../modules/session-notes';
+import { FactionList, FactionDetail, FactionEdit } from '../modules/factions';
+import { ProjectList, ProjectDetail, ProjectEdit } from '../modules/projects';
 
 // Module view registry - maps moduleId to view components
 const moduleViews: Record<
@@ -55,6 +58,21 @@ const moduleViews: Record<
   'live-play': {
     list: LivePlayDashboard, // Dashboard is the main view
     detail: LivePlayDashboard, // No detail view, always show dashboard
+  },
+  'session-notes': {
+    list: SessionNotesList,
+    detail: SessionNotesDetail,
+    edit: SessionNotesEdit,
+  },
+  factions: {
+    list: FactionList,
+    detail: FactionDetail,
+    edit: FactionEdit,
+  },
+  projects: {
+    list: ProjectList,
+    detail: ProjectDetail,
+    edit: ProjectEdit,
   },
 };
 

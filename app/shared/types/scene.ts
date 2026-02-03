@@ -46,9 +46,35 @@ export interface SceneShip {
   type?: string;
   class?: string;
   image?: string;
+  imagePosition?: { x: number; y: number; scale: number };
   isCrewShip?: boolean;
   disposition?: Disposition;
   pressure?: number;
   damage?: ShipDamage;
   visibleToPlayers?: boolean;
+}
+
+/**
+ * Dice types available for rolling
+ */
+export type DiceType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd100';
+
+/**
+ * A single dice roll record
+ */
+export interface DiceRoll {
+  id: string;
+  diceType: DiceType;
+  result: number;
+  rolledBy: 'dm' | 'player';
+  rollerName?: string;
+  rolledAt: string;
+}
+
+/**
+ * Dice roll state - tracks recent dice rolls for live play
+ */
+export interface DiceRollState {
+  rolls: DiceRoll[];
+  visibleToPlayers: boolean;
 }

@@ -27,7 +27,7 @@ export function PressureTracker({ value, editable = false, compact = false, onCh
     onChange(index + 1 === value ? index : index + 1);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!editable || !onChange) return;
     if (e.key === 'ArrowRight' && value < 5) {
       e.preventDefault();
@@ -59,7 +59,7 @@ export function PressureTracker({ value, editable = false, compact = false, onCh
             key={i}
             type="button"
             onClick={() => handleClick(i)}
-            onKeyDown={(e) => handleKeyDown(e, i)}
+            onKeyDown={handleKeyDown}
             disabled={!editable}
             aria-label={`Set pressure to ${i + 1}`}
             aria-pressed={i < value}
@@ -146,19 +146,17 @@ interface ResourceTrackerProps {
   onChange?: (value: ResourceLevel) => void;
 }
 
-export function ResourceTracker({ value, editable = false, compact = false, onChange }: ResourceTrackerProps) {
-  const handleKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+export function ResourceTracker({ value, editable = false, compact: _compact = false, onChange }: ResourceTrackerProps) {
+  const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
     if (!editable || !onChange) return;
-    if (e.key === 'ArrowDown' && currentIndex < resourceLevels.length - 1) {
+    if (e.key === 'ArrowDown' && idx < resourceLevels.length - 1) {
       e.preventDefault();
-      onChange(resourceLevels[currentIndex + 1]);
-    } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+      onChange(resourceLevels[idx + 1]);
+    } else if (e.key === 'ArrowUp' && idx > 0) {
       e.preventDefault();
-      onChange(resourceLevels[currentIndex - 1]);
+      onChange(resourceLevels[idx - 1]);
     }
   };
-
-  const currentIndex = resourceLevels.indexOf(value);
 
   return (
     <div className="flex flex-col gap-1" role="radiogroup" aria-label="Resources">

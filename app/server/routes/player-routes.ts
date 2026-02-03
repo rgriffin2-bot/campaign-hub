@@ -180,6 +180,83 @@ router.get('/campaigns/:campaignId/search', async (req, res) => {
 });
 
 // =============================================================================
+// Player Session Notes (Write Access)
+// =============================================================================
+
+// Create a session note
+router.post('/campaigns/:campaignId/files/session-notes', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const { name, frontmatter, content } = req.body;
+
+    if (!name || !name.trim()) {
+      res.status(400).json({ success: false, error: 'Name is required' });
+      return;
+    }
+
+    const file = await fileStore.create(campaignId, 'session-notes', {
+      name: name.trim(),
+      frontmatter: frontmatter || {},
+      content: content || '',
+    });
+
+    res.status(201).json({ success: true, data: file });
+  } catch (error) {
+    console.error('Error creating session notes:', error);
+    res.status(500).json({ success: false, error: 'Failed to create session notes' });
+  }
+});
+
+// Update a session note
+router.put('/campaigns/:campaignId/files/session-notes/:fileId', async (req, res) => {
+  try {
+    const { campaignId, fileId } = req.params;
+    const { name, frontmatter, content } = req.body;
+
+    const existingFile = await fileStore.get(campaignId, 'session-notes', fileId);
+    if (!existingFile) {
+      res.status(404).json({ success: false, error: 'Session notes not found' });
+      return;
+    }
+
+    const updated = await fileStore.update(campaignId, 'session-notes', fileId, {
+      name,
+      frontmatter: frontmatter || {},
+      content,
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating session notes:', error);
+    res.status(500).json({ success: false, error: 'Failed to update session notes' });
+  }
+});
+
+// Delete a session note
+router.delete('/campaigns/:campaignId/files/session-notes/:fileId', async (req, res) => {
+  try {
+    const { campaignId, fileId } = req.params;
+
+    const existingFile = await fileStore.get(campaignId, 'session-notes', fileId);
+    if (!existingFile) {
+      res.status(404).json({ success: false, error: 'Session notes not found' });
+      return;
+    }
+
+    const success = await fileStore.delete(campaignId, 'session-notes', fileId);
+    if (!success) {
+      res.status(404).json({ success: false, error: 'Session notes not found' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting session notes:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete session notes' });
+  }
+});
+
+// =============================================================================
 // Player Character Updates (Write Access for Own Characters)
 // =============================================================================
 
@@ -564,6 +641,109 @@ router.patch('/scene-ships/:shipId', async (req, res) => {
   } catch (error) {
     console.error('Error updating crew ship:', error);
     res.status(500).json({ success: false, error: 'Failed to update ship' });
+  }
+});
+
+// =============================================================================
+// Player Dice Rolls
+// =============================================================================
+
+interface DiceRoll {
+  id: string;
+  diceType: string;
+  result: number;
+  rolledBy: 'dm' | 'player';
+  rollerName?: string;
+  rolledAt: string;
+}
+
+interface DiceRollState {
+  rolls: DiceRoll[];
+  visibleToPlayers: boolean;
+}
+
+// Get dice rolls (only if visible to players)
+router.get('/dice-rolls', async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const filePath = path.join(config.campaignsDir, campaign.id, '_dice-rolls.json');
+    let state: DiceRollState = { rolls: [], visibleToPlayers: true };
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      state = JSON.parse(content);
+    } catch {
+      // File doesn't exist - return empty state
+    }
+
+    // If not visible to players, return empty rolls
+    if (!state.visibleToPlayers) {
+      res.json({ success: true, data: { rolls: [], visibleToPlayers: false } });
+      return;
+    }
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error getting dice rolls for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to get dice rolls' });
+  }
+});
+
+// Roll dice (players can roll)
+router.post('/dice-rolls', async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { diceType, rollerName } = req.body;
+
+    // Validate dice type
+    const validDice = ['d4', 'd6', 'd8', 'd10', 'd12', 'd100'];
+    if (!validDice.includes(diceType)) {
+      res.status(400).json({ success: false, error: 'Invalid dice type' });
+      return;
+    }
+
+    // Generate random result
+    const maxValue = diceType === 'd100' ? 100 : parseInt(diceType.substring(1));
+    const result = Math.floor(Math.random() * maxValue) + 1;
+
+    const roll: DiceRoll = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      diceType,
+      result,
+      rolledBy: 'player',
+      rollerName,
+      rolledAt: new Date().toISOString(),
+    };
+
+    const filePath = path.join(config.campaignsDir, campaign.id, '_dice-rolls.json');
+    let state: DiceRollState = { rolls: [], visibleToPlayers: true };
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      state = JSON.parse(content);
+    } catch {
+      // File doesn't exist - use default state
+    }
+
+    // Add new roll to the beginning and keep only last 5
+    state.rolls = [roll, ...state.rolls].slice(0, 5);
+
+    await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error rolling dice for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to roll dice' });
   }
 });
 
