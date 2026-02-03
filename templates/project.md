@@ -18,43 +18,19 @@ notes: >-
   complications that might arise, NPCs involved behind the scenes.
 ---
 
-# Project Details
+Write your downtime project content here using Markdown formatting. This section is completely open-ended - structure it however makes sense for your content.
 
-Write detailed notes about this project using Markdown formatting. This section is player-visible (unless the entry is hidden).
+You can use any Markdown features:
+- Headers (# ## ###)
+- **Bold** and *italic* text
+- Lists and numbered lists
+- > Blockquotes
+- `code` and code blocks
+- Tables
+- And more
 
-## Requirements
-
-What needs to happen to complete this project? Resources needed, skills required, etc.
-
-## Current Status
-
-Where does the project currently stand? What's been accomplished?
-
-## Complications
-
-What obstacles or complications have arisen?
-
----
-
-## Progress Notes
-
-Track roll results and narrative progress here:
-
-- **Session X**: Rolled a 7 (1 segment). Encountered [complication].
-- **Session Y**: Rolled a 10+ (2 segments). Made a breakthrough with [detail].
-
----
-
-## Reference: Clock Sizes
-
-- **4 segments** — Straightforward or well-supported work
-- **6 segments** — Complex, risky, or unfamiliar work
-- **8 segments** — Major undertakings, rare materials, or high-stakes goals
-
-## Reference: Move the Needle Results
-
-When pushing a long-term project forward:
-- **10+** — Mark 2 segments
-- **7–9** — Mark 1 segment
-- **Miss** — No progress (may spend a resource to mark 1 segment)
+To reference other entries, use wiki-style links:
+- [[lore:entry-id]] - Link to another lore entry
+- [[npcs:character-id]] - Link to an NPC
+- [[locations:place-id]] - Link to a location
 
