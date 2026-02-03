@@ -5,6 +5,54 @@ import { markdownParser } from './markdown-parser.js';
 import { generateFileId } from '../../shared/utils/ids.js';
 import type { ParsedFile, FileMetadata, CreateFileInput, UpdateFileInput } from '../../shared/types/file.js';
 
+// =============================================================================
+// ID Index Cache for O(1) file lookups
+// =============================================================================
+
+// Cache structure: campaignId -> moduleFolder -> fileId -> filePath
+const idIndex = new Map<string, Map<string, Map<string, string>>>();
+
+
+function getCachedPath(campaignId: string, moduleFolder: string, fileId: string): string | undefined {
+  const campaignCache = idIndex.get(campaignId);
+  if (!campaignCache) return undefined;
+  const moduleCache = campaignCache.get(moduleFolder);
+  if (!moduleCache) return undefined;
+  return moduleCache.get(fileId);
+}
+
+function setCachedPath(campaignId: string, moduleFolder: string, fileId: string, filePath: string): void {
+  let campaignCache = idIndex.get(campaignId);
+  if (!campaignCache) {
+    campaignCache = new Map();
+    idIndex.set(campaignId, campaignCache);
+  }
+  let moduleCache = campaignCache.get(moduleFolder);
+  if (!moduleCache) {
+    moduleCache = new Map();
+    campaignCache.set(moduleFolder, moduleCache);
+  }
+  moduleCache.set(fileId, filePath);
+}
+
+function removeCachedPath(campaignId: string, moduleFolder: string, fileId: string): void {
+  const campaignCache = idIndex.get(campaignId);
+  if (!campaignCache) return;
+  const moduleCache = campaignCache.get(moduleFolder);
+  if (!moduleCache) return;
+  moduleCache.delete(fileId);
+}
+
+function clearModuleCache(campaignId: string, moduleFolder: string): void {
+  const campaignCache = idIndex.get(campaignId);
+  if (!campaignCache) return;
+  campaignCache.delete(moduleFolder);
+}
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
 async function ensureDir(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
 }
@@ -18,7 +66,28 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function findFileById(dirPath: string, fileId: string): Promise<string | null> {
+/**
+ * Find a file by ID, using cached index when available
+ * Falls back to scanning if not in cache
+ */
+async function findFileById(
+  campaignId: string,
+  moduleFolder: string,
+  dirPath: string,
+  fileId: string
+): Promise<string | null> {
+  // Try cache first (O(1) lookup)
+  const cachedPath = getCachedPath(campaignId, moduleFolder, fileId);
+  if (cachedPath) {
+    // Verify the file still exists
+    if (await fileExists(cachedPath)) {
+      return cachedPath;
+    }
+    // Cache is stale, remove it
+    removeCachedPath(campaignId, moduleFolder, fileId);
+  }
+
+  // Fall back to scanning (O(n) lookup)
   try {
     const files = await fs.readdir(dirPath);
     const mdFiles = files.filter(f => f.endsWith('.md'));
@@ -28,6 +97,8 @@ async function findFileById(dirPath: string, fileId: string): Promise<string | n
       const content = await fs.readFile(filePath, 'utf-8');
       const { frontmatter } = markdownParser.parse(content);
       if (frontmatter.id === fileId) {
+        // Cache for next time
+        setCachedPath(campaignId, moduleFolder, fileId, filePath);
         return filePath;
       }
     }
@@ -48,6 +119,9 @@ export const fileStore = {
     const files = await fs.readdir(dirPath);
     const mdFiles = files.filter(f => f.endsWith('.md'));
 
+    // Clear and rebuild the cache for this module
+    clearModuleCache(campaignId, moduleFolder);
+
     const metadata: FileMetadata[] = [];
 
     for (const file of mdFiles) {
@@ -62,8 +136,13 @@ export const fileStore = {
           continue;
         }
 
+        const fileId = frontmatter.id as string;
+
+        // Cache the ID -> filePath mapping for O(1) lookups
+        setCachedPath(campaignId, moduleFolder, fileId, filePath);
+
         metadata.push({
-          id: frontmatter.id as string,
+          id: fileId,
           name: frontmatter.name as string,
           filePath: path.join(moduleFolder, file),
           modified: stat.mtime.toISOString(),
@@ -80,7 +159,7 @@ export const fileStore = {
 
   async get(campaignId: string, moduleFolder: string, fileId: string): Promise<ParsedFile | null> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
-    const filePath = await findFileById(dirPath, fileId);
+    const filePath = await findFileById(campaignId, moduleFolder, dirPath, fileId);
 
     if (!filePath) {
       return null;
@@ -133,7 +212,7 @@ export const fileStore = {
     data: UpdateFileInput
   ): Promise<ParsedFile | null> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
-    const filePath = await findFileById(dirPath, fileId);
+    const filePath = await findFileById(campaignId, moduleFolder, dirPath, fileId);
 
     if (!filePath) {
       return null;
@@ -179,13 +258,15 @@ export const fileStore = {
 
   async delete(campaignId: string, moduleFolder: string, fileId: string): Promise<boolean> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
-    const filePath = await findFileById(dirPath, fileId);
+    const filePath = await findFileById(campaignId, moduleFolder, dirPath, fileId);
 
     if (!filePath) {
       return false;
     }
 
     await fs.unlink(filePath);
+    // Remove from cache
+    removeCachedPath(campaignId, moduleFolder, fileId);
     return true;
   },
 

@@ -15,6 +15,16 @@ import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSave
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
+import {
+  validate,
+  loginSchema,
+  createCampaignSchema,
+  updateCampaignSchema,
+  createFileSchema,
+  updateFileSchema,
+  cropPositionSchema,
+  parseJsonField,
+} from './core/validation.js';
 
 // Import modules (registers them automatically)
 import './modules/lore/index.js';
@@ -106,13 +116,8 @@ const auth = createAuthMiddleware(config.auth.dmPassword, config.auth.playerPass
 // =============================================================================
 
 // Login endpoint
-app.post('/api/auth/login', authLimiter, (req, res) => {
+app.post('/api/auth/login', authLimiter, validate({ body: loginSchema }), (req, res) => {
   const { password } = req.body;
-
-  if (!password || typeof password !== 'string') {
-    res.status(400).json({ success: false, error: 'Password required' });
-    return;
-  }
 
   const result = login(password, config.auth.dmPassword, config.auth.playerPassword);
 
@@ -214,7 +219,7 @@ app.get('/api/campaigns', auth.requireDm, async (_req, res) => {
 });
 
 // Create a campaign
-app.post('/api/campaigns', auth.requireDm, async (req, res) => {
+app.post('/api/campaigns', auth.requireDm, validate({ body: createCampaignSchema }), async (req, res) => {
   try {
     const campaign = await campaignManager.create(req.body);
     res.status(201).json({ success: true, data: campaign });
@@ -240,7 +245,7 @@ app.get('/api/campaigns/:id', auth.requireDm, async (req, res) => {
 });
 
 // Update a campaign
-app.put('/api/campaigns/:id', auth.requireDm, async (req, res) => {
+app.put('/api/campaigns/:id', auth.requireDm, validate({ body: updateCampaignSchema }), async (req, res) => {
   try {
     const campaign = await campaignManager.update(req.params.id, req.body);
     if (!campaign) {
@@ -376,7 +381,7 @@ async function invalidatePlayerMapCache(campaignId: string, moduleId: string) {
 }
 
 // Create a file
-app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (req, res) => {
+app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, validate({ body: createFileSchema }), async (req, res) => {
   try {
     const { campaignId, moduleId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -396,7 +401,7 @@ app.post('/api/campaigns/:campaignId/files/:moduleId', auth.requireDm, async (re
 });
 
 // Update a file
-app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, async (req, res) => {
+app.put('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, validate({ body: updateFileSchema }), async (req, res) => {
   try {
     const { campaignId, moduleId, fileId } = req.params;
     const module = moduleRegistry.get(moduleId);
@@ -482,14 +487,7 @@ app.post(
       }
 
       // Get crop position from request body (sent as JSON string in form data)
-      let cropPosition;
-      if (req.body.cropPosition) {
-        try {
-          cropPosition = JSON.parse(req.body.cropPosition);
-        } catch {
-          // Ignore invalid JSON
-        }
-      }
+      const cropPosition = parseJsonField(req.body.cropPosition, cropPositionSchema);
 
       const portraitPath = await processAndSavePortrait(
         campaignId,

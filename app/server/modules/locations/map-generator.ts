@@ -210,23 +210,41 @@ export async function generateStarSystemMap(
 
   return new Promise((resolve) => {
     // We need to call Python in a way that doesn't use the GUI
-    // Let's create a command-line interface for the generator
+    // Pass all paths as command-line arguments to avoid code injection
     const mapWidth = mapConfig.mapWidth || DEFAULT_MAP_CONFIG.mapWidth;
     const mapHeight = mapConfig.mapHeight || DEFAULT_MAP_CONFIG.mapHeight;
 
+    // Use a safe Python wrapper script that takes arguments instead of string interpolation
+    // This prevents path injection vulnerabilities
     const pythonCode = `
 import sys
-sys.path.insert(0, '${path.dirname(generatorPath)}')
-from star_system_generator_v7 import CSVStarSystemGenerator
 import os
+import json
 
-csv_path = '${tempCsvPath.replace(/\\/g, '/')}'
-output_path = '${outputPath.replace(/\\/g, '/')}'
+# Get arguments from command line (safer than string interpolation)
+if len(sys.argv) < 6:
+    print("Usage: script.py <generator_dir> <csv_path> <output_path> <campaign_path> <width> <height>", file=sys.stderr)
+    sys.exit(1)
 
-# Change to CSV directory for relative image paths
-os.chdir('${campaignPath.replace(/\\/g, '/')}')
+generator_dir = sys.argv[1]
+csv_path = sys.argv[2]
+output_path = sys.argv[3]
+campaign_path = sys.argv[4]
+width = int(sys.argv[5])
+height = int(sys.argv[6])
 
-generator = CSVStarSystemGenerator(width=${mapWidth}, height=${mapHeight})
+# Validate paths exist and are safe
+if not os.path.isfile(csv_path):
+    print(f"CSV file not found: {csv_path}", file=sys.stderr)
+    sys.exit(1)
+
+sys.path.insert(0, generator_dir)
+from star_system_generator_v7 import CSVStarSystemGenerator
+
+# Change to campaign directory for relative image paths
+os.chdir(campaign_path)
+
+generator = CSVStarSystemGenerator(width=width, height=height)
 generator.load_csv(csv_path)
 generator.calculate_positions()
 html_content = generator.generate_interactive_html()
@@ -237,7 +255,16 @@ with open(output_path, 'w') as f:
 print('SUCCESS')
 `;
 
-    const python = spawn('python3', ['-c', pythonCode], {
+    // Pass paths as arguments instead of embedding them in the code
+    const python = spawn('python3', [
+      '-c', pythonCode,
+      path.dirname(generatorPath),  // arg 1: generator directory
+      tempCsvPath,                   // arg 2: CSV path
+      outputPath,                    // arg 3: output path
+      campaignPath,                  // arg 4: campaign path
+      String(mapWidth),              // arg 5: width
+      String(mapHeight),             // arg 6: height
+    ], {
       cwd: campaignPath,
     });
 

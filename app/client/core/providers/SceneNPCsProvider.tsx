@@ -3,36 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useCampaign } from './CampaignProvider';
 import { useAuth } from './AuthProvider';
+import type { SceneNPC, Disposition } from '@shared/types/scene';
+
+// Re-export types for consumers
+export type { SceneNPC, Disposition };
 
 // Polling interval for live updates (3 seconds)
 const POLL_INTERVAL = 3000;
-
-export type Disposition = 'hostile' | 'friendly' | 'neutral';
-
-export interface SceneNPC {
-  id: string;
-  name: string;
-  occupation?: string;
-  portrait?: string;
-  portraitPosition?: { x: number; y: number; scale: number };
-  hasStats?: boolean;
-  disposition?: Disposition;
-  stats?: {
-    damage?: number;
-    maxDamage?: number;
-    armor?: number;
-    moves?: string;
-  };
-  visibleToPlayers?: boolean;
-  // Backwards compatibility
-  isAntagonist?: boolean;
-  antagonistStats?: {
-    damage?: number;
-    maxDamage?: number;
-    armor?: number;
-    moves?: string;
-  };
-}
 
 interface SceneNPCsContextValue {
   sceneNPCs: SceneNPC[];

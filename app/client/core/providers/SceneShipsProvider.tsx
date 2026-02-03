@@ -3,23 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useCampaign } from './CampaignProvider';
 import { useAuth } from './AuthProvider';
-import type { ShipDamage, ShipDisposition } from '@shared/schemas/ship';
+import type { ShipDisposition } from '@shared/schemas/ship';
+import type { SceneShip } from '@shared/types/scene';
+
+// Re-export type for consumers
+export type { SceneShip };
 
 // Polling interval for live updates (3 seconds)
 const POLL_INTERVAL = 3000;
-
-export interface SceneShip {
-  id: string;
-  name: string;
-  type?: string;
-  class?: string;
-  image?: string;
-  isCrewShip?: boolean;
-  disposition?: ShipDisposition;
-  pressure?: number;
-  damage?: ShipDamage;
-  visibleToPlayers?: boolean;
-}
 
 interface SceneShipsContextValue {
   sceneShips: SceneShip[];

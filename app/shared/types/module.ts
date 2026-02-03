@@ -6,6 +6,7 @@ export interface ModuleRoute {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
   handler: RequestHandler;
+  middleware?: RequestHandler[]; // Optional validation/preprocessing middleware
 }
 
 export interface ModuleAIConfig {

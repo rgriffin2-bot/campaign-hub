@@ -68,7 +68,11 @@ export const moduleRegistry = {
       for (const route of module.routes) {
         const path = `/api/modules/${moduleId}${route.path}`;
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
-        app[method](path, route.handler);
+        // Support middleware array for validation
+        const handlers = route.middleware
+          ? [...route.middleware, route.handler]
+          : [route.handler];
+        app[method](path, ...handlers);
         console.log(`  Route mounted: ${route.method} ${path}`);
       }
     }

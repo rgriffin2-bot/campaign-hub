@@ -4,39 +4,19 @@ import * as path from 'path';
 import { moduleRegistry } from '../registry.js';
 import { campaignManager } from '../../core/campaign-manager.js';
 import { config } from '../../config.js';
+import { withFileLock } from '../../core/file-lock.js';
 import type { ModuleDefinition } from '../../../shared/types/module.js';
+import type { SceneNPC, SceneShip } from '../../../shared/types/scene.js';
+import {
+  validate,
+  sceneNPCSchema,
+  updateSceneNPCSchema,
+  sceneShipSchema,
+  updateSceneShipSchema,
+} from '../../core/validation.js';
 
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
-
-// Disposition type for NPCs
-type Disposition = 'hostile' | 'friendly' | 'neutral';
-
-// Scene NPC type (matches client-side SceneNPC)
-interface SceneNPC {
-  id: string;
-  name: string;
-  occupation?: string;
-  portrait?: string;
-  portraitPosition?: { x: number; y: number; scale: number };
-  hasStats?: boolean;
-  disposition?: Disposition;
-  stats?: {
-    damage?: number;
-    maxDamage?: number;
-    armor?: number;
-    moves?: string;
-  };
-  visibleToPlayers?: boolean;
-  // Backwards compatibility
-  isAntagonist?: boolean;
-  antagonistStats?: {
-    damage?: number;
-    maxDamage?: number;
-    armor?: number;
-    moves?: string;
-  };
-}
 
 // Helper to get the scene file path for a campaign
 function getSceneFilePath(campaignId: string): string {
@@ -54,10 +34,12 @@ async function readSceneNPCs(campaignId: string): Promise<SceneNPC[]> {
   }
 }
 
-// Helper to write scene NPCs to file
+// Helper to write scene NPCs to file (with file locking to prevent corruption)
 async function writeSceneNPCs(campaignId: string, npcs: SceneNPC[]): Promise<void> {
   const filePath = getSceneFilePath(campaignId);
-  await fs.writeFile(filePath, JSON.stringify(npcs, null, 2), 'utf-8');
+  await withFileLock(filePath, async () => {
+    await fs.writeFile(filePath, JSON.stringify(npcs, null, 2), 'utf-8');
+  });
 }
 
 // GET /scene-npcs - Get all scene NPCs
@@ -77,7 +59,7 @@ const getSceneNPCs: RequestHandler = async (_req, res) => {
   }
 };
 
-// POST /scene-npcs - Add an NPC to the scene
+// POST /scene-npcs - Add an NPC to the scene (validation via middleware)
 const addSceneNPC: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -87,10 +69,6 @@ const addSceneNPC: RequestHandler = async (req, res) => {
     }
 
     const npc: SceneNPC = req.body;
-    if (!npc.id || !npc.name) {
-      res.status(400).json({ success: false, error: 'NPC id and name are required' });
-      return;
-    }
 
     // Default to visible if not specified
     if (npc.visibleToPlayers === undefined) {
@@ -200,28 +178,8 @@ const clearSceneNPCs: RequestHandler = async (_req, res) => {
 };
 
 // ============================================================================
-// Scene Ships
+// Scene Ships (uses shared SceneShip type from ../../../shared/types/scene.js)
 // ============================================================================
-
-interface SceneShip {
-  id: string;
-  name: string;
-  type?: string;
-  class?: string;
-  image?: string;
-  isCrewShip?: boolean;
-  disposition?: Disposition;
-  pressure?: number;
-  damage?: {
-    helmControl?: { minor?: string; major?: string };
-    enginesDrives?: { minor?: string; major?: string };
-    sensorsArrays?: { minor?: string; major?: string };
-    hullStructure?: { minor?: string; major?: string };
-    powerLifeSupport?: { minor?: string; major?: string };
-    weaponsBoarding?: { minor?: string; major?: string };
-  };
-  visibleToPlayers?: boolean;
-}
 
 function getSceneShipsFilePath(campaignId: string): string {
   return path.join(config.campaignsDir, campaignId, '_scene-ships.json');
@@ -237,9 +195,12 @@ async function readSceneShips(campaignId: string): Promise<SceneShip[]> {
   }
 }
 
+// Helper to write scene ships to file (with file locking to prevent corruption)
 async function writeSceneShips(campaignId: string, ships: SceneShip[]): Promise<void> {
   const filePath = getSceneShipsFilePath(campaignId);
-  await fs.writeFile(filePath, JSON.stringify(ships, null, 2), 'utf-8');
+  await withFileLock(filePath, async () => {
+    await fs.writeFile(filePath, JSON.stringify(ships, null, 2), 'utf-8');
+  });
 }
 
 // GET /scene-ships - Get all scene ships
@@ -259,7 +220,7 @@ const getSceneShips: RequestHandler = async (_req, res) => {
   }
 };
 
-// POST /scene-ships - Add a ship to the scene
+// POST /scene-ships - Add a ship to the scene (validation via middleware)
 const addSceneShip: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -269,10 +230,6 @@ const addSceneShip: RequestHandler = async (req, res) => {
     }
 
     const ship: SceneShip = req.body;
-    if (!ship.id || !ship.name) {
-      res.status(400).json({ success: false, error: 'Ship id and name are required' });
-      return;
-    }
 
     if (ship.visibleToPlayers === undefined) {
       ship.visibleToPlayers = true;
@@ -385,14 +342,14 @@ export const livePlayModule: ModuleDefinition = {
   routes: [
     // Scene NPCs
     { method: 'GET', path: '/scene-npcs', handler: getSceneNPCs },
-    { method: 'POST', path: '/scene-npcs', handler: addSceneNPC },
-    { method: 'PATCH', path: '/scene-npcs/:npcId', handler: updateSceneNPC },
+    { method: 'POST', path: '/scene-npcs', handler: addSceneNPC, middleware: [validate({ body: sceneNPCSchema })] },
+    { method: 'PATCH', path: '/scene-npcs/:npcId', handler: updateSceneNPC, middleware: [validate({ body: updateSceneNPCSchema })] },
     { method: 'DELETE', path: '/scene-npcs/:npcId', handler: removeSceneNPC },
     { method: 'DELETE', path: '/scene-npcs', handler: clearSceneNPCs },
     // Scene Ships
     { method: 'GET', path: '/scene-ships', handler: getSceneShips },
-    { method: 'POST', path: '/scene-ships', handler: addSceneShip },
-    { method: 'PATCH', path: '/scene-ships/:shipId', handler: updateSceneShip },
+    { method: 'POST', path: '/scene-ships', handler: addSceneShip, middleware: [validate({ body: sceneShipSchema })] },
+    { method: 'PATCH', path: '/scene-ships/:shipId', handler: updateSceneShip, middleware: [validate({ body: updateSceneShipSchema })] },
     { method: 'DELETE', path: '/scene-ships/:shipId', handler: removeSceneShip },
     { method: 'DELETE', path: '/scene-ships', handler: clearSceneShips },
   ],
