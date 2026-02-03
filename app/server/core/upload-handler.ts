@@ -338,3 +338,85 @@ export async function deleteBoardBackground(
     // Ignore if file doesn't exist
   }
 }
+
+// Ensure board token images directory exists
+async function ensureBoardTokenImageDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'board-tokens');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+// Standard size range for board token images (to avoid giant or tiny images)
+const TOKEN_IMAGE_MIN_SIZE = 100; // pixels
+const TOKEN_IMAGE_MAX_SIZE = 400; // pixels
+const TOKEN_IMAGE_DEFAULT_SIZE = 200; // target size for normalization
+
+export async function processAndSaveBoardTokenImage(
+  campaignId: string,
+  tokenId: string,
+  buffer: Buffer,
+  originalFilename: string
+): Promise<{ path: string; normalizedSize: number }> {
+  const uploadDir = await ensureBoardTokenImageDir(campaignId);
+
+  // Get image metadata
+  const metadata = await sharp(buffer).metadata();
+  const originalWidth = metadata.width || TOKEN_IMAGE_DEFAULT_SIZE;
+  const originalHeight = metadata.height || TOKEN_IMAGE_DEFAULT_SIZE;
+
+  // Determine the larger dimension
+  const largerDimension = Math.max(originalWidth, originalHeight);
+
+  // Calculate the normalized token size based on the image's original size
+  // Large images get capped, small images get scaled up
+  let normalizedSize: number;
+  if (largerDimension > 1000) {
+    // Very large image - use max size
+    normalizedSize = TOKEN_IMAGE_MAX_SIZE;
+  } else if (largerDimension < 50) {
+    // Very small image - use min size
+    normalizedSize = TOKEN_IMAGE_MIN_SIZE;
+  } else {
+    // Scale proportionally between min and max
+    // Map 50-1000 pixel range to 100-400 token size range
+    const ratio = (largerDimension - 50) / (1000 - 50);
+    normalizedSize = Math.round(TOKEN_IMAGE_MIN_SIZE + ratio * (TOKEN_IMAGE_MAX_SIZE - TOKEN_IMAGE_MIN_SIZE));
+  }
+
+  // Preserve original extension for transparency support (PNG, GIF)
+  const ext = path.extname(originalFilename).toLowerCase() || '.png';
+
+  // For GIFs, preserve the original file to keep animation
+  if (ext === '.gif' || metadata.format === 'gif') {
+    const gifFilename = `${tokenId}.gif`;
+    const gifFilepath = path.join(uploadDir, gifFilename);
+    await fs.writeFile(gifFilepath, buffer);
+    return { path: `assets/board-tokens/${gifFilename}`, normalizedSize };
+  }
+
+  // For other formats, resize to a reasonable size and save as PNG (for transparency)
+  const processedFilename = `${tokenId}.png`;
+  const processedFilepath = path.join(uploadDir, processedFilename);
+
+  await sharp(buffer)
+    .resize(500, 500, {
+      fit: 'inside',
+      withoutEnlargement: false, // Allow enlargement for very small images
+    })
+    .png({ quality: 90 })
+    .toFile(processedFilepath);
+
+  return { path: `assets/board-tokens/${processedFilename}`, normalizedSize };
+}
+
+export async function deleteBoardTokenImage(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}

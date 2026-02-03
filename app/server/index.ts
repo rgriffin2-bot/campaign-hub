@@ -11,7 +11,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -678,6 +678,46 @@ app.post(
       res.json({ success: true, data: { path: imagePath } });
     } catch (error) {
       console.error('Error uploading board background:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload an image token for a tactical board
+app.post(
+  '/api/campaigns/:campaignId/board-tokens/:boardId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, boardId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      // Generate a unique token ID
+      const tokenId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const result = await processAndSaveBoardTokenImage(
+        campaignId,
+        tokenId,
+        req.file.buffer,
+        req.file.originalname
+      );
+
+      res.json({
+        success: true,
+        data: {
+          tokenId,
+          path: result.path,
+          normalizedSize: result.normalizedSize,
+        },
+      });
+    } catch (error) {
+      console.error('Error uploading board token image:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload image';
       res.status(500).json({ success: false, error: message });
     }

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { User, Skull, Ship, MapPin, Circle, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { User, Skull, Ship, MapPin, Circle, Plus, Search, ChevronDown, ChevronRight, ImagePlus, Loader2 } from 'lucide-react';
 import { useFiles } from '../../../hooks/useFiles';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { TokenSourceType } from '@shared/schemas/tactical-board';
@@ -11,6 +11,7 @@ interface TokenPaletteProps {
     label: string,
     image?: string
   ) => void;
+  onAddImage?: (file: File) => Promise<void>;
 }
 
 interface SourceCategory {
@@ -73,7 +74,8 @@ interface CategorySectionProps {
 }
 
 function CategorySection({ category, search, onAddToken }: CategorySectionProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Default to collapsed unless user has expanded or is searching
+  const [isExpanded, setIsExpanded] = useState(false);
   const { list } = useFiles(category.moduleId);
 
   const entities = (list.data || []) as Array<{
@@ -143,8 +145,26 @@ function CategorySection({ category, search, onAddToken }: CategorySectionProps)
   );
 }
 
-export function TokenPalette({ onAddToken }: TokenPaletteProps) {
+export function TokenPalette({ onAddToken, onAddImage }: TokenPaletteProps) {
   const [search, setSearch] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onAddImage) return;
+
+    setIsUploading(true);
+    try {
+      await onAddImage(file);
+    } finally {
+      setIsUploading(false);
+      // Reset input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -166,6 +186,37 @@ export function TokenPalette({ onAddToken }: TokenPaletteProps) {
           />
         </div>
       </div>
+
+      {/* Image upload section */}
+      {onAddImage && (
+        <div className="border-b border-border p-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/50 py-3 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-secondary hover:text-foreground disabled:opacity-50"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <ImagePlus className="h-4 w-4" />
+                <span>Upload Image</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Entity categories */}
       <div className="flex-1 overflow-auto p-2">

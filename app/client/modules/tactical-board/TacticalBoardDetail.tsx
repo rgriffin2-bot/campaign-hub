@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { useCampaign } from '../../core/providers/CampaignProvider';
 import { BoardCanvas, BoardCanvasRef } from './components/BoardCanvas';
 import { BoardToolbar } from './components/BoardToolbar';
 import { TokenPalette } from './components/TokenPalette';
@@ -9,6 +10,7 @@ import type { TacticalBoard, BoardToken, TokenSourceType } from '@shared/schemas
 
 export function TacticalBoardDetail() {
   const { fileId } = useParams<{ fileId: string }>();
+  const { campaign } = useCampaign();
   const { get, update } = useFiles('tactical-board');
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [showPalette, setShowPalette] = useState(true);
@@ -118,18 +120,142 @@ export function TacticalBoardDetail() {
     [handleAddToken]
   );
 
+  // Handle uploading an image to the board
+  const handleAddImage = useCallback(
+    async (file: File) => {
+      if (!campaign || !board || !fileId) return;
+
+      // Get current viewport center
+      const viewportCenter = canvasRef.current?.getViewportCenter();
+      const x = viewportCenter?.x ?? (board.canvasWidth || 2000) / 2;
+      const y = viewportCenter?.y ?? (board.canvasHeight || 2000) / 2;
+
+      // Upload the image
+      const formData = new FormData();
+      formData.append('image', file);
+
+      try {
+        const response = await fetch(
+          `/api/campaigns/${campaign.id}/board-tokens/${fileId}`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to upload image');
+        }
+
+        const result = await response.json();
+        const { path, normalizedSize } = result.data;
+
+        // Create a token with the uploaded image
+        // Extract filename without extension for label
+        const label = file.name.replace(/\.[^/.]+$/, '');
+
+        const newToken: BoardToken = {
+          id: `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          sourceType: 'custom',
+          sourceId: '',
+          label,
+          image: path,
+          x,
+          y,
+          size: normalizedSize,
+          rotation: 0,
+          zIndex: tokens.length,
+          shape: 'rectangle', // Use rectangle for images to show full picture
+          showLabel: false, // Don't show label by default for images
+          labelPosition: 'below',
+          visibleToPlayers: true,
+          locked: false,
+        };
+
+        await update.mutateAsync({
+          fileId,
+          input: { frontmatter: { ...board, tokens: [...tokens, newToken] } },
+        });
+
+        setSelectedTokenId(newToken.id);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        // Could show a toast/notification here
+      }
+    },
+    [campaign, board, fileId, tokens, update]
+  );
+
   // Handle deleting a token
   const handleDeleteToken = useCallback(async () => {
     if (!board || !fileId || !selectedTokenId) return;
 
     const filteredTokens = tokens.filter((t) => t.id !== selectedTokenId);
+
+    // Also remove any connections involving this token
+    const connections = board.connections || [];
+    const filteredConnections = connections.filter(
+      (c) => c.fromTokenId !== selectedTokenId && c.toTokenId !== selectedTokenId
+    );
+
     await update.mutateAsync({
       fileId,
-      input: { frontmatter: { ...board, tokens: filteredTokens } },
+      input: { frontmatter: { ...board, tokens: filteredTokens, connections: filteredConnections } },
     });
 
     setSelectedTokenId(null);
   }, [board, fileId, selectedTokenId, tokens, update]);
+
+  // Handle adding a connection between tokens
+  const handleAddConnection = useCallback(
+    async (fromTokenId: string, toTokenId: string) => {
+      if (!board || !fileId) return;
+
+      const connections = board.connections || [];
+
+      // Check if connection already exists (in either direction)
+      const exists = connections.some(
+        (c) =>
+          (c.fromTokenId === fromTokenId && c.toTokenId === toTokenId) ||
+          (c.fromTokenId === toTokenId && c.toTokenId === fromTokenId)
+      );
+
+      if (exists) return;
+
+      const newConnection = {
+        id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        fromTokenId,
+        toTokenId,
+        color: '#00ffff', // Cyan for sci-fi look
+        style: 'solid' as const,
+        thickness: 2,
+        animated: true,
+      };
+
+      await update.mutateAsync({
+        fileId,
+        input: { frontmatter: { ...board, connections: [...connections, newConnection] } },
+      });
+    },
+    [board, fileId, update]
+  );
+
+  // Handle deleting a connection
+  const handleDeleteConnection = useCallback(
+    async (connectionId: string) => {
+      if (!board || !fileId) return;
+
+      const connections = board.connections || [];
+      const filteredConnections = connections.filter((c) => c.id !== connectionId);
+
+      await update.mutateAsync({
+        fileId,
+        input: { frontmatter: { ...board, connections: filteredConnections } },
+      });
+    },
+    [board, fileId, update]
+  );
 
   // Toggle grid
   const handleToggleGrid = useCallback(() => {
@@ -139,6 +265,12 @@ export function TacticalBoardDetail() {
   // Toggle snap to grid
   const handleToggleSnapToGrid = useCallback(() => {
     handleUpdateBoard({ snapToGrid: !board?.snapToGrid });
+  }, [board, handleUpdateBoard]);
+
+  // Toggle animations (for performance on complex boards)
+  const handleToggleAnimations = useCallback(() => {
+    const currentValue = board?.animationsEnabled ?? true;
+    handleUpdateBoard({ animationsEnabled: !currentValue });
   }, [board, handleUpdateBoard]);
 
   // Toggle token visibility
@@ -187,6 +319,7 @@ export function TacticalBoardDetail() {
         isEditable={true}
         onToggleGrid={handleToggleGrid}
         onToggleSnapToGrid={handleToggleSnapToGrid}
+        onToggleAnimations={handleToggleAnimations}
       />
 
       {/* Main content area */}
@@ -205,13 +338,15 @@ export function TacticalBoardDetail() {
             onToggleTokenLock={handleToggleTokenLock}
             onToggleTokenVisibility={handleToggleTokenVisibility}
             onDeleteToken={handleDeleteToken}
+            onAddConnection={handleAddConnection}
+            onDeleteConnection={handleDeleteConnection}
           />
         </div>
 
         {/* Token Palette Sidebar */}
         {showPalette && (
           <div className="w-64 shrink-0 border-l border-border bg-card">
-            <TokenPalette onAddToken={handleAddTokenFromPalette} />
+            <TokenPalette onAddToken={handleAddTokenFromPalette} onAddImage={handleAddImage} />
           </div>
         )}
 

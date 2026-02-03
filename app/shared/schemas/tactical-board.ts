@@ -20,6 +20,24 @@ export type TokenShape = (typeof tokenShapes)[number];
 export const labelPositions = ['below', 'above', 'inside', 'hidden'] as const;
 export type LabelPosition = (typeof labelPositions)[number];
 
+// Connection styles
+export const connectionStyles = ['solid', 'dashed', 'dotted'] as const;
+export type ConnectionStyle = (typeof connectionStyles)[number];
+
+// Connection between tokens
+export const boardConnectionSchema = z.object({
+  id: z.string(),
+  fromTokenId: z.string(),
+  toTokenId: z.string(),
+  label: z.string().optional(),
+  color: z.string().default('#00ffff'), // Cyan for sci-fi look
+  style: z.enum(connectionStyles).default('solid'),
+  thickness: z.number().min(1).max(10).default(2),
+  animated: z.boolean().default(true), // Animated glow effect
+});
+
+export type BoardConnection = z.infer<typeof boardConnectionSchema>;
+
 // Image position within token (for cropping/positioning)
 export const imagePositionSchema = z.object({
   x: z.number().default(0),
@@ -89,6 +107,12 @@ export const tacticalBoardSchema = z.object({
 
   // Tokens on this board
   tokens: z.array(boardTokenSchema).default([]),
+
+  // Connections between tokens
+  connections: z.array(boardConnectionSchema).default([]),
+
+  // Performance settings
+  animationsEnabled: z.boolean().default(true), // Disable for better performance on complex boards
 
   // Visibility
   hidden: z.boolean().default(false),

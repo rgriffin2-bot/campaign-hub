@@ -4,6 +4,7 @@ import {
   Magnet,
   Settings,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react';
 import type { TacticalBoard } from '@shared/schemas/tactical-board';
 
@@ -12,6 +13,7 @@ interface BoardToolbarProps {
   isEditable: boolean;
   onToggleGrid: () => void;
   onToggleSnapToGrid: () => void;
+  onToggleAnimations?: () => void;
 }
 
 export function BoardToolbar({
@@ -19,7 +21,9 @@ export function BoardToolbar({
   isEditable,
   onToggleGrid,
   onToggleSnapToGrid,
+  onToggleAnimations,
 }: BoardToolbarProps) {
+  const animationsEnabled = board.animationsEnabled ?? true;
   return (
     <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
       {/* Left section: Navigation and board name */}
@@ -72,6 +76,22 @@ export function BoardToolbar({
             title={board.snapToGrid ? 'Disable snap to grid' : 'Enable snap to grid'}
           >
             <Magnet className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Animations toggle */}
+        {onToggleAnimations && (
+          <button
+            type="button"
+            onClick={onToggleAnimations}
+            className={`rounded p-1.5 transition-colors ${
+              animationsEnabled
+                ? 'bg-cyan-500/20 text-cyan-400'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+            title={animationsEnabled ? 'Disable connection animations (better performance)' : 'Enable connection animations'}
+          >
+            <Sparkles className="h-4 w-4" />
           </button>
         )}
       </div>

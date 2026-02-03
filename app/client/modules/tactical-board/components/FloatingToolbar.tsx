@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Lock, Unlock, Eye, EyeOff, Trash2, MousePointer2, Hand, Type } from 'lucide-react';
+import { Lock, Unlock, Eye, EyeOff, Trash2, MousePointer2, Hand, Type, Cable } from 'lucide-react';
 import type { BoardToken } from '@shared/schemas/tactical-board';
 
-export type InteractionMode = 'select' | 'pan';
+export type InteractionMode = 'select' | 'pan' | 'connect';
 
 interface FloatingToolbarProps {
   selectedToken: BoardToken | null;
@@ -80,6 +80,15 @@ export function FloatingToolbar({
         icon={<Hand className="h-4 w-4" />}
         tooltip="Pan"
         isActive={interactionMode === 'pan'}
+      />
+
+      {/* Interaction Mode: Connect */}
+      <TooltipButton
+        onClick={() => onSetInteractionMode('connect')}
+        icon={<Cable className="h-4 w-4" />}
+        tooltip="Connect"
+        isActive={interactionMode === 'connect'}
+        activeClass="bg-cyan-500/20 text-cyan-400"
       />
 
       {/* Divider */}

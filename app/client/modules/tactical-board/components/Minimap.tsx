@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect, memo } from 'react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { TacticalBoard } from '@shared/schemas/tactical-board';
 
@@ -14,7 +14,7 @@ interface MinimapProps {
 const MINIMAP_WIDTH = 160;
 const MINIMAP_HEIGHT = 120;
 
-export function Minimap({
+export const Minimap = memo(function Minimap({
   board,
   pan,
   zoom,
@@ -210,4 +210,4 @@ export function Minimap({
       </div>
     </div>
   );
-}
+});

@@ -1,9 +1,89 @@
-import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle, memo } from 'react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { BoardToken } from './BoardToken';
+import { BoardConnections } from './BoardConnections';
 import { Minimap } from './Minimap';
 import { FloatingToolbar, InteractionMode } from './FloatingToolbar';
 import type { TacticalBoard, BoardToken as BoardTokenType } from '@shared/schemas/tactical-board';
+
+// Wrapper component to provide stable callbacks for each token
+// This prevents re-renders of memoized BoardToken components
+interface TokenWrapperProps {
+  token: BoardTokenType;
+  isSelected: boolean;
+  isEditable: boolean;
+  scale: number;
+  interactionMode: InteractionMode;
+  connectionStart: string | null;
+  onSelectToken: (tokenId: string) => void;
+  onTokenMove: (tokenId: string, x: number, y: number) => void;
+  onTokenResize: (tokenId: string, size: number) => void;
+  onUpdateToken: (tokenId: string, updates: Partial<BoardTokenType>) => void;
+  onTokenClickForConnection: (tokenId: string) => void;
+}
+
+const TokenWrapper = memo(function TokenWrapper({
+  token,
+  isSelected,
+  isEditable,
+  scale,
+  interactionMode,
+  connectionStart,
+  onSelectToken,
+  onTokenMove,
+  onTokenResize,
+  onUpdateToken,
+  onTokenClickForConnection,
+}: TokenWrapperProps) {
+  const isConnectionTarget = interactionMode === 'connect' && connectionStart && connectionStart !== token.id;
+  const isConnectionStart = connectionStart === token.id;
+
+  // Create stable callbacks using useCallback with token.id in closure
+  const handleSelect = useCallback(() => {
+    if (interactionMode === 'select') {
+      onSelectToken(token.id);
+    } else if (interactionMode === 'connect') {
+      onTokenClickForConnection(token.id);
+    }
+  }, [interactionMode, onSelectToken, onTokenClickForConnection, token.id]);
+
+  const handleMove = useCallback((x: number, y: number) => {
+    onTokenMove(token.id, x, y);
+  }, [onTokenMove, token.id]);
+
+  const handleResize = useCallback((size: number) => {
+    onTokenResize(token.id, size);
+  }, [onTokenResize, token.id]);
+
+  const handleUpdateLabel = useCallback((label: string) => {
+    onUpdateToken(token.id, { label });
+  }, [onUpdateToken, token.id]);
+
+  const handleWrapperClick = useCallback(() => {
+    if (interactionMode === 'connect') {
+      onTokenClickForConnection(token.id);
+    }
+  }, [interactionMode, onTokenClickForConnection, token.id]);
+
+  return (
+    <div
+      onClick={handleWrapperClick}
+      className={`${isConnectionTarget ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-transparent rounded-full' : ''} ${isConnectionStart ? 'ring-2 ring-cyan-400 animate-pulse rounded-full' : ''}`}
+      style={{ display: 'contents' }}
+    >
+      <BoardToken
+        token={token}
+        isSelected={isSelected || isConnectionStart}
+        isEditable={isEditable && interactionMode === 'select'}
+        scale={scale}
+        onSelect={handleSelect}
+        onMove={handleMove}
+        onResize={handleResize}
+        onUpdateLabel={handleUpdateLabel}
+      />
+    </div>
+  );
+});
 
 interface BoardCanvasProps {
   board: TacticalBoard;
@@ -16,6 +96,8 @@ interface BoardCanvasProps {
   onToggleTokenLock?: () => void;
   onToggleTokenVisibility?: () => void;
   onDeleteToken?: () => void;
+  onAddConnection?: (fromTokenId: string, toTokenId: string) => void;
+  onDeleteConnection?: (connectionId: string) => void;
 }
 
 export interface BoardCanvasRef {
@@ -34,6 +116,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     onToggleTokenLock,
     onToggleTokenVisibility,
     onDeleteToken,
+    onAddConnection,
+    onDeleteConnection,
   },
   ref
 ) {
@@ -44,6 +128,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
   const [isPanning, setIsPanning] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('select');
+  const [connectionStart, setConnectionStart] = useState<string | null>(null); // Token ID to connect from
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
   // Track container size for minimap
@@ -264,17 +350,55 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [zoom]
   );
 
+  // Handle token click in connect mode
+  const handleTokenClickForConnection = useCallback(
+    (tokenId: string) => {
+      if (interactionMode !== 'connect' || !onAddConnection) return;
+
+      if (!connectionStart) {
+        // First click - set the start token
+        setConnectionStart(tokenId);
+      } else if (connectionStart !== tokenId) {
+        // Second click on different token - create connection
+        onAddConnection(connectionStart, tokenId);
+        setConnectionStart(null);
+      }
+      // Clicking same token cancels
+      else {
+        setConnectionStart(null);
+      }
+    },
+    [interactionMode, connectionStart, onAddConnection]
+  );
+
+  // Handle deleting selected connection
+  const handleDeleteSelectedConnection = useCallback(() => {
+    if (selectedConnectionId && onDeleteConnection) {
+      onDeleteConnection(selectedConnectionId);
+      setSelectedConnectionId(null);
+    }
+  }, [selectedConnectionId, onDeleteConnection]);
+
+  // Reset connection start when switching modes
+  useEffect(() => {
+    if (interactionMode !== 'connect') {
+      setConnectionStart(null);
+    }
+  }, [interactionMode]);
+
   // Generate grid pattern
   const gridSize = board.gridSize || 50;
   const gridPatternId = `grid-${board.id}`;
 
   // Visible tokens (for players, filter hidden tokens)
   const visibleTokens = board.tokens;
+  const connections = board.connections || [];
 
   // Determine cursor based on interaction mode
   const getCursor = () => {
     if (isPanning) return 'grabbing';
     if (interactionMode === 'pan') return 'grab';
+    if (interactionMode === 'connect') return connectionStart ? 'crosshair' : 'cell';
     return 'default';
   };
 
@@ -337,17 +461,30 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
           </svg>
         )}
 
+        {/* Connections (rendered behind tokens) */}
+        <BoardConnections
+          connections={connections}
+          tokens={visibleTokens}
+          selectedConnectionId={selectedConnectionId}
+          onSelectConnection={setSelectedConnectionId}
+          animationsEnabled={board.animationsEnabled ?? true}
+        />
+
         {/* Tokens */}
         {visibleTokens.map((token) => (
-          <BoardToken
+          <TokenWrapper
             key={token.id}
             token={token}
             isSelected={selectedTokenId === token.id}
-            isEditable={isEditable && interactionMode === 'select'}
+            isEditable={isEditable}
             scale={zoom}
-            onSelect={() => interactionMode === 'select' && onSelectToken(token.id)}
-            onMove={(x, y) => handleTokenMove(token.id, x, y)}
-            onResize={(size) => handleTokenResize(token.id, size)}
+            interactionMode={interactionMode}
+            connectionStart={connectionStart}
+            onSelectToken={onSelectToken}
+            onTokenMove={handleTokenMove}
+            onTokenResize={handleTokenResize}
+            onUpdateToken={onUpdateToken}
+            onTokenClickForConnection={handleTokenClickForConnection}
           />
         ))}
       </div>
@@ -383,10 +520,31 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
       {/* Instructions hint */}
       {isEditable && (
         <div className="absolute bottom-4 left-4 rounded bg-black/50 px-2 py-1 text-xs text-white/70">
-          {interactionMode === 'pan'
-            ? 'Drag to pan | Scroll to zoom'
-            : 'Click to select | Drag to pan | Scroll to zoom'
-          }
+          {interactionMode === 'pan' && 'Drag to pan | Scroll to zoom'}
+          {interactionMode === 'select' && 'Click to select | Drag to pan | Scroll to zoom'}
+          {interactionMode === 'connect' && !connectionStart && 'Click a token to start connection'}
+          {interactionMode === 'connect' && connectionStart && 'Click another token to connect | Click same to cancel'}
+        </div>
+      )}
+
+      {/* Connection mode indicator */}
+      {interactionMode === 'connect' && connectionStart && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-cyan-500/20 border border-cyan-400 px-3 py-1 text-xs text-cyan-400">
+          Connecting from token...
+        </div>
+      )}
+
+      {/* Selected connection controls */}
+      {selectedConnectionId && onDeleteConnection && (
+        <div className="absolute top-4 right-4 flex gap-2 rounded bg-black/80 px-3 py-2 text-xs">
+          <span className="text-white/70">Connection selected</span>
+          <button
+            type="button"
+            onClick={handleDeleteSelectedConnection}
+            className="text-red-400 hover:text-red-300"
+          >
+            Delete
+          </button>
         </div>
       )}
     </div>
