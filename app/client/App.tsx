@@ -39,6 +39,7 @@ import { PlayerFactionList } from './player/PlayerFactionList';
 import { PlayerFactionDetail } from './player/PlayerFactionDetail';
 import { PlayerProjectList } from './player/PlayerProjectList';
 import { PlayerProjectDetail } from './player/PlayerProjectDetail';
+import { PlayerTacticalBoardList, PlayerTacticalBoardDetail } from './player/PlayerTacticalBoard';
 import { AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -149,6 +150,8 @@ function AppRoutes() {
           <Route path="modules/projects" element={<PlayerProjectList />} />
           <Route path="modules/projects/:fileId" element={<PlayerProjectDetail />} />
           <Route path="modules/live-play" element={<PlayerLivePlay />} />
+          <Route path="modules/tactical-board" element={<PlayerTacticalBoardList />} />
+          <Route path="tactical-board/:boardId" element={<PlayerTacticalBoardDetail />} />
           {/* Catch-all for modules without player views */}
           <Route path="modules/*" element={<PlayerModuleNotFound />} />
         </Route>

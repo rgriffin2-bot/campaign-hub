@@ -13,6 +13,7 @@ import { LivePlayDashboard } from '../modules/live-play';
 import { SessionNotesList, SessionNotesDetail, SessionNotesEdit } from '../modules/session-notes';
 import { FactionList, FactionDetail, FactionEdit } from '../modules/factions';
 import { ProjectList, ProjectDetail, ProjectEdit } from '../modules/projects';
+import { TacticalBoardList, TacticalBoardDetail, TacticalBoardEdit } from '../modules/tactical-board';
 
 // Module view registry - maps moduleId to view components
 const moduleViews: Record<
@@ -73,6 +74,11 @@ const moduleViews: Record<
     list: ProjectList,
     detail: ProjectDetail,
     edit: ProjectEdit,
+  },
+  'tactical-board': {
+    list: TacticalBoardList,
+    detail: TacticalBoardDetail,
+    edit: TacticalBoardEdit,
   },
 };
 

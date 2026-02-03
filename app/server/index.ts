@@ -11,7 +11,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -37,6 +37,7 @@ import './modules/live-play/index.js';
 import './modules/session-notes/index.js';
 import './modules/factions/index.js';
 import './modules/projects/index.js';
+import './modules/tactical-board/index.js';
 
 const app = express();
 
@@ -648,6 +649,35 @@ app.post(
       res.json({ success: true, data: { path: imagePath } });
     } catch (error) {
       console.error('Error uploading ship image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload a background image for a tactical board
+app.post(
+  '/api/campaigns/:campaignId/board-backgrounds/:boardId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, boardId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveBoardBackground(
+        campaignId,
+        boardId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading board background:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload image';
       res.status(500).json({ success: false, error: message });
     }

@@ -645,6 +645,82 @@ router.patch('/scene-ships/:shipId', async (req, res) => {
 });
 
 // =============================================================================
+// Player Tactical Boards (Read-Only, Filtered)
+// =============================================================================
+
+// List tactical boards (filtered for players)
+router.get('/tactical-boards', async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const boards = await fileStore.list(campaign.id, 'tactical-boards');
+
+    // Filter out hidden boards and filter tokens to only visible ones
+    // Note: list returns FileMetadata which includes frontmatter fields
+    const visibleBoards = boards
+      .filter((board) => !(board as Record<string, unknown>).hidden)
+      .map((board) => {
+        const boardData = board as Record<string, unknown>;
+        const tokens = (boardData.tokens || []) as Array<{ visibleToPlayers?: boolean }>;
+        return {
+          ...boardData,
+          tokens: tokens.filter((token) => token.visibleToPlayers !== false),
+        };
+      });
+
+    res.json({ success: true, data: visibleBoards });
+  } catch (error) {
+    console.error('Error listing tactical boards for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to list boards' });
+  }
+});
+
+// Get a single tactical board (filtered for players)
+router.get('/tactical-boards/:boardId', async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { boardId } = req.params;
+    const parsedFile = await fileStore.get(campaign.id, 'tactical-boards', boardId);
+
+    if (!parsedFile) {
+      res.status(404).json({ success: false, error: 'Board not found' });
+      return;
+    }
+
+    const boardData = parsedFile.frontmatter as Record<string, unknown>;
+
+    if (boardData.hidden) {
+      res.status(404).json({ success: false, error: 'Board not found' });
+      return;
+    }
+
+    // Filter tokens to only show visible ones
+    const tokens = (boardData.tokens || []) as Array<{ visibleToPlayers?: boolean }>;
+    const filteredBoard = {
+      ...parsedFile,
+      frontmatter: {
+        ...boardData,
+        tokens: tokens.filter((token) => token.visibleToPlayers !== false),
+      },
+    };
+
+    res.json({ success: true, data: filteredBoard });
+  } catch (error) {
+    console.error('Error getting tactical board for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to get board' });
+  }
+});
+
+// =============================================================================
 // Player Dice Rolls
 // =============================================================================
 

@@ -296,3 +296,45 @@ export async function deleteShipImage(
     // Ignore if file doesn't exist
   }
 }
+
+// Ensure board backgrounds directory exists
+async function ensureBoardBackgroundDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'board-backgrounds');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSaveBoardBackground(
+  campaignId: string,
+  boardId: string,
+  buffer: Buffer
+): Promise<string> {
+  const uploadDir = await ensureBoardBackgroundDir(campaignId);
+  const filename = `${boardId}.jpg`;
+  const filepath = path.join(uploadDir, filename);
+
+  // For board backgrounds, we want to keep them large for zooming
+  // Max dimension 4000px to handle large battle maps while keeping file size reasonable
+  await sharp(buffer)
+    .resize(4000, 4000, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 90 })
+    .toFile(filepath);
+
+  // Return relative path from campaign root
+  return `assets/board-backgrounds/${filename}`;
+}
+
+export async function deleteBoardBackground(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
