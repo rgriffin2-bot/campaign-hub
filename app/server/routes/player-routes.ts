@@ -706,11 +706,8 @@ router.get('/tactical-boards/:boardId', async (req, res) => {
     // Filter tokens to only show visible ones
     const tokens = (boardData.tokens || []) as Array<{ visibleToPlayers?: boolean }>;
     const filteredBoard = {
-      ...parsedFile,
-      frontmatter: {
-        ...boardData,
-        tokens: tokens.filter((token) => token.visibleToPlayers !== false),
-      },
+      ...boardData,
+      tokens: tokens.filter((token) => token.visibleToPlayers !== false),
     };
 
     res.json({ success: true, data: filteredBoard });
@@ -820,6 +817,86 @@ router.post('/dice-rolls', async (req, res) => {
   } catch (error) {
     console.error('Error rolling dice for player:', error);
     res.status(500).json({ success: false, error: 'Failed to roll dice' });
+  }
+});
+
+// =============================================================================
+// Player Initiative (Read-Only)
+// =============================================================================
+
+interface InitiativeEntry {
+  id: string;
+  sourceType: 'pc' | 'npc' | 'ship' | 'custom';
+  sourceId?: string;
+  name: string;
+  portrait?: string;
+  portraitPosition?: { x: number; y: number; scale: number };
+  initiative: number;
+  isActive: boolean;
+  notes?: string;
+}
+
+interface InitiativeState {
+  entries: InitiativeEntry[];
+  currentRound: number;
+  isActive: boolean;
+  visibleToPlayers: boolean;
+}
+
+// Get initiative state for players
+router.get('/initiative', async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const filePath = path.join(config.campaignsDir, campaign.id, '_initiative.json');
+    let state: InitiativeState = {
+      entries: [],
+      currentRound: 1,
+      isActive: false,
+      visibleToPlayers: true,
+    };
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      state = JSON.parse(content);
+    } catch {
+      // File doesn't exist - return default state
+    }
+
+    // If not visible to players, return minimal state
+    if (!state.visibleToPlayers) {
+      res.json({
+        success: true,
+        data: {
+          entries: [],
+          currentRound: state.currentRound,
+          isActive: false,
+          visibleToPlayers: false,
+        },
+      });
+      return;
+    }
+
+    // Remove DM notes from entries
+    const entriesWithoutNotes = state.entries.map((entry) => ({
+      ...entry,
+      notes: undefined,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        ...state,
+        entries: entriesWithoutNotes,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting initiative for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to get initiative' });
   }
 });
 

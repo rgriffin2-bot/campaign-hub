@@ -71,8 +71,9 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newShips) => {
-      queryClient.setQueryData(['scene-ships', campaign?.id, isDm], newShips);
+    onSuccess: () => {
+      // Invalidate all scene-ships queries to ensure fresh data regardless of isDm state
+      queryClient.invalidateQueries({ queryKey: ['scene-ships'] });
     },
   });
 
@@ -87,8 +88,8 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newShips) => {
-      queryClient.setQueryData(['scene-ships', campaign?.id, isDm], newShips);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene-ships'] });
     },
   });
 
@@ -105,8 +106,8 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newShips) => {
-      queryClient.setQueryData(['scene-ships', campaign?.id, isDm], newShips);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene-ships'] });
     },
   });
 
@@ -122,7 +123,7 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
       return data.data;
     },
     onSuccess: () => {
-      queryClient.setQueryData(['scene-ships', campaign?.id, isDm], []);
+      queryClient.invalidateQueries({ queryKey: ['scene-ships'] });
     },
   });
 

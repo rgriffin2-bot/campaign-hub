@@ -6,7 +6,9 @@ import { useCampaign } from '../../core/providers/CampaignProvider';
 import { BoardCanvas, BoardCanvasRef } from './components/BoardCanvas';
 import { BoardToolbar } from './components/BoardToolbar';
 import { TokenPalette } from './components/TokenPalette';
-import type { TacticalBoard, BoardToken, TokenSourceType } from '@shared/schemas/tactical-board';
+import { InitiativePanel } from './components/InitiativePanel';
+import { useTacticalBoardInitiative } from './hooks/useTacticalBoardInitiative';
+import type { TacticalBoard, BoardToken, TokenSourceType, InitiativePanelPosition } from '@shared/schemas/tactical-board';
 
 export function TacticalBoardDetail() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -22,6 +24,9 @@ export function TacticalBoardDetail() {
   // Extract board from frontmatter
   const board = parsedFile?.frontmatter as TacticalBoard | undefined;
   const tokens = (board?.tokens || []) as BoardToken[];
+
+  // Local initiative state for this board (persists across position changes)
+  const initiativeState = useTacticalBoardInitiative(tokens);
 
   // Handle board update
   const handleUpdateBoard = useCallback(
@@ -291,6 +296,39 @@ export function TacticalBoardDetail() {
     }
   }, [tokens, selectedTokenId, handleUpdateToken]);
 
+  // Toggle fog visibility
+  const handleToggleFog = useCallback(() => {
+    const currentValue = board?.fogEnabled ?? true;
+    handleUpdateBoard({ fogEnabled: !currentValue });
+  }, [board, handleUpdateBoard]);
+
+  // Update fog cells
+  const handleUpdateFog = useCallback(
+    (fogCells: string[]) => {
+      handleUpdateBoard({ fogCells });
+    },
+    [handleUpdateBoard]
+  );
+
+  // Clear all fog
+  const handleClearAllFog = useCallback(() => {
+    handleUpdateBoard({ fogCells: [] });
+  }, [handleUpdateBoard]);
+
+  // Toggle initiative panel
+  const handleToggleInitiativePanel = useCallback(() => {
+    const currentValue = board?.showInitiativePanel ?? false;
+    handleUpdateBoard({ showInitiativePanel: !currentValue });
+  }, [board, handleUpdateBoard]);
+
+  // Set initiative panel position
+  const handleSetInitiativePanelPosition = useCallback(
+    (position: InitiativePanelPosition) => {
+      handleUpdateBoard({ initiativePanelPosition: position });
+    },
+    [handleUpdateBoard]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -320,50 +358,77 @@ export function TacticalBoardDetail() {
         onToggleGrid={handleToggleGrid}
         onToggleSnapToGrid={handleToggleSnapToGrid}
         onToggleAnimations={handleToggleAnimations}
+        onToggleFog={handleToggleFog}
+        onClearAllFog={handleClearAllFog}
+        onToggleInitiativePanel={handleToggleInitiativePanel}
+        onSetInitiativePanelPosition={handleSetInitiativePanelPosition}
       />
 
       {/* Main content area */}
-      <div className="relative flex flex-1 overflow-hidden">
-        {/* Canvas */}
-        <div className="flex-1">
-          <BoardCanvas
-            ref={canvasRef}
-            board={fullBoard}
-            isEditable={true}
-            selectedTokenId={selectedTokenId}
-            onSelectToken={setSelectedTokenId}
-            onUpdateToken={handleUpdateToken}
-            onAddToken={handleAddTokenAtPosition}
-            onAddTextBox={handleAddTextBox}
-            onToggleTokenLock={handleToggleTokenLock}
-            onToggleTokenVisibility={handleToggleTokenVisibility}
-            onDeleteToken={handleDeleteToken}
-            onAddConnection={handleAddConnection}
-            onDeleteConnection={handleDeleteConnection}
-          />
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+        {/* Horizontal layout with canvas and side panels */}
+        <div className="relative flex flex-1 overflow-hidden">
+          {/* Canvas */}
+          <div className="flex-1">
+            <BoardCanvas
+              ref={canvasRef}
+              board={fullBoard}
+              isEditable={true}
+              selectedTokenId={selectedTokenId}
+              onSelectToken={setSelectedTokenId}
+              onUpdateToken={handleUpdateToken}
+              onAddToken={handleAddTokenAtPosition}
+              onAddTextBox={handleAddTextBox}
+              onToggleTokenLock={handleToggleTokenLock}
+              onToggleTokenVisibility={handleToggleTokenVisibility}
+              onDeleteToken={handleDeleteToken}
+              onAddConnection={handleAddConnection}
+              onDeleteConnection={handleDeleteConnection}
+              onUpdateFog={handleUpdateFog}
+              isPlayerView={false}
+            />
+          </div>
+
+          {/* Initiative Panel (Right position) */}
+          {fullBoard.showInitiativePanel && fullBoard.initiativePanelPosition === 'right' && (
+            <InitiativePanel
+              position="right"
+              onClose={handleToggleInitiativePanel}
+              initiativeState={initiativeState}
+            />
+          )}
+
+          {/* Token Palette Sidebar */}
+          {showPalette && (
+            <div className="w-64 shrink-0 border-l border-border bg-card">
+              <TokenPalette onAddToken={handleAddTokenFromPalette} onAddImage={handleAddImage} />
+            </div>
+          )}
+
+          {/* Palette toggle button */}
+          <button
+            type="button"
+            onClick={() => setShowPalette(!showPalette)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 rounded-l-md border border-r-0 border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            style={{ right: showPalette ? '16rem' : 0 }}
+            title={showPalette ? 'Hide palette' : 'Show palette'}
+          >
+            {showPalette ? (
+              <PanelLeftClose className="h-4 w-4" />
+            ) : (
+              <PanelLeft className="h-4 w-4" />
+            )}
+          </button>
         </div>
 
-        {/* Token Palette Sidebar */}
-        {showPalette && (
-          <div className="w-64 shrink-0 border-l border-border bg-card">
-            <TokenPalette onAddToken={handleAddTokenFromPalette} onAddImage={handleAddImage} />
-          </div>
+        {/* Initiative Panel (Bottom position) */}
+        {fullBoard.showInitiativePanel && fullBoard.initiativePanelPosition === 'bottom' && (
+          <InitiativePanel
+            position="bottom"
+            onClose={handleToggleInitiativePanel}
+            initiativeState={initiativeState}
+          />
         )}
-
-        {/* Palette toggle button */}
-        <button
-          type="button"
-          onClick={() => setShowPalette(!showPalette)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 rounded-l-md border border-r-0 border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          style={{ right: showPalette ? '16rem' : 0 }}
-          title={showPalette ? 'Hide palette' : 'Show palette'}
-        >
-          {showPalette ? (
-            <PanelLeftClose className="h-4 w-4" />
-          ) : (
-            <PanelLeft className="h-4 w-4" />
-          )}
-        </button>
       </div>
     </div>
   );

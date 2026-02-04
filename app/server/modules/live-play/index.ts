@@ -8,6 +8,8 @@ import { config } from '../../config.js';
 import { withFileLock } from '../../core/file-lock.js';
 import type { ModuleDefinition } from '../../../shared/types/module.js';
 import type { SceneNPC, SceneShip, DiceRollState, DiceRoll } from '../../../shared/types/scene.js';
+import type { InitiativeState, InitiativeEntry } from '../../../shared/types/initiative.js';
+import { DEFAULT_INITIATIVE_STATE } from '../../../shared/types/initiative.js';
 import {
   validate,
   sceneNPCSchema,
@@ -521,6 +523,421 @@ const clearDiceRolls: RequestHandler = async (_req, res) => {
   }
 };
 
+// ============================================================================
+// Initiative Tracker
+// ============================================================================
+
+function getInitiativeFilePath(campaignId: string): string {
+  return path.join(config.campaignsDir, campaignId, '_initiative.json');
+}
+
+async function readInitiativeState(campaignId: string): Promise<InitiativeState> {
+  const filePath = getInitiativeFilePath(campaignId);
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return { ...DEFAULT_INITIATIVE_STATE };
+  }
+}
+
+async function writeInitiativeState(campaignId: string, state: InitiativeState): Promise<void> {
+  const filePath = getInitiativeFilePath(campaignId);
+  await withFileLock(filePath, async () => {
+    await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+  });
+}
+
+// GET /initiative - Get current initiative state
+const getInitiative: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error getting initiative:', error);
+    res.status(500).json({ success: false, error: 'Failed to get initiative' });
+  }
+};
+
+// POST /initiative - Add an entry to initiative
+const addInitiativeEntry: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const entryData = req.body;
+    const state = await readInitiativeState(campaign.id);
+
+    // Create the entry with a generated ID
+    const newEntry: InitiativeEntry = {
+      id: `init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      sourceType: entryData.sourceType || 'custom',
+      sourceId: entryData.sourceId,
+      name: entryData.name || 'Unknown',
+      portrait: entryData.portrait,
+      portraitPosition: entryData.portraitPosition,
+      initiative: entryData.initiative || 0,
+      isActive: entryData.isActive || false,
+      notes: entryData.notes,
+    };
+
+    // If no active entry exists and this is the first, make it active
+    if (state.entries.length === 0) {
+      newEntry.isActive = true;
+    }
+
+    state.entries.push(newEntry);
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error adding initiative entry:', error);
+    res.status(500).json({ success: false, error: 'Failed to add initiative entry' });
+  }
+};
+
+// POST /initiative/batch - Add multiple entries to initiative (skips duplicates)
+const addInitiativeEntriesBatch: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const entries: Array<Omit<InitiativeEntry, 'id'>> = req.body.entries || [];
+    if (!Array.isArray(entries) || entries.length === 0) {
+      res.status(400).json({ success: false, error: 'No entries provided' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+
+    // Build sets of existing sourceIds and name+type combinations for duplicate checking
+    const existingSourceIds = new Set(
+      state.entries.filter((e) => e.sourceId).map((e) => e.sourceId)
+    );
+    const existingNameTypes = new Set(
+      state.entries.map((e) => `${e.sourceType}:${e.name}`)
+    );
+
+    let addedCount = 0;
+
+    for (const entryData of entries) {
+      // Skip if sourceId already exists
+      if (entryData.sourceId && existingSourceIds.has(entryData.sourceId)) {
+        continue;
+      }
+
+      // Skip if name+type combination already exists
+      const nameTypeKey = `${entryData.sourceType || 'custom'}:${entryData.name || 'Unknown'}`;
+      if (existingNameTypes.has(nameTypeKey)) {
+        continue;
+      }
+
+      // Create the entry with a generated ID
+      const newEntry: InitiativeEntry = {
+        id: `init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${addedCount}`,
+        sourceType: entryData.sourceType || 'custom',
+        sourceId: entryData.sourceId,
+        name: entryData.name || 'Unknown',
+        portrait: entryData.portrait,
+        portraitPosition: entryData.portraitPosition,
+        initiative: entryData.initiative || 0,
+        isActive: false,
+        notes: entryData.notes,
+      };
+
+      // If first entry, make it active
+      if (state.entries.length === 0 && addedCount === 0) {
+        newEntry.isActive = true;
+      }
+
+      state.entries.push(newEntry);
+
+      // Track this entry to prevent duplicates within the batch
+      if (entryData.sourceId) {
+        existingSourceIds.add(entryData.sourceId);
+      }
+      existingNameTypes.add(nameTypeKey);
+      addedCount++;
+    }
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state, addedCount });
+  } catch (error) {
+    console.error('Error adding initiative entries batch:', error);
+    res.status(500).json({ success: false, error: 'Failed to add initiative entries' });
+  }
+};
+
+// PATCH /initiative/:entryId - Update a single entry
+const updateInitiativeEntry: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { entryId } = req.params;
+    const updates = req.body;
+
+    const state = await readInitiativeState(campaign.id);
+    const index = state.entries.findIndex((e) => e.id === entryId);
+
+    if (index === -1) {
+      res.status(404).json({ success: false, error: 'Entry not found' });
+      return;
+    }
+
+    // Merge updates
+    state.entries[index] = {
+      ...state.entries[index],
+      ...updates,
+    };
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error updating initiative entry:', error);
+    res.status(500).json({ success: false, error: 'Failed to update initiative entry' });
+  }
+};
+
+// DELETE /initiative/:entryId - Remove an entry
+const removeInitiativeEntry: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { entryId } = req.params;
+
+    const state = await readInitiativeState(campaign.id);
+    const wasActive = state.entries.find((e) => e.id === entryId)?.isActive;
+    state.entries = state.entries.filter((e) => e.id !== entryId);
+
+    // If removed entry was active, activate the first entry
+    if (wasActive && state.entries.length > 0) {
+      state.entries[0].isActive = true;
+    }
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error removing initiative entry:', error);
+    res.status(500).json({ success: false, error: 'Failed to remove initiative entry' });
+  }
+};
+
+// DELETE /initiative - Clear all entries (reset to defaults)
+const clearInitiative: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state: InitiativeState = {
+      entries: [],
+      currentRound: 1,
+      isActive: false,
+      visibleToPlayers: true,
+    };
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error clearing initiative:', error);
+    res.status(500).json({ success: false, error: 'Failed to clear initiative' });
+  }
+};
+
+// POST /initiative/next-turn - Advance to next turn
+const nextTurn: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+
+    if (state.entries.length === 0) {
+      res.json({ success: true, data: state });
+      return;
+    }
+
+    // Find current active index
+    const activeIndex = state.entries.findIndex((e) => e.isActive);
+    const currentIndex = activeIndex === -1 ? 0 : activeIndex;
+
+    // Deactivate current
+    if (activeIndex !== -1) {
+      state.entries[activeIndex].isActive = false;
+    }
+
+    // Calculate next index
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= state.entries.length) {
+      nextIndex = 0;
+      state.currentRound += 1; // Increment round when wrapping
+    }
+
+    // Activate next
+    state.entries[nextIndex].isActive = true;
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error advancing turn:', error);
+    res.status(500).json({ success: false, error: 'Failed to advance turn' });
+  }
+};
+
+// POST /initiative/prev-turn - Go to previous turn
+const prevTurn: RequestHandler = async (_req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+
+    if (state.entries.length === 0) {
+      res.json({ success: true, data: state });
+      return;
+    }
+
+    // Find current active index
+    const activeIndex = state.entries.findIndex((e) => e.isActive);
+    const currentIndex = activeIndex === -1 ? 0 : activeIndex;
+
+    // Deactivate current
+    if (activeIndex !== -1) {
+      state.entries[activeIndex].isActive = false;
+    }
+
+    // Calculate previous index
+    let prevIndex = currentIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = state.entries.length - 1;
+      state.currentRound = Math.max(1, state.currentRound - 1); // Decrement round when wrapping back
+    }
+
+    // Activate previous
+    state.entries[prevIndex].isActive = true;
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error going to previous turn:', error);
+    res.status(500).json({ success: false, error: 'Failed to go to previous turn' });
+  }
+};
+
+// POST /initiative/reorder - Reorder entries (move up/down)
+const reorderInitiative: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { entryId, direction } = req.body;
+
+    if (!entryId || !['up', 'down'].includes(direction)) {
+      res.status(400).json({ success: false, error: 'Invalid reorder request' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+    const index = state.entries.findIndex((e) => e.id === entryId);
+
+    if (index === -1) {
+      res.status(404).json({ success: false, error: 'Entry not found' });
+      return;
+    }
+
+    // Calculate swap index
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+
+    // Bounds check
+    if (swapIndex < 0 || swapIndex >= state.entries.length) {
+      res.json({ success: true, data: state }); // No change needed
+      return;
+    }
+
+    // Swap entries
+    [state.entries[index], state.entries[swapIndex]] = [state.entries[swapIndex], state.entries[index]];
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error reordering initiative:', error);
+    res.status(500).json({ success: false, error: 'Failed to reorder initiative' });
+  }
+};
+
+// PATCH /initiative/state - Update state-level properties (visibility, active, round, entries)
+const updateInitiativeState: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const updates = req.body;
+    const state = await readInitiativeState(campaign.id);
+
+    // Merge allowed state updates
+    if (updates.visibleToPlayers !== undefined) {
+      state.visibleToPlayers = updates.visibleToPlayers;
+    }
+    if (updates.isActive !== undefined) {
+      state.isActive = updates.isActive;
+    }
+    if (updates.currentRound !== undefined) {
+      state.currentRound = Math.max(1, updates.currentRound);
+    }
+    if (updates.entries !== undefined) {
+      state.entries = updates.entries;
+    }
+
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error updating initiative state:', error);
+    res.status(500).json({ success: false, error: 'Failed to update initiative state' });
+  }
+};
+
 // Live Play module
 export const livePlayModule: ModuleDefinition = {
   id: 'live-play',
@@ -546,6 +963,17 @@ export const livePlayModule: ModuleDefinition = {
     { method: 'POST', path: '/dice-rolls', handler: rollDice },
     { method: 'PATCH', path: '/dice-rolls/visibility', handler: toggleDiceVisibility },
     { method: 'DELETE', path: '/dice-rolls', handler: clearDiceRolls },
+    // Initiative Tracker
+    { method: 'GET', path: '/initiative', handler: getInitiative },
+    { method: 'POST', path: '/initiative', handler: addInitiativeEntry },
+    { method: 'POST', path: '/initiative/batch', handler: addInitiativeEntriesBatch },
+    { method: 'PATCH', path: '/initiative/:entryId', handler: updateInitiativeEntry },
+    { method: 'DELETE', path: '/initiative/:entryId', handler: removeInitiativeEntry },
+    { method: 'DELETE', path: '/initiative', handler: clearInitiative },
+    { method: 'POST', path: '/initiative/next-turn', handler: nextTurn },
+    { method: 'POST', path: '/initiative/prev-turn', handler: prevTurn },
+    { method: 'POST', path: '/initiative/reorder', handler: reorderInitiative },
+    { method: 'PATCH', path: '/initiative/state', handler: updateInitiativeState },
   ],
   views: {
     list: PlaceholderView, // Dashboard is the "list" view

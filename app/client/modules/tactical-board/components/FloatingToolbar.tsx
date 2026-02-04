@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Lock, Unlock, Eye, EyeOff, Trash2, MousePointer2, Hand, Type, Cable } from 'lucide-react';
-import type { BoardToken } from '@shared/schemas/tactical-board';
+import { Lock, Unlock, Eye, EyeOff, Trash2, MousePointer2, Hand, Type, Cable, CloudFog, Eraser, Plus, Minus, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import type { BoardToken, TextAlignment } from '@shared/schemas/tactical-board';
 
-export type InteractionMode = 'select' | 'pan' | 'connect';
+export type InteractionMode = 'select' | 'pan' | 'connect' | 'addFog' | 'clearFog';
 
 interface FloatingToolbarProps {
   selectedToken: BoardToken | null;
@@ -12,6 +12,11 @@ interface FloatingToolbarProps {
   onDelete: () => void;
   onSetInteractionMode: (mode: InteractionMode) => void;
   onAddTextBox: () => void;
+  onSetTextAlign?: (align: TextAlignment) => void;
+  onSetFontSize?: (size: number) => void;
+  brushSize?: number;
+  onSetBrushSize?: (size: number) => void;
+  gridEnabled?: boolean;
 }
 
 interface TooltipButtonProps {
@@ -63,7 +68,37 @@ export function FloatingToolbar({
   onDelete,
   onSetInteractionMode,
   onAddTextBox,
+  onSetTextAlign,
+  onSetFontSize,
+  brushSize = 1,
+  onSetBrushSize,
+  gridEnabled = false,
 }: FloatingToolbarProps) {
+  const isFogMode = interactionMode === 'addFog' || interactionMode === 'clearFog';
+  const isTextBox = selectedToken?.sourceType === 'text';
+  const currentAlign = selectedToken?.textAlign || 'left';
+  const currentFontSize = selectedToken?.fontSize || 14;
+
+  // Cycle through alignments: left -> center -> right -> left
+  const cycleAlignment = () => {
+    if (!onSetTextAlign) return;
+    const alignments: TextAlignment[] = ['left', 'center', 'right'];
+    const currentIndex = alignments.indexOf(currentAlign);
+    const nextIndex = (currentIndex + 1) % alignments.length;
+    onSetTextAlign(alignments[nextIndex]);
+  };
+
+  // Get the appropriate alignment icon
+  const getAlignIcon = () => {
+    switch (currentAlign) {
+      case 'center':
+        return <AlignCenter className="h-4 w-4" />;
+      case 'right':
+        return <AlignRight className="h-4 w-4" />;
+      default:
+        return <AlignLeft className="h-4 w-4" />;
+    }
+  };
   return (
     <div className="absolute left-4 top-4 z-50 flex flex-col gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
       {/* Interaction Mode: Select */}
@@ -102,6 +137,52 @@ export function FloatingToolbar({
         hoverClass="hover:bg-accent"
       />
 
+      {/* Fog Tools Section */}
+      <div className="my-1 h-px bg-border" />
+
+      {/* Add Fog */}
+      <TooltipButton
+        onClick={() => gridEnabled && onSetInteractionMode('addFog')}
+        icon={<CloudFog className="h-4 w-4" />}
+        tooltip={gridEnabled ? 'Add Fog' : 'Enable grid for fog'}
+        isActive={interactionMode === 'addFog'}
+        activeClass="bg-slate-500/20 text-slate-300"
+        hoverClass={gridEnabled ? 'hover:bg-accent' : 'hover:bg-accent opacity-50 cursor-not-allowed'}
+      />
+
+      {/* Clear Fog */}
+      <TooltipButton
+        onClick={() => gridEnabled && onSetInteractionMode('clearFog')}
+        icon={<Eraser className="h-4 w-4" />}
+        tooltip={gridEnabled ? 'Clear Fog' : 'Enable grid for fog'}
+        isActive={interactionMode === 'clearFog'}
+        activeClass="bg-red-500/20 text-red-400"
+        hoverClass={gridEnabled ? 'hover:bg-accent' : 'hover:bg-accent opacity-50 cursor-not-allowed'}
+      />
+
+      {/* Brush Size Controls - only show in fog modes */}
+      {isFogMode && onSetBrushSize && (
+        <div className="mt-1 flex flex-col items-center gap-0.5 border-t border-border pt-1">
+          <button
+            type="button"
+            onClick={() => onSetBrushSize(Math.min(brushSize + 1, 5))}
+            className="flex h-6 w-6 items-center justify-center rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            title="Increase brush size"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          <span className="text-xs font-medium text-foreground">{brushSize}</span>
+          <button
+            type="button"
+            onClick={() => onSetBrushSize(Math.max(brushSize - 1, 1))}
+            className="flex h-6 w-6 items-center justify-center rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            title="Decrease brush size"
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {/* Token-specific actions - only show when token is selected */}
       {selectedToken && (
         <>
@@ -133,6 +214,42 @@ export function FloatingToolbar({
             tooltip="Delete"
             hoverClass="hover:bg-destructive/10 hover:text-destructive"
           />
+
+          {/* Text Box Controls - only show for text boxes */}
+          {isTextBox && onSetTextAlign && onSetFontSize && (
+            <>
+              {/* Divider */}
+              <div className="my-1 h-px bg-border" />
+
+              {/* Text Alignment - cycles through left/center/right */}
+              <TooltipButton
+                onClick={cycleAlignment}
+                icon={getAlignIcon()}
+                tooltip={`Align: ${currentAlign}`}
+              />
+
+              {/* Font Size Controls */}
+              <div className="flex flex-col items-center gap-0.5 border-t border-border pt-1 mt-1">
+                <button
+                  type="button"
+                  onClick={() => onSetFontSize(Math.min(currentFontSize + 2, 48))}
+                  className="flex h-6 w-6 items-center justify-center rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title="Increase font size"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+                <span className="text-xs font-medium text-foreground">{currentFontSize}</span>
+                <button
+                  type="button"
+                  onClick={() => onSetFontSize(Math.max(currentFontSize - 2, 8))}
+                  className="flex h-6 w-6 items-center justify-center rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title="Decrease font size"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

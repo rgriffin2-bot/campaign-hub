@@ -2,9 +2,10 @@ import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHand
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { BoardToken } from './BoardToken';
 import { BoardConnections } from './BoardConnections';
+import { FogLayer } from './FogLayer';
 import { Minimap } from './Minimap';
 import { FloatingToolbar, InteractionMode } from './FloatingToolbar';
-import type { TacticalBoard, BoardToken as BoardTokenType } from '@shared/schemas/tactical-board';
+import type { TacticalBoard, BoardToken as BoardTokenType, TextAlignment } from '@shared/schemas/tactical-board';
 
 // Wrapper component to provide stable callbacks for each token
 // This prevents re-renders of memoized BoardToken components
@@ -18,6 +19,7 @@ interface TokenWrapperProps {
   onSelectToken: (tokenId: string) => void;
   onTokenMove: (tokenId: string, x: number, y: number) => void;
   onTokenResize: (tokenId: string, size: number) => void;
+  onTokenResizeDimensions: (tokenId: string, width: number, height: number) => void;
   onUpdateToken: (tokenId: string, updates: Partial<BoardTokenType>) => void;
   onTokenClickForConnection: (tokenId: string) => void;
 }
@@ -32,6 +34,7 @@ const TokenWrapper = memo(function TokenWrapper({
   onSelectToken,
   onTokenMove,
   onTokenResize,
+  onTokenResizeDimensions,
   onUpdateToken,
   onTokenClickForConnection,
 }: TokenWrapperProps) {
@@ -54,6 +57,10 @@ const TokenWrapper = memo(function TokenWrapper({
   const handleResize = useCallback((size: number) => {
     onTokenResize(token.id, size);
   }, [onTokenResize, token.id]);
+
+  const handleResizeDimensions = useCallback((width: number, height: number) => {
+    onTokenResizeDimensions(token.id, width, height);
+  }, [onTokenResizeDimensions, token.id]);
 
   const handleUpdateLabel = useCallback((label: string) => {
     onUpdateToken(token.id, { label });
@@ -79,6 +86,7 @@ const TokenWrapper = memo(function TokenWrapper({
         onSelect={handleSelect}
         onMove={handleMove}
         onResize={handleResize}
+        onResizeDimensions={handleResizeDimensions}
         onUpdateLabel={handleUpdateLabel}
       />
     </div>
@@ -98,6 +106,8 @@ interface BoardCanvasProps {
   onDeleteToken?: () => void;
   onAddConnection?: (fromTokenId: string, toTokenId: string) => void;
   onDeleteConnection?: (connectionId: string) => void;
+  onUpdateFog?: (fogCells: string[]) => void;
+  isPlayerView?: boolean;
 }
 
 export interface BoardCanvasRef {
@@ -118,6 +128,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     onDeleteToken,
     onAddConnection,
     onDeleteConnection,
+    onUpdateFog,
+    isPlayerView = false,
   },
   ref
 ) {
@@ -131,6 +143,12 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
   const [connectionStart, setConnectionStart] = useState<string | null>(null); // Token ID to connect from
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+
+  // Fog painting state
+  const [brushSize, setBrushSize] = useState(1);
+  const [isPainting, setIsPainting] = useState(false);
+  const [brushPreviewCells, setBrushPreviewCells] = useState<Set<string> | null>(null);
+  const lastPaintedCellsRef = useRef<Set<string>>(new Set());
 
   // Track container size for minimap
   useEffect(() => {
@@ -206,8 +224,14 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
   );
 
   // Handle pan start (mouse down on canvas background)
+  // Note: Fog painting is handled via a separate ref-based approach to avoid circular dependencies
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Fog painting is handled separately via handleCanvasMouseDown
+      if (interactionMode === 'addFog' || interactionMode === 'clearFog') {
+        return; // Let the fog handler in the div's onMouseDown handle it
+      }
+
       const target = e.target as HTMLElement;
       const isCanvasBackground =
         target === e.currentTarget ||
@@ -337,6 +361,34 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [onUpdateToken]
   );
 
+  // Handle token dimension resize (for text boxes)
+  const handleTokenResizeDimensions = useCallback(
+    (tokenId: string, width: number, height: number) => {
+      onUpdateToken(tokenId, { width, height });
+    },
+    [onUpdateToken]
+  );
+
+  // Handle text alignment change (for text boxes)
+  const handleSetTextAlign = useCallback(
+    (align: TextAlignment) => {
+      if (selectedTokenId) {
+        onUpdateToken(selectedTokenId, { textAlign: align });
+      }
+    },
+    [selectedTokenId, onUpdateToken]
+  );
+
+  // Handle font size change (for text boxes)
+  const handleSetFontSize = useCallback(
+    (fontSize: number) => {
+      if (selectedTokenId) {
+        onUpdateToken(selectedTokenId, { fontSize });
+      }
+    },
+    [selectedTokenId, onUpdateToken]
+  );
+
   // Handle minimap navigation - center viewport on the clicked canvas position
   const handleMinimapNavigate = useCallback(
     (canvasX: number, canvasY: number) => {
@@ -386,6 +438,126 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     }
   }, [interactionMode]);
 
+  // Fog painting: convert mouse position to grid cells affected by brush
+  const getAffectedCells = useCallback(
+    (clientX: number, clientY: number): Set<string> => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect || !board.gridSize) return new Set();
+
+      // Convert to canvas coordinates
+      const canvasX = (clientX - rect.left - pan.x) / zoom;
+      const canvasY = (clientY - rect.top - pan.y) / zoom;
+
+      // Convert to grid cell
+      const gridX = Math.floor(canvasX / board.gridSize);
+      const gridY = Math.floor(canvasY / board.gridSize);
+
+      // Get all cells in brush area (brushSize x brushSize centered on cursor)
+      const cells = new Set<string>();
+      const halfBrush = Math.floor(brushSize / 2);
+
+      for (let dx = -halfBrush; dx <= halfBrush; dx++) {
+        for (let dy = -halfBrush; dy <= halfBrush; dy++) {
+          const cellX = gridX + dx;
+          const cellY = gridY + dy;
+          // Only add if within canvas bounds
+          const maxGridX = Math.ceil(board.canvasWidth / board.gridSize);
+          const maxGridY = Math.ceil(board.canvasHeight / board.gridSize);
+          if (cellX >= 0 && cellY >= 0 && cellX < maxGridX && cellY < maxGridY) {
+            cells.add(`${cellX},${cellY}`);
+          }
+        }
+      }
+      return cells;
+    },
+    [pan, zoom, board.gridSize, board.canvasWidth, board.canvasHeight, brushSize]
+  );
+
+  // Apply fog changes
+  const applyFogChange = useCallback(
+    (cells: Set<string>, isAdding: boolean) => {
+      if (!onUpdateFog) return;
+
+      const currentFog = new Set(board.fogCells || []);
+
+      cells.forEach((cell) => {
+        if (isAdding) {
+          currentFog.add(cell);
+        } else {
+          currentFog.delete(cell);
+        }
+      });
+
+      onUpdateFog(Array.from(currentFog));
+    },
+    [board.fogCells, onUpdateFog]
+  );
+
+  // Handle fog painting mouse down
+  const handleFogMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (interactionMode !== 'addFog' && interactionMode !== 'clearFog') return;
+      if (!board.gridEnabled) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      setIsPainting(true);
+
+      const cells = getAffectedCells(e.clientX, e.clientY);
+      lastPaintedCellsRef.current = cells;
+      applyFogChange(cells, interactionMode === 'addFog');
+    },
+    [interactionMode, board.gridEnabled, getAffectedCells, applyFogChange]
+  );
+
+  // Handle fog painting mouse move
+  const handleFogMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (interactionMode !== 'addFog' && interactionMode !== 'clearFog') {
+        setBrushPreviewCells(null);
+        return;
+      }
+
+      const cells = getAffectedCells(e.clientX, e.clientY);
+      setBrushPreviewCells(cells);
+
+      if (isPainting) {
+        // Only apply change if we've moved to new cells
+        const newCells = new Set<string>();
+        cells.forEach((cell) => {
+          if (!lastPaintedCellsRef.current.has(cell)) {
+            newCells.add(cell);
+          }
+        });
+        if (newCells.size > 0) {
+          applyFogChange(newCells, interactionMode === 'addFog');
+          cells.forEach((cell) => lastPaintedCellsRef.current.add(cell));
+        }
+      }
+    },
+    [interactionMode, isPainting, getAffectedCells, applyFogChange]
+  );
+
+  // Handle fog painting mouse up
+  const handleFogMouseUp = useCallback(() => {
+    setIsPainting(false);
+    lastPaintedCellsRef.current = new Set();
+  }, []);
+
+  // Add/remove global mouse listeners for fog painting
+  useEffect(() => {
+    if (interactionMode === 'addFog' || interactionMode === 'clearFog') {
+      window.addEventListener('mousemove', handleFogMouseMove);
+      window.addEventListener('mouseup', handleFogMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleFogMouseMove);
+        window.removeEventListener('mouseup', handleFogMouseUp);
+      };
+    } else {
+      setBrushPreviewCells(null);
+    }
+  }, [interactionMode, handleFogMouseMove, handleFogMouseUp]);
+
   // Generate grid pattern
   const gridSize = board.gridSize || 50;
   const gridPatternId = `grid-${board.id}`;
@@ -399,15 +571,30 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     if (isPanning) return 'grabbing';
     if (interactionMode === 'pan') return 'grab';
     if (interactionMode === 'connect') return connectionStart ? 'crosshair' : 'cell';
+    if (interactionMode === 'addFog' || interactionMode === 'clearFog') return 'crosshair';
     return 'default';
   };
+
+  // Combined mouse down handler for both panning and fog painting
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // Handle fog painting modes
+      if (interactionMode === 'addFog' || interactionMode === 'clearFog') {
+        handleFogMouseDown(e);
+        return;
+      }
+      // Otherwise handle normal interactions
+      handleMouseDown(e);
+    },
+    [interactionMode, handleFogMouseDown, handleMouseDown]
+  );
 
   return (
     <div
       ref={containerRef}
       className="relative h-full w-full overflow-hidden bg-neutral-900"
       onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
+      onMouseDown={handleCanvasMouseDown}
       onDoubleClick={handleDoubleClick}
       style={{ cursor: getCursor() }}
     >
@@ -483,10 +670,31 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
             onSelectToken={onSelectToken}
             onTokenMove={handleTokenMove}
             onTokenResize={handleTokenResize}
+            onTokenResizeDimensions={handleTokenResizeDimensions}
             onUpdateToken={onUpdateToken}
             onTokenClickForConnection={handleTokenClickForConnection}
           />
         ))}
+
+        {/* Fog Layer - renders above tokens */}
+        {board.gridEnabled && (
+          <FogLayer
+            fogCells={board.fogCells || []}
+            gridSize={board.gridSize || 50}
+            canvasWidth={board.canvasWidth}
+            canvasHeight={board.canvasHeight}
+            isPlayerView={isPlayerView}
+            fogEnabled={board.fogEnabled ?? true}
+            brushPreview={
+              brushPreviewCells
+                ? {
+                    cells: brushPreviewCells,
+                    isAdding: interactionMode === 'addFog',
+                  }
+                : null
+            }
+          />
+        )}
       </div>
 
       {/* Floating Toolbar - always visible in edit mode */}
@@ -499,6 +707,11 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
           onDelete={onDeleteToken}
           onSetInteractionMode={setInteractionMode}
           onAddTextBox={handleAddTextBox}
+          onSetTextAlign={handleSetTextAlign}
+          onSetFontSize={handleSetFontSize}
+          brushSize={brushSize}
+          onSetBrushSize={setBrushSize}
+          gridEnabled={board.gridEnabled}
         />
       )}
 
@@ -524,6 +737,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
           {interactionMode === 'select' && 'Click to select | Drag to pan | Scroll to zoom'}
           {interactionMode === 'connect' && !connectionStart && 'Click a token to start connection'}
           {interactionMode === 'connect' && connectionStart && 'Click another token to connect | Click same to cancel'}
+          {interactionMode === 'addFog' && 'Click/drag to add fog | Scroll to zoom'}
+          {interactionMode === 'clearFog' && 'Click/drag to clear fog | Scroll to zoom'}
         </div>
       )}
 

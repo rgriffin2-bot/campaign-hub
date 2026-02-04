@@ -73,8 +73,9 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newNPCs) => {
-      queryClient.setQueryData(['scene-npcs', campaign?.id, isDm], newNPCs);
+    onSuccess: () => {
+      // Invalidate all scene-npcs queries to ensure fresh data regardless of isDm state
+      queryClient.invalidateQueries({ queryKey: ['scene-npcs'] });
     },
   });
 
@@ -89,8 +90,8 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newNPCs) => {
-      queryClient.setQueryData(['scene-npcs', campaign?.id, isDm], newNPCs);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene-npcs'] });
     },
   });
 
@@ -107,8 +108,8 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
-    onSuccess: (newNPCs) => {
-      queryClient.setQueryData(['scene-npcs', campaign?.id, isDm], newNPCs);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene-npcs'] });
     },
   });
 
@@ -124,7 +125,7 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
       return data.data;
     },
     onSuccess: () => {
-      queryClient.setQueryData(['scene-npcs', campaign?.id, isDm], []);
+      queryClient.invalidateQueries({ queryKey: ['scene-npcs'] });
     },
   });
 

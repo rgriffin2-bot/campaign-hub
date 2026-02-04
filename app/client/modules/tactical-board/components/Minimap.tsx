@@ -195,6 +195,27 @@ export const Minimap = memo(function Minimap({
           />
         ))}
 
+        {/* Fog overlay in minimap (DM view only - shows where fog is placed) */}
+        {board.fogEnabled !== false && board.fogCells && board.fogCells.length > 0 && (
+          <svg className="pointer-events-none absolute inset-0" style={{ width: minimapCanvasWidth, height: minimapCanvasHeight }}>
+            {board.fogCells.map((cellKey) => {
+              const [gridX, gridY] = cellKey.split(',').map(Number);
+              const gridSize = board.gridSize || 50;
+              const cellSize = gridSize * scale;
+              return (
+                <rect
+                  key={`fog-${cellKey}`}
+                  x={gridX * cellSize}
+                  y={gridY * cellSize}
+                  width={cellSize}
+                  height={cellSize}
+                  fill="rgba(50, 50, 50, 0.6)"
+                />
+              );
+            })}
+          </svg>
+        )}
+
         {/* Viewport rectangle */}
         <div
           className="absolute border-2 border-primary bg-primary/10"

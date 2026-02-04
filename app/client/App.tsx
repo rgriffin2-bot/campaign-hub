@@ -5,6 +5,7 @@ import { ModeProvider } from './core/providers/ModeProvider';
 import { AuthProvider, useAuth } from './core/providers/AuthProvider';
 import { SceneNPCsProvider } from './core/providers/SceneNPCsProvider';
 import { SceneShipsProvider } from './core/providers/SceneShipsProvider';
+import { InitiativeProvider } from './core/providers/InitiativeProvider';
 import { Layout } from './core/Layout';
 import { Dashboard } from './core/Dashboard';
 import { ModuleRouter } from './core/ModuleRouter';
@@ -168,7 +169,9 @@ export function App() {
           <BrowserRouter>
             <SceneNPCsProvider>
               <SceneShipsProvider>
-                <AppRoutes />
+                <InitiativeProvider>
+                  <AppRoutes />
+                </InitiativeProvider>
               </SceneShipsProvider>
             </SceneNPCsProvider>
           </BrowserRouter>

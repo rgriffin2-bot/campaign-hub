@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
 import { SceneNPCPanel } from './components/SceneNPCPanel';
 import { SceneShipPanel } from './components/SceneShipPanel';
 import { CrewShipPanel } from './components/CrewShipPanel';
 import { DiceRoller } from './components/DiceRoller';
+import { InitiativeTracker } from '../../components/InitiativeTracker';
 import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../../core/providers/SceneShipsProvider';
+import { useInitiative } from '../../core/providers/InitiativeProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import type { ShipDamage, ShipDisposition } from '@shared/schemas/ship';
 import type { FileMetadata } from '@shared/types/file';
@@ -26,8 +28,21 @@ export function LivePlayDashboard() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('compact');
+  const [combatToolsExpanded, setCombatToolsExpanded] = useState(true);
   const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
   const { sceneShips, removeFromScene: removeShipFromScene, clearScene: clearShipScene, updateShip, updateDisposition: updateShipDisposition, toggleVisibility: toggleShipVisibility } = useSceneShips();
+  const {
+    initiative,
+    addEntry,
+    addEntriesBatch,
+    removeEntry,
+    updateEntry,
+    clearAllEntries,
+    nextTurn,
+    prevTurn,
+    moveEntryUp,
+    moveEntryDown,
+  } = useInitiative();
 
   // Separate crew ships from other ships
   const crewShips = sceneShips.filter((ship: SceneShip) => ship.isCrewShip);
@@ -107,6 +122,56 @@ export function LivePlayDashboard() {
     clearShipScene();
   };
 
+  // Handle adding all scene entities to initiative (PCs always, + scene NPCs + all scene ships including crew)
+  // Uses batch API to add all at once and prevent duplicates server-side
+  const handleAddInScene = useCallback(() => {
+    const entriesToAdd: Array<Omit<import('@shared/types/initiative').InitiativeEntry, 'id'>> = [];
+
+    // Add all player characters (always considered "in scene")
+    for (const pc of characters) {
+      const frontmatter = pc as unknown as PlayerCharacterFrontmatter;
+      entriesToAdd.push({
+        sourceType: 'pc',
+        sourceId: pc.id,
+        name: frontmatter.name || 'Unknown PC',
+        portrait: frontmatter.portrait,
+        initiative: 0,
+        isActive: false,
+      });
+    }
+
+    // Add all scene NPCs
+    for (const npc of sceneNPCs) {
+      entriesToAdd.push({
+        sourceType: 'npc',
+        sourceId: npc.id,
+        name: npc.name,
+        portrait: npc.portrait,
+        portraitPosition: npc.portraitPosition,
+        initiative: 0,
+        isActive: false,
+      });
+    }
+
+    // Add all scene ships (including crew ships)
+    for (const ship of sceneShips) {
+      entriesToAdd.push({
+        sourceType: 'ship',
+        sourceId: ship.id,
+        name: ship.name,
+        portrait: ship.image,
+        portraitPosition: ship.imagePosition,
+        initiative: 0,
+        isActive: false,
+      });
+    }
+
+    // Send all entries in a single batch request - server handles duplicate prevention
+    if (entriesToAdd.length > 0) {
+      addEntriesBatch(entriesToAdd);
+    }
+  }, [characters, sceneNPCs, sceneShips, addEntriesBatch]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -182,9 +247,56 @@ export function LivePlayDashboard() {
         </div>
       </div>
 
-      {/* Dice Roller - constrained width */}
-      <div className="max-w-[300px]">
-        <DiceRoller isDM />
+      {/* Combat Tools Section - Collapsible Dice Roller + Initiative */}
+      <div className="rounded-lg border border-border bg-card">
+        {/* Collapsible header */}
+        <button
+          type="button"
+          onClick={() => setCombatToolsExpanded(!combatToolsExpanded)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+        >
+          {combatToolsExpanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Swords className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-foreground">Combat Tools</span>
+          <span className="text-xs text-muted-foreground">(Dice Roller + Initiative)</span>
+        </button>
+
+        {/* Collapsible content */}
+        {combatToolsExpanded && (
+          <div className="border-t border-border px-4 py-4">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+              {/* Dice Roller */}
+              <div className="shrink-0 lg:w-[300px]">
+                <DiceRoller isDM />
+              </div>
+
+              {/* Initiative Tracker */}
+              <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Swords className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
+                </div>
+                <InitiativeTracker
+                  initiative={initiative}
+                  isDm={true}
+                  onAddEntry={addEntry}
+                  onRemoveEntry={removeEntry}
+                  onUpdateEntry={updateEntry}
+                  onClearAllEntries={clearAllEntries}
+                  onNextTurn={nextTurn}
+                  onPrevTurn={prevTurn}
+                  onMoveEntryUp={moveEntryUp}
+                  onMoveEntryDown={moveEntryDown}
+                  onAddInScene={handleAddInScene}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Crew Ships + Vehicles Section - Spans full width above party */}

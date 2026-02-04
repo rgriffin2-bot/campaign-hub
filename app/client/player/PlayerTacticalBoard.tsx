@@ -105,6 +105,7 @@ export function PlayerTacticalBoardDetail() {
     queryKey: ['player', 'tactical-board', boardId],
     queryFn: () => fetchPlayerBoard(boardId!),
     enabled: !!boardId,
+    refetchInterval: 3000, // Poll every 3 seconds for fog/token updates
   });
 
   if (isLoading) {
@@ -153,13 +154,14 @@ export function PlayerTacticalBoardDetail() {
       </div>
 
       {/* Canvas (read-only) */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-hidden">
         <BoardCanvas
           board={playerBoard}
           isEditable={false}
           selectedTokenId={null}
           onSelectToken={() => {}}
           onUpdateToken={() => {}}
+          isPlayerView={true}
         />
       </div>
     </div>

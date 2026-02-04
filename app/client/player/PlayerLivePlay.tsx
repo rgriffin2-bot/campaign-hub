@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Lock, Users, Rocket } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Lock, Users, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { PCPanel } from '../modules/live-play/components/PCPanel';
 import { SceneNPCPanel } from '../modules/live-play/components/SceneNPCPanel';
 import { SceneShipPanel } from '../modules/live-play/components/SceneShipPanel';
 import { CrewShipPanel } from '../modules/live-play/components/CrewShipPanel';
 import { DiceRoller } from '../modules/live-play/components/DiceRoller';
+import { InitiativeTracker } from '../components/InitiativeTracker';
 import { useSceneNPCs, type SceneNPC } from '../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../core/providers/SceneShipsProvider';
+import { useInitiative } from '../core/providers/InitiativeProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
@@ -31,8 +33,10 @@ export function PlayerLivePlay() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [layout, setLayout] = useState<LayoutMode>('compact');
+  const [combatToolsExpanded, setCombatToolsExpanded] = useState(true);
   const { sceneNPCs } = useSceneNPCs();
   const { sceneShips, updateShip } = useSceneShips();
+  const { initiative } = useInitiative();
 
   // For now, we'll allow editing of any PC in player mode
   // In a full implementation, you'd check the logged-in player against pc.player
@@ -170,9 +174,49 @@ export function PlayerLivePlay() {
         </div>
       </div>
 
-      {/* Dice Roller - constrained width */}
-      <div className="max-w-[300px]">
-        <DiceRoller />
+      {/* Combat Tools Section - Collapsible Dice Roller + Initiative */}
+      <div className="rounded-lg border border-border bg-card">
+        {/* Collapsible header */}
+        <button
+          type="button"
+          onClick={() => setCombatToolsExpanded(!combatToolsExpanded)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+        >
+          {combatToolsExpanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Swords className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-foreground">Combat Tools</span>
+          <span className="text-xs text-muted-foreground">(Dice Roller + Initiative)</span>
+        </button>
+
+        {/* Collapsible content */}
+        {combatToolsExpanded && (
+          <div className="border-t border-border px-4 py-4">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+              {/* Dice Roller */}
+              <div className="shrink-0 lg:w-[300px]">
+                <DiceRoller />
+              </div>
+
+              {/* Initiative Tracker (read-only for players, only shows if DM has made it visible) */}
+              {initiative.visibleToPlayers && (
+                <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Swords className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
+                  </div>
+                  <InitiativeTracker
+                    initiative={initiative}
+                    isDm={false}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Crew Ships + Vehicles Section (editable for players) - appears above party */}

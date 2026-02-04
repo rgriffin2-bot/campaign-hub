@@ -691,7 +691,7 @@ app.post(
   upload.single('image'),
   async (req, res) => {
     try {
-      const { campaignId, boardId } = req.params;
+      const { campaignId } = req.params;
 
       if (!req.file) {
         res.status(400).json({ success: false, error: 'No file uploaded' });

@@ -11,6 +11,7 @@ interface BoardTokenProps {
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (size: number) => void;
+  onResizeDimensions?: (width: number, height: number) => void; // For text boxes with independent width/height
   onUpdateLabel?: (label: string) => void;
 }
 
@@ -41,11 +42,12 @@ export const BoardToken = memo(function BoardToken({
   onSelect,
   onMove,
   onResize,
+  onResizeDimensions,
   onUpdateLabel,
 }: BoardTokenProps) {
   const { campaign } = useCampaign();
   const tokenRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,8 +55,11 @@ export const BoardToken = memo(function BoardToken({
   // Local position during drag - prevents server calls on every mouse move
   const [localPosition, setLocalPosition] = useState<{ x: number; y: number } | null>(null);
   const [localSize, setLocalSize] = useState<number | null>(null);
+  // Local dimensions for text box resizing
+  const [localDimensions, setLocalDimensions] = useState<{ width: number; height: number } | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; tokenX: number; tokenY: number } | null>(null);
   const resizeStartRef = useRef<{ mouseX: number; size: number } | null>(null);
+  const dimensionResizeStartRef = useRef<{ mouseX: number; mouseY: number; width: number; height: number } | null>(null);
 
   // Build image URL
   const imageUrl = token.image && campaign
@@ -108,6 +113,17 @@ export const BoardToken = memo(function BoardToken({
         // Update local size only (no server call)
         setLocalSize(Math.round(newSize));
       }
+      // Handle dimension resizing for text boxes
+      if (isResizing && dimensionResizeStartRef.current) {
+        const dx = (e.clientX - dimensionResizeStartRef.current.mouseX) / scale;
+        const dy = (e.clientY - dimensionResizeStartRef.current.mouseY) / scale;
+        const newWidth = Math.max(60, Math.min(800, dimensionResizeStartRef.current.width + dx));
+        const newHeight = Math.max(30, Math.min(600, dimensionResizeStartRef.current.height + dy));
+        setLocalDimensions({
+          width: Math.round(newWidth),
+          height: Math.round(newHeight),
+        });
+      }
     },
     [isDragging, isResizing, scale]
   );
@@ -121,14 +137,20 @@ export const BoardToken = memo(function BoardToken({
     if (isResizing && localSize !== null) {
       onResize(localSize);
     }
+    // Sync dimension changes for text boxes
+    if (isResizing && localDimensions && onResizeDimensions) {
+      onResizeDimensions(localDimensions.width, localDimensions.height);
+    }
     // Reset local state
     setIsDragging(false);
     setIsResizing(false);
     setLocalPosition(null);
     setLocalSize(null);
+    setLocalDimensions(null);
     dragStartRef.current = null;
     resizeStartRef.current = null;
-  }, [isDragging, isResizing, localPosition, localSize, onMove, onResize]);
+    dimensionResizeStartRef.current = null;
+  }, [isDragging, isResizing, localPosition, localSize, localDimensions, onMove, onResize, onResizeDimensions]);
 
   // Add/remove global mouse listeners
   useEffect(() => {
@@ -182,9 +204,13 @@ export const BoardToken = memo(function BoardToken({
   // Handle key down in edit mode
   const handleEditKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        // Enter without shift saves the text
         e.preventDefault();
         handleSaveEdit();
+      } else if (e.key === 'Enter' && e.shiftKey) {
+        // Shift+Enter adds a new line (default behavior for textarea)
+        // Don't prevent default - let it add the newline
       } else if (e.key === 'Escape') {
         e.preventDefault();
         setEditText(token.label);
@@ -192,6 +218,26 @@ export const BoardToken = memo(function BoardToken({
       }
     },
     [handleSaveEdit, token.label]
+  );
+
+  // Handle dimension resize start (for text boxes)
+  const handleDimensionResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isEditable || token.locked) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizing(true);
+      // Use current dimensions or defaults
+      const currentWidth = token.width || 150;
+      const currentHeight = token.height || 40;
+      dimensionResizeStartRef.current = {
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        width: currentWidth,
+        height: currentHeight,
+      };
+    },
+    [isEditable, token.width, token.height, token.locked]
   );
 
   // Calculate image position
@@ -202,16 +248,12 @@ export const BoardToken = memo(function BoardToken({
   const displayY = localPosition?.y ?? token.y;
   const displaySize = localSize ?? token.size;
 
-  // Text box tokens render differently - scale based on size (default 80 = 1x scale)
+  // Text box tokens render differently - use explicit width/height for independent sizing
   if (token.sourceType === 'text') {
-    // Calculate scale factor based on token size (80 is baseline = 1x)
-    const textScale = displaySize / 80;
     const baseFontSize = token.fontSize || 14;
-    const scaledFontSize = baseFontSize * textScale;
-    const scaledPaddingX = 12 * textScale; // px-3 = 12px
-    const scaledPaddingY = 6 * textScale;  // py-1.5 = 6px
-    const scaledBorderRadius = 6 * textScale; // rounded-md ~ 6px
-    const scaledLockSize = 12 * textScale; // h-3 w-3 = 12px
+    // Use local dimensions during resize, otherwise use token dimensions with defaults
+    const displayWidth = localDimensions?.width ?? token.width ?? 150;
+    const displayHeight = localDimensions?.height ?? token.height ?? 40;
 
     return (
       <div
@@ -226,9 +268,9 @@ export const BoardToken = memo(function BoardToken({
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Text box */}
+        {/* Text box with explicit dimensions */}
         <div
-          className={`relative whitespace-nowrap border-2 transition-shadow ${
+          className={`relative overflow-hidden border-2 transition-shadow ${
             isSelected
               ? 'border-primary shadow-lg shadow-primary/30'
               : token.locked
@@ -236,51 +278,52 @@ export const BoardToken = memo(function BoardToken({
                 : 'border-white/30 hover:border-white/50'
           } ${!token.visibleToPlayers ? 'opacity-60' : ''}`}
           style={{
+            width: displayWidth,
+            height: displayHeight,
             backgroundColor: token.backgroundColor || 'rgba(0, 0, 0, 0.75)',
             color: token.textColor || '#ffffff',
-            fontSize: scaledFontSize,
-            padding: `${scaledPaddingY}px ${scaledPaddingX}px`,
-            borderRadius: scaledBorderRadius,
+            fontSize: baseFontSize,
+            borderRadius: 6,
           }}
         >
           {isEditing ? (
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
               onBlur={handleSaveEdit}
               onKeyDown={handleEditKeyDown}
-              className="bg-transparent font-medium outline-none"
+              className="h-full w-full resize-none bg-transparent p-2 font-medium outline-none"
               style={{
                 color: token.textColor || '#ffffff',
-                fontSize: scaledFontSize,
-                minWidth: '40px',
-                width: `${Math.max(40, editText.length * scaledFontSize * 0.6)}px`,
+                fontSize: baseFontSize,
+                textAlign: token.textAlign || 'left',
               }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
+              placeholder="Enter text..."
             />
           ) : (
-            <span className="font-medium">{token.label}</span>
-          )}
-
-          {/* Lock indicator */}
-          {token.locked && !isEditing && (
-            <Lock
-              className="ml-1.5 inline-block text-amber-500"
-              style={{ width: scaledLockSize, height: scaledLockSize, marginLeft: 6 * textScale }}
-            />
+            <div
+              className="h-full w-full overflow-hidden p-2"
+              style={{ textAlign: token.textAlign || 'left' }}
+            >
+              <span className="whitespace-pre-wrap break-words font-medium">{token.label}</span>
+              {/* Lock indicator */}
+              {token.locked && (
+                <Lock
+                  className="absolute right-1 top-1 text-amber-500"
+                  style={{ width: 12, height: 12 }}
+                />
+              )}
+            </div>
           )}
 
           {/* Hidden indicator */}
           {!token.visibleToPlayers && !isEditing && (
-            <span
-              className="text-white/60"
-              style={{ marginLeft: 8 * textScale, fontSize: scaledFontSize * 0.75 }}
-            >
-              (hidden)
-            </span>
+            <div className="absolute bottom-1 right-1 rounded bg-black/50 px-1 text-xs text-white/60">
+              hidden
+            </div>
           )}
         </div>
 
@@ -288,7 +331,7 @@ export const BoardToken = memo(function BoardToken({
         {isSelected && isEditable && !token.locked && !isEditing && (
           <div
             className="resize-handle absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-full border-2 border-primary bg-background"
-            onMouseDown={handleResizeStart}
+            onMouseDown={handleDimensionResizeStart}
           />
         )}
       </div>

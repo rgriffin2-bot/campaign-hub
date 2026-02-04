@@ -20,9 +20,17 @@ export type TokenShape = (typeof tokenShapes)[number];
 export const labelPositions = ['below', 'above', 'inside', 'hidden'] as const;
 export type LabelPosition = (typeof labelPositions)[number];
 
+// Text alignment options (for text boxes)
+export const textAlignments = ['left', 'center', 'right'] as const;
+export type TextAlignment = (typeof textAlignments)[number];
+
 // Connection styles
 export const connectionStyles = ['solid', 'dashed', 'dotted'] as const;
 export type ConnectionStyle = (typeof connectionStyles)[number];
+
+// Initiative panel position options
+export const initiativePanelPositions = ['right', 'bottom'] as const;
+export type InitiativePanelPosition = (typeof initiativePanelPositions)[number];
 
 // Connection between tokens
 export const boardConnectionSchema = z.object({
@@ -69,10 +77,13 @@ export const boardTokenSchema = z.object({
   labelPosition: z.enum(labelPositions).default('below'),
 
   // Text box specific fields
-  textContent: z.string().optional(), // For text box tokens
+  textContent: z.string().optional(), // For text box tokens (multi-line content)
   textColor: z.string().optional(), // Text color for text boxes
   backgroundColor: z.string().optional(), // Background color for text boxes
   fontSize: z.number().optional(), // Font size for text boxes
+  textAlign: z.enum(textAlignments).optional(), // Text alignment for text boxes
+  width: z.number().optional(), // Width for text boxes (independent of size)
+  height: z.number().optional(), // Height for text boxes (independent of size)
 
   // Visibility
   visibleToPlayers: z.boolean().default(true),
@@ -113,6 +124,14 @@ export const tacticalBoardSchema = z.object({
 
   // Performance settings
   animationsEnabled: z.boolean().default(true), // Disable for better performance on complex boards
+
+  // Fog of war settings
+  fogEnabled: z.boolean().default(true), // Master toggle for fog visibility
+  fogCells: z.array(z.string()).default([]), // Array of "gridX,gridY" cell coordinates
+
+  // Initiative panel settings
+  showInitiativePanel: z.boolean().default(false), // Whether to show initiative panel
+  initiativePanelPosition: z.enum(initiativePanelPositions).default('right'), // Position of panel
 
   // Visibility
   hidden: z.boolean().default(false),
