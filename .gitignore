@@ -20,6 +20,14 @@ dist/
 .DS_Store
 Thumbs.db
 
+# macOS app bundles
+*.app/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Logs
 *.log
 npm-debug.log*
