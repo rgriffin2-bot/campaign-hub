@@ -11,7 +11,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage } from './core/upload-handler.js';
+import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage, processAndSaveArtefactImage, deleteArtefactImage, deleteArtefactImageFolder } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -38,6 +38,7 @@ import './modules/session-notes/index.js';
 import './modules/factions/index.js';
 import './modules/projects/index.js';
 import './modules/tactical-board/index.js';
+import './modules/story-artefacts/index.js';
 
 const app = express();
 
@@ -127,9 +128,12 @@ app.post('/api/auth/login', authLimiter, validate({ body: loginSchema }), (req, 
 
   if (result.success) {
     // Set cookie for browser clients
+    // Add Secure flag when accessed over HTTPS (e.g., via ngrok)
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    const securePart = isSecure ? '; Secure' : '';
     res.setHeader(
       'Set-Cookie',
-      `session=${result.token}; HttpOnly; SameSite=Strict; Max-Age=${24 * 60 * 60}; Path=/`
+      `session=${result.token}; HttpOnly; SameSite=Strict${securePart}; Max-Age=${24 * 60 * 60}; Path=/`
     );
     res.json({ success: true, role: result.role });
   } else {
@@ -146,7 +150,10 @@ app.post('/api/auth/logout', (req, res) => {
       logout(match[1]);
     }
   }
-  res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
+  // Add Secure flag when accessed over HTTPS (e.g., via ngrok)
+  const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  const securePart = isSecure ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `session=; HttpOnly; SameSite=Strict${securePart}; Max-Age=0; Path=/`);
   res.json({ success: true });
 });
 
@@ -719,6 +726,207 @@ app.post(
     } catch (error) {
       console.error('Error uploading board token image:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// =============================================================================
+// Story Artefact Image Routes (Multi-image gallery support)
+// =============================================================================
+
+// Upload a new image to an artefact's gallery
+app.post(
+  '/api/campaigns/:campaignId/artefact-images/:artefactId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, artefactId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      // Verify the artefact exists
+      const artefact = await fileStore.get(campaignId, 'story-artefacts', artefactId);
+      if (!artefact) {
+        res.status(404).json({ success: false, error: 'Artefact not found' });
+        return;
+      }
+
+      // Process and save the image (creates both full and thumbnail versions)
+      const result = await processAndSaveArtefactImage(
+        campaignId,
+        artefactId,
+        req.file.buffer
+      );
+
+      // Add the new image to the artefact's images array
+      const currentImages = (artefact.frontmatter.images as Array<{ id: string; path: string; thumbPath?: string; caption?: string; isPrimary?: boolean }>) || [];
+      const isFirstImage = currentImages.length === 0;
+
+      const newImage = {
+        id: result.id,
+        path: result.path,
+        thumbPath: result.thumbPath,
+        isPrimary: isFirstImage, // First image becomes primary by default
+      };
+
+      await fileStore.update(campaignId, 'story-artefacts', artefactId, {
+        frontmatter: {
+          images: [...currentImages, newImage],
+        },
+      });
+
+      res.json({ success: true, data: newImage });
+    } catch (error) {
+      console.error('Error uploading artefact image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Delete an image from an artefact's gallery
+app.delete(
+  '/api/campaigns/:campaignId/artefact-images/:artefactId/:imageId',
+  auth.requireDm,
+  async (req, res) => {
+    try {
+      const { campaignId, artefactId, imageId } = req.params;
+
+      // Verify the artefact exists
+      const artefact = await fileStore.get(campaignId, 'story-artefacts', artefactId);
+      if (!artefact) {
+        res.status(404).json({ success: false, error: 'Artefact not found' });
+        return;
+      }
+
+      // Remove the image files
+      await deleteArtefactImage(campaignId, artefactId, imageId);
+
+      // Update the artefact's images array
+      const currentImages = (artefact.frontmatter.images as Array<{ id: string; path: string; isPrimary?: boolean }>) || [];
+      const wasDeleted = currentImages.find(img => img.id === imageId);
+      const updatedImages = currentImages.filter(img => img.id !== imageId);
+
+      // If we deleted the primary image, make the first remaining image primary
+      if (wasDeleted?.isPrimary && updatedImages.length > 0) {
+        updatedImages[0].isPrimary = true;
+      }
+
+      await fileStore.update(campaignId, 'story-artefacts', artefactId, {
+        frontmatter: {
+          images: updatedImages,
+        },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting artefact image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to delete image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Update an image's metadata (caption, isPrimary)
+app.patch(
+  '/api/campaigns/:campaignId/artefact-images/:artefactId/:imageId',
+  auth.requireDm,
+  async (req, res) => {
+    try {
+      const { campaignId, artefactId, imageId } = req.params;
+      const { caption, isPrimary } = req.body;
+
+      // Verify the artefact exists
+      const artefact = await fileStore.get(campaignId, 'story-artefacts', artefactId);
+      if (!artefact) {
+        res.status(404).json({ success: false, error: 'Artefact not found' });
+        return;
+      }
+
+      const currentImages = (artefact.frontmatter.images as Array<{ id: string; path: string; thumbPath?: string; caption?: string; isPrimary?: boolean }>) || [];
+      const imageIndex = currentImages.findIndex(img => img.id === imageId);
+
+      if (imageIndex === -1) {
+        res.status(404).json({ success: false, error: 'Image not found' });
+        return;
+      }
+
+      // Update the image metadata
+      if (caption !== undefined) {
+        currentImages[imageIndex].caption = caption;
+      }
+
+      // If setting this as primary, unset all others
+      if (isPrimary === true) {
+        currentImages.forEach((img, i) => {
+          img.isPrimary = i === imageIndex;
+        });
+      }
+
+      await fileStore.update(campaignId, 'story-artefacts', artefactId, {
+        frontmatter: {
+          images: currentImages,
+        },
+      });
+
+      res.json({ success: true, data: currentImages[imageIndex] });
+    } catch (error) {
+      console.error('Error updating artefact image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to update image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Reorder images in an artefact's gallery
+app.put(
+  '/api/campaigns/:campaignId/artefact-images/:artefactId/reorder',
+  auth.requireDm,
+  async (req, res) => {
+    try {
+      const { campaignId, artefactId } = req.params;
+      const { imageIds } = req.body; // Array of image IDs in new order
+
+      if (!Array.isArray(imageIds)) {
+        res.status(400).json({ success: false, error: 'imageIds array required' });
+        return;
+      }
+
+      // Verify the artefact exists
+      const artefact = await fileStore.get(campaignId, 'story-artefacts', artefactId);
+      if (!artefact) {
+        res.status(404).json({ success: false, error: 'Artefact not found' });
+        return;
+      }
+
+      const currentImages = (artefact.frontmatter.images as Array<{ id: string; path: string; thumbPath?: string; caption?: string; isPrimary?: boolean }>) || [];
+
+      // Reorder images based on the provided order
+      const reorderedImages = imageIds
+        .map(id => currentImages.find(img => img.id === id))
+        .filter((img): img is NonNullable<typeof img> => img !== undefined);
+
+      // Make sure we didn't lose any images
+      if (reorderedImages.length !== currentImages.length) {
+        res.status(400).json({ success: false, error: 'Image IDs do not match existing images' });
+        return;
+      }
+
+      await fileStore.update(campaignId, 'story-artefacts', artefactId, {
+        frontmatter: {
+          images: reorderedImages,
+        },
+      });
+
+      res.json({ success: true, data: reorderedImages });
+    } catch (error) {
+      console.error('Error reordering artefact images:', error);
+      const message = error instanceof Error ? error.message : 'Failed to reorder images';
       res.status(500).json({ success: false, error: message });
     }
   }

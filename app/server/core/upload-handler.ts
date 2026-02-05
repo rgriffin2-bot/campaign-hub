@@ -420,3 +420,104 @@ export async function deleteBoardTokenImage(
     // Ignore if file doesn't exist
   }
 }
+
+// =============================================================================
+// Story Artefact Images (Multi-image gallery support)
+// =============================================================================
+
+// Ensure artefact images directory exists for a specific artefact
+async function ensureArtefactImageDir(campaignId: string, artefactId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'artefacts', artefactId);
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+// Generate a unique image ID based on timestamp
+function generateImageId(): string {
+  return `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export interface ArtefactImageResult {
+  id: string;
+  path: string;
+  thumbPath: string;
+}
+
+export async function processAndSaveArtefactImage(
+  campaignId: string,
+  artefactId: string,
+  buffer: Buffer
+): Promise<ArtefactImageResult> {
+  const uploadDir = await ensureArtefactImageDir(campaignId, artefactId);
+  const imageId = generateImageId();
+
+  // Full-size image: preserve aspect ratio, max 2000px on longest side
+  const fullFilename = `${imageId}.jpg`;
+  const fullFilepath = path.join(uploadDir, fullFilename);
+
+  await sharp(buffer)
+    .resize(2000, 2000, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 85 })
+    .toFile(fullFilepath);
+
+  // Thumbnail: 500x500 square crop from center
+  const thumbFilename = `${imageId}-thumb.jpg`;
+  const thumbFilepath = path.join(uploadDir, thumbFilename);
+
+  await sharp(buffer)
+    .resize(500, 500, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({ quality: 80 })
+    .toFile(thumbFilepath);
+
+  // Return relative paths from campaign root
+  const basePath = `assets/artefacts/${artefactId}`;
+  return {
+    id: imageId,
+    path: `${basePath}/${fullFilename}`,
+    thumbPath: `${basePath}/${thumbFilename}`,
+  };
+}
+
+export async function deleteArtefactImage(
+  campaignId: string,
+  artefactId: string,
+  imageId: string
+): Promise<void> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'artefacts', artefactId);
+
+  // Delete both full and thumbnail versions
+  const fullPath = path.join(uploadDir, `${imageId}.jpg`);
+  const thumbPath = path.join(uploadDir, `${imageId}-thumb.jpg`);
+
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+
+  try {
+    await fs.unlink(thumbPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
+
+export async function deleteArtefactImageFolder(
+  campaignId: string,
+  artefactId: string
+): Promise<void> {
+  const folderPath = path.join(config.campaignsDir, campaignId, 'assets', 'artefacts', artefactId);
+
+  try {
+    // Remove entire folder and contents
+    await fs.rm(folderPath, { recursive: true, force: true });
+  } catch {
+    // Ignore if folder doesn't exist
+  }
+}

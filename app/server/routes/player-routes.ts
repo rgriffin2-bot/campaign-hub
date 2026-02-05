@@ -9,6 +9,7 @@ import { filterDmOnlyContent, filterDmOnlyMetadataList, isHiddenFromPlayers } fr
 import { config } from '../config.js';
 import { generateStarSystemMap } from '../modules/locations/map-generator.js';
 import { upload, processAndSavePCPortrait } from '../core/upload-handler.js';
+import { withFileLock } from '../core/file-lock.js';
 
 const router = Router();
 
@@ -575,69 +576,78 @@ router.patch('/scene-ships/:shipId', async (req, res) => {
     const updates = req.body;
 
     const scenePath = path.join(config.campaignsDir, campaign.id, '_scene-ships.json');
-    let ships: Array<{
-      id: string;
-      name: string;
-      isCrewShip?: boolean;
-      [key: string]: unknown;
-    }> = [];
 
-    try {
-      const content = await fs.readFile(scenePath, 'utf-8');
-      ships = JSON.parse(content);
-    } catch {
-      res.status(404).json({ success: false, error: 'Ship not found' });
-      return;
-    }
+    // Use file lock to prevent race conditions during read-modify-write
+    type ShipUpdateResult = { data: unknown[] } | { error: string; status: number };
+    const result: ShipUpdateResult = await withFileLock(scenePath, async () => {
+      let ships: Array<{
+        id: string;
+        name: string;
+        isCrewShip?: boolean;
+        [key: string]: unknown;
+      }> = [];
 
-    const index = ships.findIndex(s => s.id === shipId);
-    if (index === -1) {
-      res.status(404).json({ success: false, error: 'Ship not found' });
-      return;
-    }
-
-    // Players can only update crew ships
-    if (!ships[index].isCrewShip) {
-      res.status(403).json({ success: false, error: 'Cannot update non-crew ships' });
-      return;
-    }
-
-    // Only allow updating certain fields
-    const allowedFields = ['pressure', 'damage'];
-    const safeUpdates: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        safeUpdates[field] = updates[field];
+      try {
+        const content = await fs.readFile(scenePath, 'utf-8');
+        ships = JSON.parse(content);
+      } catch {
+        return { error: 'Ship not found', status: 404 };
       }
+
+      const index = ships.findIndex(s => s.id === shipId);
+      if (index === -1) {
+        return { error: 'Ship not found', status: 404 };
+      }
+
+      // Players can only update crew ships
+      if (!ships[index].isCrewShip) {
+        return { error: 'Cannot update non-crew ships', status: 403 };
+      }
+
+      // Only allow updating certain fields
+      const allowedFields = ['pressure', 'damage'];
+      const safeUpdates: Record<string, unknown> = {};
+      for (const field of allowedFields) {
+        if (updates[field] !== undefined) {
+          safeUpdates[field] = updates[field];
+        }
+      }
+
+      ships[index] = {
+        ...ships[index],
+        ...safeUpdates,
+        // Deep merge damage
+        damage: updates.damage
+          ? { ...(ships[index].damage as Record<string, unknown>), ...updates.damage }
+          : ships[index].damage,
+      };
+
+      await fs.writeFile(scenePath, JSON.stringify(ships, null, 2), 'utf-8');
+
+      // Return filtered list for players
+      const visibleShips = ships
+        .filter(ship => ship.visibleToPlayers !== false)
+        .map(ship => ({
+          id: ship.id,
+          name: ship.name,
+          type: ship.type,
+          class: ship.class,
+          image: ship.image,
+          isCrewShip: ship.isCrewShip,
+          disposition: ship.disposition,
+          pressure: ship.pressure,
+          damage: ship.damage,
+        }));
+
+      return { data: visibleShips };
+    });
+
+    if ('error' in result) {
+      res.status(result.status).json({ success: false, error: result.error });
+      return;
     }
 
-    ships[index] = {
-      ...ships[index],
-      ...safeUpdates,
-      // Deep merge damage
-      damage: updates.damage
-        ? { ...(ships[index].damage as Record<string, unknown>), ...updates.damage }
-        : ships[index].damage,
-    };
-
-    await fs.writeFile(scenePath, JSON.stringify(ships, null, 2), 'utf-8');
-
-    // Return filtered list for players
-    const visibleShips = ships
-      .filter(ship => ship.visibleToPlayers !== false)
-      .map(ship => ({
-        id: ship.id,
-        name: ship.name,
-        type: ship.type,
-        class: ship.class,
-        image: ship.image,
-        isCrewShip: ship.isCrewShip,
-        disposition: ship.disposition,
-        pressure: ship.pressure,
-        damage: ship.damage,
-      }));
-
-    res.json({ success: true, data: visibleShips });
+    res.json({ success: true, data: result.data });
   } catch (error) {
     console.error('Error updating crew ship:', error);
     res.status(500).json({ success: false, error: 'Failed to update ship' });
@@ -799,19 +809,25 @@ router.post('/dice-rolls', async (req, res) => {
     };
 
     const filePath = path.join(config.campaignsDir, campaign.id, '_dice-rolls.json');
-    let state: DiceRollState = { rolls: [], visibleToPlayers: true };
 
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      state = JSON.parse(content);
-    } catch {
-      // File doesn't exist - use default state
-    }
+    // Use file lock to prevent race conditions during read-modify-write
+    const state = await withFileLock(filePath, async () => {
+      let currentState: DiceRollState = { rolls: [], visibleToPlayers: true };
 
-    // Add new roll to the beginning and keep only last 5
-    state.rolls = [roll, ...state.rolls].slice(0, 5);
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        currentState = JSON.parse(content);
+      } catch {
+        // File doesn't exist - use default state
+      }
 
-    await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+      // Add new roll to the beginning and keep only last 5
+      currentState.rolls = [roll, ...currentState.rolls].slice(0, 5);
+
+      await fs.writeFile(filePath, JSON.stringify(currentState, null, 2), 'utf-8');
+
+      return currentState;
+    });
 
     res.json({ success: true, data: state });
   } catch (error) {
