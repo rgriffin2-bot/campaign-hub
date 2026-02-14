@@ -1,9 +1,17 @@
+/**
+ * PlayerFactionDetail.tsx
+ *
+ * Player (read-only) detail page for a single faction.
+ * Features a prominent affinity card with a read-only -3..+3 scale,
+ * along with faction type, location, leader, description, and notes.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Users, MapPin, User } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { MarkdownContent } from '../components/MarkdownContent';
 import { affinityLabels, FACTION_TYPE_LABELS, type FactionFrontmatter } from '@shared/schemas/faction';
 
+/** Faction detail page for the player view. */
 export function PlayerFactionDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { get } = usePlayerFiles('factions');
@@ -95,7 +103,7 @@ export function PlayerFactionDetail() {
         </div>
       </div>
 
-      {/* Affinity Card */}
+      {/* Affinity Card -- shows the party's current standing */}
       <div className={`rounded-lg border-2 p-6 ${getAffinityBorderColor(affinity)}`}>
         <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Standing with the Crew
@@ -109,7 +117,7 @@ export function PlayerFactionDetail() {
           </span>
         </div>
 
-        {/* Affinity Scale (read-only) */}
+        {/* Read-only 7-step affinity scale from -3 to +3 */}
         <div className="mt-4 flex items-center gap-1">
           {[-3, -2, -1, 0, 1, 2, 3].map((value) => (
             <div
@@ -146,6 +154,9 @@ export function PlayerFactionDetail() {
   );
 }
 
+// --- Affinity color helpers ---
+
+/** Border + faint background color for the affinity card. */
 function getAffinityBorderColor(affinity: number): string {
   if (affinity >= 3) return 'border-emerald-500/50 bg-emerald-500/5';
   if (affinity === 2) return 'border-green-500/50 bg-green-500/5';
@@ -156,6 +167,7 @@ function getAffinityBorderColor(affinity: number): string {
   return 'border-red-500/50 bg-red-500/5'; // -3
 }
 
+/** Solid background for the active step on the affinity scale. */
 function getAffinityBgColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500';
   if (affinity === 2) return 'bg-green-500';
@@ -166,6 +178,7 @@ function getAffinityBgColor(affinity: number): string {
   return 'bg-red-500'; // -3
 }
 
+/** Text color for the large affinity number and label. */
 function getAffinityTextColor(affinity: number): string {
   if (affinity >= 3) return 'text-emerald-500';
   if (affinity === 2) return 'text-green-500';

@@ -1,3 +1,11 @@
+/**
+ * PlayerPlaybookMoveDetail.tsx
+ *
+ * Player (read-only) detail page for a single playbook move.
+ * Fetches the move via the rules player endpoint and shows its
+ * rendered markdown content. The back link returns to the
+ * owning character's detail page.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
@@ -5,15 +13,16 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { useQuery } from '@tanstack/react-query';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 
+/** Playbook move detail page for the player view. */
 export function PlayerPlaybookMoveDetail() {
   const { fileId: characterId, moveId } = useParams<{ fileId: string; moveId: string }>();
   const { campaign } = useCampaign();
   const { get: getCharacter } = usePlayerFiles('player-characters');
 
-  // Fetch character to get their name for the back link
+  // Fetch the character so we can show their name in the back link
   const { data: character } = getCharacter(characterId || '');
 
-  // Fetch the specific move using player endpoint
+  // Fetch the specific move via the rules player endpoint
   const { data: move, isLoading } = useQuery({
     queryKey: ['player-move-detail', campaign?.id, moveId],
     queryFn: async () => {

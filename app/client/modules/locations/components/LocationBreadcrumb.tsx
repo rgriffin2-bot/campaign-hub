@@ -1,3 +1,9 @@
+/**
+ * LocationBreadcrumb - Renders a hierarchical breadcrumb trail for a location
+ * by walking up the parent chain. Displays clickable ancestor links separated
+ * by chevrons, with the current location name at the end.
+ */
+
 import { Link } from 'react-router-dom';
 import { ChevronRight, MapPin } from 'lucide-react';
 import type { FileMetadata } from '@shared/types/file';

@@ -1,6 +1,11 @@
+/**
+ * Session Notes schema.
+ * Validates frontmatter for session recap/note files stored in the session-notes/ folder.
+ * Supports per-note author attribution and a player-only visibility flag.
+ */
+
 import { z } from 'zod';
 
-// Session notes schema
 export const sessionNotesSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Title is required'),
@@ -12,6 +17,7 @@ export const sessionNotesSchema = z.object({
 
 export type SessionNotesFrontmatter = z.infer<typeof sessionNotesSchema>;
 
+/** A fully parsed session notes file (frontmatter + markdown body + path) */
 export interface SessionNotesFile {
   frontmatter: SessionNotesFrontmatter;
   content: string;

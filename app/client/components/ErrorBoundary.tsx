@@ -1,3 +1,9 @@
+/**
+ * ErrorBoundary - React class component that catches unhandled render errors.
+ * Displays a user-friendly error screen with a reload button instead of
+ * crashing the entire application.
+ */
+
 import React, { Component, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 

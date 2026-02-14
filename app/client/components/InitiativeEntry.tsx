@@ -1,3 +1,11 @@
+/**
+ * InitiativeEntry -- renders a single participant in the initiative tracker.
+ * Three layout variants:
+ *   - tacticalBoardMode: vertical sidebar card with portrait + action buttons
+ *   - compact: small portrait pill for bottom-bar on tactical board
+ *   - full: larger card with portrait and DM reorder/remove controls (live play)
+ * DM-only controls (move up/down, delete) are conditionally shown.
+ */
 import { memo } from 'react';
 import {
   ChevronUp,
@@ -10,7 +18,7 @@ import {
 import type { InitiativeEntry as InitiativeEntryType } from '@shared/types/initiative';
 import { useCampaign } from '../core/providers/CampaignProvider';
 
-// Simple classnames helper
+// Simple classnames helper -- filters falsy values and joins with spaces
 function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
@@ -46,7 +54,7 @@ export const InitiativeEntryComponent = memo(function InitiativeEntryComponent({
     ? `/api/campaigns/${campaign.id}/assets/${entry.portrait.replace('assets/', '')}`
     : null;
 
-  // Get icon based on source type
+  // Return the appropriate icon component based on entity type (PC, NPC, ship)
   const getSourceIcon = (size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = {
       sm: 'h-4 w-4',

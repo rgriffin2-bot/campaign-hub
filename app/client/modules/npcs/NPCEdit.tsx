@@ -1,3 +1,12 @@
+/**
+ * NPCEdit.tsx
+ *
+ * Create / edit form for Non-Player Characters. Handles basic info,
+ * description fields, antagonist combat stats, DM-only secrets,
+ * related character links, portrait upload, and free-text notes.
+ * On save, constructs the frontmatter object and either creates or
+ * updates the NPC file via the useFiles hook.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Swords } from 'lucide-react';
@@ -14,7 +23,9 @@ export function NPCEdit() {
   const isNew = fileId === 'new';
   const { data: existingNPC, isLoading } = get(isNew ? '' : fileId || '');
 
-  // Form state
+  // ── Form state ──
+  // Each NPC field has its own state variable; they are assembled into a
+  // frontmatter object on save.
   const [name, setName] = useState('');
   const [occupation, setOccupation] = useState('');
   const [location, setLocation] = useState('');
@@ -39,6 +50,7 @@ export function NPCEdit() {
   const [isSaving, setIsSaving] = useState(false);
 
 
+  // Populate form fields when loading an existing NPC
   useEffect(() => {
     if (existingNPC && !isNew) {
       const fm = existingNPC.frontmatter as unknown as NPCFrontmatter;
@@ -67,16 +79,21 @@ export function NPCEdit() {
     }
   }, [existingNPC, isNew]);
 
+  // ── Save handler ──
+  // Assembles all form fields into the NPC frontmatter shape and
+  // either creates a new file or patches the existing one.
   const handleSave = async () => {
     if (!name.trim()) return;
 
     setIsSaving(true);
     try {
+      // Parse comma-separated tags into an array
       const tagsArray = tags
         .split(',')
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
 
+      // Only include dmOnly block if at least one DM field is filled
       const dmOnly =
         secrets || voice || dmNotes
           ? {

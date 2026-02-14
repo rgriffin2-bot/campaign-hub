@@ -1,7 +1,14 @@
+/**
+ * Date formatting and conversion utilities.
+ * All functions accept/return ISO 8601 date strings for consistency.
+ */
+
+/** Converts a Date (or now) to an ISO 8601 string */
 export function toISOString(date: Date = new Date()): string {
   return date.toISOString();
 }
 
+/** Formats an ISO date string as "Jan 1, 2025" */
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
@@ -11,6 +18,7 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** Formats an ISO date string as "Jan 1, 2025, 3:45 PM" */
 export function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleString('en-US', {
@@ -22,6 +30,7 @@ export function formatDateTime(dateString: string): string {
   });
 }
 
+/** Formats an ISO date string as a relative time (e.g. "5 minutes ago") */
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

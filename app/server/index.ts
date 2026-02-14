@@ -1,3 +1,12 @@
+/**
+ * CampaignHub Express Server — Main Entry Point
+ *
+ * Sets up middleware (security, CORS, auth), mounts all API route groups
+ * (campaigns, files, uploads, map generation, player routes), serves static
+ * assets, and starts the HTTP server. Module definitions are imported for
+ * their side-effect of self-registering with the module registry.
+ */
+
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -26,7 +35,7 @@ import {
   parseJsonField,
 } from './core/validation.js';
 
-// Import modules (registers them automatically)
+// Side-effect imports: each module file registers itself with moduleRegistry
 import './modules/lore/index.js';
 import './modules/npcs/index.js';
 import './modules/locations/index.js';
@@ -55,8 +64,8 @@ app.use(
 );
 
 // Rate limiting disabled for local development
-// The live play polling (every 3s per user) was exceeding limits
-// For production, consider re-enabling with higher limits or using WebSockets
+// The live play polling (every 1s per user) generates heavy traffic;
+// the global rate limit is set to 5000 req/15min to handle 5 players + DM.
 
 // Stricter rate limit for auth endpoints only
 const authLimiter = rateLimit({
@@ -67,7 +76,8 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// CORS configuration - allow local network and ngrok tunnels
+// CORS configuration — allow local network (192.168.x, 10.x, 172.16-31.x)
+// and Cloudflare Tunnel URLs so the player site works from other devices.
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl)
@@ -76,7 +86,7 @@ const corsOptions: cors.CorsOptions = {
       return;
     }
 
-    // Check if origin is from local network or ngrok
+    // Check if origin is from local network or Cloudflare Tunnel
     const isAllowed =
       origin.startsWith('http://localhost') ||
       origin.startsWith('http://127.0.0.1') ||
@@ -98,9 +108,7 @@ const corsOptions: cors.CorsOptions = {
       origin.startsWith('http://172.29.') ||
       origin.startsWith('http://172.30.') ||
       origin.startsWith('http://172.31.') ||
-      origin.includes('.ngrok-free.app') ||
-      origin.includes('.ngrok-free.dev') ||
-      origin.includes('.ngrok.io');
+      origin.includes('.trycloudflare.com');
 
     if (isAllowed) {
       callback(null, true);
@@ -120,15 +128,14 @@ const auth = createAuthMiddleware(config.auth.dmPassword, config.auth.playerPass
 // Auth Routes
 // =============================================================================
 
-// Login endpoint
+// Login — issues a session cookie with role (dm or player).
+// The Secure flag is added dynamically when behind an HTTPS proxy (Cloudflare Tunnel).
 app.post('/api/auth/login', authLimiter, validate({ body: loginSchema }), (req, res) => {
   const { password } = req.body;
 
   const result = login(password, config.auth.dmPassword, config.auth.playerPassword);
 
   if (result.success) {
-    // Set cookie for browser clients
-    // Add Secure flag when accessed over HTTPS (e.g., via ngrok)
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
     const securePart = isSecure ? '; Secure' : '';
     res.setHeader(
@@ -150,18 +157,18 @@ app.post('/api/auth/logout', (req, res) => {
       logout(match[1]);
     }
   }
-  // Add Secure flag when accessed over HTTPS (e.g., via ngrok)
+  // Add Secure flag when accessed over HTTPS (e.g., via Cloudflare Tunnel)
   const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
   const securePart = isSecure ? '; Secure' : '';
   res.setHeader('Set-Cookie', `session=; HttpOnly; SameSite=Strict${securePart}; Max-Age=0; Path=/`);
   res.json({ success: true });
 });
 
-// Get ngrok tunnel URL (for sharing player link)
+// Discover the public Cloudflare Tunnel URL so the DM can share a link with players.
+// Reads from a .tunnel-url file written by the launcher script.
 app.get('/api/tunnel-url', auth.requireDm, async (_req, res) => {
   try {
-    // First try reading from .ngrok-url file (set by launcher)
-    const urlFilePath = path.join(process.cwd(), '.ngrok-url');
+    const urlFilePath = path.join(process.cwd(), '.tunnel-url');
     try {
       const url = await fs.readFile(urlFilePath, 'utf-8');
       if (url.trim()) {
@@ -169,20 +176,7 @@ app.get('/api/tunnel-url', auth.requireDm, async (_req, res) => {
         return;
       }
     } catch {
-      // File doesn't exist, try ngrok API
-    }
-
-    // Try getting URL from ngrok API directly
-    try {
-      const response = await fetch('http://localhost:4040/api/tunnels');
-      const data = await response.json() as { tunnels?: Array<{ public_url?: string }> };
-      const tunnel = data.tunnels?.find((t: { public_url?: string }) => t.public_url?.startsWith('https://'));
-      if (tunnel?.public_url) {
-        res.json({ success: true, data: { url: tunnel.public_url } });
-        return;
-      }
-    } catch {
-      // ngrok not running or API not available
+      // File doesn't exist — tunnel not running
     }
 
     res.json({ success: true, data: { url: null } });
@@ -192,9 +186,10 @@ app.get('/api/tunnel-url', auth.requireDm, async (_req, res) => {
   }
 });
 
-// Check session endpoint
+// Session check — used by the frontend on load to determine current role.
+// When auth is disabled (no passwords configured), everyone gets DM access.
 app.get('/api/auth/session', (req, res) => {
-  // If auth is not enabled, return dm role
+  // When auth is disabled, treat everyone as DM
   if (!auth.authEnabled) {
     res.json({ success: true, authenticated: true, role: 'dm', authEnabled: false });
     return;
@@ -378,7 +373,8 @@ app.get('/api/campaigns/:campaignId/files/:moduleId/:fileId', auth.requireDm, as
   }
 });
 
-// Helper to invalidate cached player map when locations change
+// When a location file is created/updated/deleted, delete the cached
+// player-specific map HTML so it regenerates on the next player request.
 async function invalidatePlayerMapCache(campaignId: string, moduleId: string) {
   if (moduleId === 'locations') {
     const campaignPath = path.join(config.campaignsDir, campaignId);
@@ -480,7 +476,9 @@ app.get('/api/campaigns/:campaignId/relationships/:fileId', auth.requireDm, asyn
 });
 
 // =============================================================================
-// Portrait Upload Routes (DM Only)
+// Image Upload Routes (DM Only)
+// Each upload type uses a dedicated processing function that resizes/converts
+// the image appropriately for its use case (see upload-handler.ts).
 // =============================================================================
 
 // Upload a portrait for an NPC
@@ -733,6 +731,9 @@ app.post(
 
 // =============================================================================
 // Story Artefact Image Routes (Multi-image gallery support)
+// Artefacts can have multiple images; the frontmatter stores an ordered array
+// of {id, path, thumbPath, caption, isPrimary}. Upload/delete/reorder all
+// keep this array in sync.
 // =============================================================================
 
 // Upload a new image to an artefact's gallery
@@ -812,7 +813,7 @@ app.delete(
       const wasDeleted = currentImages.find(img => img.id === imageId);
       const updatedImages = currentImages.filter(img => img.id !== imageId);
 
-      // If we deleted the primary image, make the first remaining image primary
+      // Auto-promote next image to primary so the gallery always has one
       if (wasDeleted?.isPrimary && updatedImages.length > 0) {
         updatedImages[0].isPrimary = true;
       }
@@ -861,7 +862,7 @@ app.patch(
         currentImages[imageIndex].caption = caption;
       }
 
-      // If setting this as primary, unset all others
+      // Only one image can be primary; unset all others when promoting
       if (isPrimary === true) {
         currentImages.forEach((img, i) => {
           img.isPrimary = i === imageIndex;
@@ -932,7 +933,8 @@ app.put(
   }
 );
 
-// Serve static assets from campaigns directory
+// Serve uploaded images (portraits, maps, etc.) as static files.
+// Each campaign has its own assets/ subdirectory.
 app.use('/api/campaigns/:campaignId/assets', (req, res, next) => {
   const { campaignId } = req.params;
   const assetsPath = path.join(config.campaignsDir, campaignId, 'assets');
@@ -1001,18 +1003,18 @@ app.get('/api/campaigns/:campaignId/map', auth.requireDm, async (req, res) => {
 // Mount Module Routes & Start Server
 // =============================================================================
 
-// Mount player routes (read-only, filtered, requires player or DM auth)
+// Player routes require player-level auth (player OR DM password works)
 app.use('/api/player', auth.requirePlayer, playerRoutes);
 
-// Mount module-specific routes (DM only)
-// Note: Module routes at /api/modules/* are protected by requireDm
+// Module-specific routes (e.g., /api/modules/live-play/scene-npcs) are
+// DM-only. The registry auto-mounts each module's declared routes.
 app.use('/api/modules', auth.requireDm);
 moduleRegistry.mountRoutes(app);
 
-// Start file watcher
+// Watch campaign files on disk for external edits (e.g., text editor)
 fileWatcher.start();
 
-// Start server - listen on all interfaces for network access
+// Listen on 0.0.0.0 so the server is accessible from other devices on the LAN
 app.listen(config.port, '0.0.0.0', () => {
   console.log(`Campaign Hub server running on http://localhost:${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);

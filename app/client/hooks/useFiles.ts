@@ -1,7 +1,15 @@
+/**
+ * useFiles -- React-Query-based hook for CRUD operations on module files.
+ * Wraps list, get, create, update, delete, and toggleVisibility for any
+ * module type (e.g., 'npcs', 'lore', 'tactical-board'). Automatically
+ * invalidates related caches on mutation success.
+ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCampaign } from './useCampaign';
 import type { FileMetadata, ParsedFile, CreateFileInput, UpdateFileInput } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
+
+// --- API helper functions ---
 
 async function fetchFiles(
   campaignId: string,
@@ -79,7 +87,7 @@ async function toggleVisibility(
   fileId: string,
   hidden: boolean
 ): Promise<ParsedFile> {
-  // For rules module, use playerVisible (inverted). For other modules, use hidden.
+  // Rules module uses an inverted `playerVisible` flag; everything else uses `hidden`
   const frontmatter = moduleId === 'rules'
     ? { playerVisible: !hidden }
     : { hidden };
@@ -98,18 +106,21 @@ async function toggleVisibility(
   return data.data!;
 }
 
+/** Hook returning query/mutation objects scoped to a single module's files */
 export function useFiles(moduleId: string) {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
 
   const campaignId = campaign?.id || '';
 
+  // List all files in this module
   const listQuery = useQuery({
     queryKey: ['files', campaignId, moduleId],
     queryFn: () => fetchFiles(campaignId, moduleId),
     enabled: !!campaignId,
   });
 
+  // Fetch a single file by ID (called as a hook: `get(fileId)`)
   const useFileQuery = (fileId: string) =>
     useQuery({
       queryKey: ['file', campaignId, moduleId, fileId],

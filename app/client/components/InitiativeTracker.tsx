@@ -1,3 +1,15 @@
+/**
+ * InitiativeTracker.tsx
+ *
+ * Displays the combat initiative order with turn navigation, entry
+ * management, and reordering. Supports three layout modes:
+ *   1. tacticalBoardMode - vertical sidebar layout
+ *   2. compact - horizontal bottom-bar layout
+ *   3. full - wrapping card layout for the Live Play module
+ *
+ * The component is entirely controlled: all state lives in the parent
+ * and mutations are dispatched via callback props.
+ */
 import { memo, useState, useCallback } from 'react';
 import {
   ChevronLeft,
@@ -9,36 +21,37 @@ import {
 import { InitiativeEntryComponent } from './InitiativeEntry';
 import type { InitiativeEntry, InitiativeState } from '@shared/types/initiative';
 
-// Simple classnames helper
+// Tiny classnames helper (avoids importing clsx for one component)
 function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
 
 interface InitiativeTrackerProps {
-  // State (required)
+  /** Current initiative state (entries, round, etc.) */
   initiative: InitiativeState;
   isDm?: boolean;
 
-  // Entry management callbacks
+  // ── Entry management callbacks ──
   onAddEntry?: (entry: Omit<InitiativeEntry, 'id'>) => void;
   onRemoveEntry?: (entryId: string) => void;
   onUpdateEntry?: (entryId: string, updates: Partial<InitiativeEntry>) => void;
   onClearAllEntries?: () => void;
 
-  // Turn management
+  // ── Turn management ──
   onNextTurn?: () => void;
   onPrevTurn?: () => void;
 
-  // Reordering
+  // ── Reordering ──
   onMoveEntryUp?: (entryId: string) => void;
   onMoveEntryDown?: (entryId: string) => void;
 
-  // Populate from scene
+  // ── Bulk population ──
+  /** Adds all PCs/NPCs/ships currently in the scene */
   onAddInScene?: () => void;
 
-  // Layout
-  compact?: boolean; // For bottom bar horizontal layout
-  tacticalBoardMode?: boolean; // For tactical board sidebar vertical layout
+  // ── Layout variants ──
+  compact?: boolean;            // Horizontal bottom-bar layout
+  tacticalBoardMode?: boolean;  // Vertical sidebar layout
   className?: string;
 }
 
@@ -58,10 +71,11 @@ export const InitiativeTracker = memo(function InitiativeTracker({
   tacticalBoardMode = false,
   className,
 }: InitiativeTrackerProps) {
+  // Local UI state for the "add custom entry" form
   const [showAddForm, setShowAddForm] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
 
-  // Handle adding a new custom entry
+  // Creates a new initiative entry with default values (initiative 0, inactive)
   const handleAddEntry = useCallback(() => {
     if (!newEntryName.trim() || !onAddEntry) return;
 
@@ -76,12 +90,12 @@ export const InitiativeTracker = memo(function InitiativeTracker({
     setShowAddForm(false);
   }, [newEntryName, onAddEntry]);
 
-  // If not visible to players and user is not DM, show minimal UI
+  // Hide the tracker from non-DM users when visibility is toggled off
   if (!initiative.visibleToPlayers && !isDm) {
     return null;
   }
 
-  // Tactical Board sidebar vertical layout - compact controls, one entry per row
+  // ── Layout 1: Tactical Board sidebar (vertical, narrow) ──
   if (tacticalBoardMode) {
     return (
       <div className={cn('flex flex-col gap-2', className)}>
@@ -196,7 +210,7 @@ export const InitiativeTracker = memo(function InitiativeTracker({
     );
   }
 
-  // Compact horizontal layout for tactical board bottom bar
+  // ── Layout 2: Compact horizontal bar ──
   if (compact) {
     return (
       <div className={cn('flex items-center gap-3 rounded-lg border border-border bg-card/80 px-3 py-2 backdrop-blur-sm', className)}>
@@ -282,7 +296,7 @@ export const InitiativeTracker = memo(function InitiativeTracker({
     );
   }
 
-  // Full horizontal layout for Live Play module
+  // ── Layout 3: Full wrapping card layout (default, used in Live Play) ──
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       {/* Header with controls */}

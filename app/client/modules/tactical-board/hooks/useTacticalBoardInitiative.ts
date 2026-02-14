@@ -1,8 +1,18 @@
+/**
+ * useTacticalBoardInitiative -- Local-only initiative tracker for the tactical board.
+ *
+ * Unlike the live-play InitiativeProvider (which is server-authoritative and polled),
+ * this hook keeps all state client-side. It is used when the DM wants a quick
+ * initiative order on the tactical board without persisting to the server.
+ *
+ * Provides `addFromTokens()` to bulk-import board tokens into the initiative list,
+ * de-duplicating by sourceId or name+type.
+ */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { InitiativeEntry, InitiativeState } from '@shared/types/initiative';
 import type { BoardToken } from '@shared/schemas/tactical-board';
 
-// Generate a unique ID for initiative entries
+/** Generate a unique ID combining timestamp and random suffix. */
 function generateId(): string {
   return `init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -21,12 +31,14 @@ export interface TacticalBoardInitiativeState {
 }
 
 export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardInitiativeState {
-  // Store tokens in ref so addFromTokens callback can access current tokens
+  // Keep a ref to the latest tokens so the stable `addFromTokens` callback
+  // always reads the current board state without needing tokens in its deps.
   const tokensRef = useRef<BoardToken[]>(tokens);
   useEffect(() => {
     tokensRef.current = tokens;
   }, [tokens]);
-  // Local initiative state - independent from Live Play module
+
+  // ── Local state ────────────────────────────────────────────────────
   const [initiative, setInitiative] = useState<InitiativeState>({
     entries: [],
     currentRound: 1,
@@ -34,7 +46,9 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     visibleToPlayers: true,
   });
 
-  // Add entry
+  // ── Entry management ────────────────────────────────────────────────
+
+  /** Add a single entry; auto-activates if it's the first in the list. */
   const addEntry = useCallback((entry: Omit<InitiativeEntry, 'id'>) => {
     const newEntry: InitiativeEntry = {
       ...entry,
@@ -51,13 +65,13 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
-  // Remove entry
+  /** Remove an entry; if it was active, the first remaining entry becomes active. */
   const removeEntry = useCallback((entryId: string) => {
     setInitiative((prev) => {
       const wasActive = prev.entries.find((e) => e.id === entryId)?.isActive;
       const entries = prev.entries.filter((e) => e.id !== entryId);
 
-      // If removed entry was active, activate the first remaining entry
+      // Reassign active flag so there's always one active entry
       if (wasActive && entries.length > 0) {
         entries[0].isActive = true;
       }
@@ -85,7 +99,9 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     }));
   }, []);
 
-  // Next turn
+  // ── Turn management ─────────────────────────────────────────────────
+
+  /** Advance to the next entry; wraps around and increments the round counter. */
   const nextTurn = useCallback(() => {
     setInitiative((prev) => {
       if (prev.entries.length === 0) return prev;
@@ -111,7 +127,7 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
-  // Previous turn
+  /** Go back to the previous entry; decrements round when wrapping to the end. */
   const prevTurn = useCallback(() => {
     setInitiative((prev) => {
       if (prev.entries.length === 0) return prev;
@@ -137,7 +153,9 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
-  // Move entry up
+  // ── Reordering ──────────────────────────────────────────────────────
+
+  /** Swap an entry one position up in the order. */
   const moveEntryUp = useCallback((entryId: string) => {
     setInitiative((prev) => {
       const index = prev.entries.findIndex((e) => e.id === entryId);
@@ -150,7 +168,7 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
-  // Move entry down
+  /** Swap an entry one position down in the order. */
   const moveEntryDown = useCallback((entryId: string) => {
     setInitiative((prev) => {
       const index = prev.entries.findIndex((e) => e.id === entryId);
@@ -163,11 +181,15 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
-  // Add from board tokens (+ In Scene) - uses tokensRef to get current tokens
+  // ── Bulk import from board ──────────────────────────────────────────
+
+  /**
+   * Import all eligible board tokens (PCs, NPCs, ships) into initiative,
+   * skipping any that are already present (matched by sourceId or name+type).
+   */
   const addFromTokens = useCallback(() => {
     const boardTokens = tokensRef.current;
 
-    // Only add tokens that are PCs, NPCs, or Ships
     const eligibleTokens = boardTokens.filter(
       (token) =>
         token.sourceType === 'pc' ||
@@ -177,6 +199,7 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
 
     setInitiative((prev) => {
       // Check which tokens are already in initiative (by sourceId or name+type)
+      // Build lookup sets to detect duplicates efficiently
       const existingSourceIds = new Set(
         prev.entries.filter((e) => e.sourceId).map((e) => e.sourceId)
       );

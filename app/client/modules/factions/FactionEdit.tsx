@@ -1,3 +1,9 @@
+/**
+ * FactionEdit -- create/edit form for factions.
+ * Covers name, type, location, leader, description, affinity picker,
+ * tags, visibility toggle, DM-only secrets/notes, and markdown content.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Users } from 'lucide-react';
@@ -12,6 +18,7 @@ export function FactionEdit() {
   const isNew = fileId === 'new';
   const { data: existingFaction, isLoading } = get(isNew ? '' : fileId || '');
 
+  // -- Form state -------------------------------------------------------------
   const [name, setName] = useState('');
   const [type, setType] = useState<FactionType>('other');
   const [description, setDescription] = useState('');
@@ -25,6 +32,7 @@ export function FactionEdit() {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate form when editing an existing faction
   useEffect(() => {
     if (existingFaction && !isNew) {
       const fm = existingFaction.frontmatter as unknown as FactionFrontmatter;
@@ -42,6 +50,7 @@ export function FactionEdit() {
     }
   }, [existingFaction, isNew]);
 
+  // -- Save handler -----------------------------------------------------------
   const handleSave = async () => {
     if (!name.trim()) return;
 
@@ -325,6 +334,7 @@ export function FactionEdit() {
   );
 }
 
+/** Maps affinity (-3..+3) to a Tailwind background color for the picker buttons. */
 function getAffinityBgColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500';
   if (affinity === 2) return 'bg-green-500';

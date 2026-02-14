@@ -1,4 +1,13 @@
+/**
+ * Tactical Board schema.
+ * Validates frontmatter for tactical board files used in the tactical-board module.
+ * Models a virtual tabletop with tokens, connections, grid, fog of war,
+ * and initiative panel integration.
+ */
+
 import { z } from 'zod';
+
+// ── Token Enums ─────────────────────────────────────────────────────────────
 
 // Token source types - where the token comes from
 export const tokenSourceTypes = [
@@ -32,7 +41,9 @@ export type ConnectionStyle = (typeof connectionStyles)[number];
 export const initiativePanelPositions = ['right', 'bottom'] as const;
 export type InitiativePanelPosition = (typeof initiativePanelPositions)[number];
 
-// Connection between tokens
+// ── Connection Schema ───────────────────────────────────────────────────────
+
+// Visual connection line between two tokens on the board
 export const boardConnectionSchema = z.object({
   id: z.string(),
   fromTokenId: z.string(),
@@ -55,7 +66,9 @@ export const imagePositionSchema = z.object({
 
 export type ImagePosition = z.infer<typeof imagePositionSchema>;
 
-// Individual token on the board
+// ── Token Schema ────────────────────────────────────────────────────────────
+
+// Individual token on the board (can be a character, ship, or text label)
 export const boardTokenSchema = z.object({
   id: z.string(),
   sourceType: z.enum(tokenSourceTypes),
@@ -94,7 +107,9 @@ export const boardTokenSchema = z.object({
 
 export type BoardToken = z.infer<typeof boardTokenSchema>;
 
-// The tactical board itself
+// ── Board Schema ────────────────────────────────────────────────────────────
+
+// The tactical board itself, containing all tokens, connections, and settings
 export const tacticalBoardSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -142,13 +157,15 @@ export const tacticalBoardSchema = z.object({
 
 export type TacticalBoard = z.infer<typeof tacticalBoardSchema>;
 
+// ── Defaults & Helpers ──────────────────────────────────────────────────────
+
 // Default values for new tokens
 export const DEFAULT_TOKEN_SIZE = 80;
 export const DEFAULT_CANVAS_WIDTH = 2000;
 export const DEFAULT_CANVAS_HEIGHT = 2000;
 export const DEFAULT_GRID_SIZE = 50;
 
-// Helper to create a new token
+/** Creates a new board token with sensible defaults */
 export function createToken(
   sourceType: TokenSourceType,
   sourceId: string,

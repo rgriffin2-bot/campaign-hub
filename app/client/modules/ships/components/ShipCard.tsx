@@ -1,3 +1,10 @@
+/**
+ * ShipCard -- summary card for the ship grid. Shows an image preview,
+ * status badges (hidden, damaged, in-scene), crew badge, and characteristics.
+ * Includes quick-action buttons to toggle visibility and scene membership
+ * without navigating away from the list.
+ */
+
 import { Link } from 'react-router-dom';
 import { Rocket, EyeOff, Users, AlertTriangle, Eye, Plus, Minus } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -15,6 +22,7 @@ export function ShipCard({ ship }: ShipCardProps) {
   const { toggleVisibility } = useFiles('ships');
   const { addToScene, removeFromScene, isInScene } = useSceneShips();
 
+  // -- Extract typed fields from generic FileMetadata ------------------------
   const isHidden = ship.hidden as boolean | undefined;
   const isCrewShip = ship.isCrewShip as boolean | undefined;
   const shipType = ship.type as string | undefined;
@@ -33,6 +41,7 @@ export function ShipCard({ ship }: ShipCardProps) {
     ? `/api/campaigns/${campaign.id}/assets/${image.replace('assets/', '')}`
     : null;
 
+  // stopPropagation prevents the parent <Link> from navigating on button clicks
   const handleToggleVisibility = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();

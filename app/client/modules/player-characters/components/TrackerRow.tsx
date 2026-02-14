@@ -1,6 +1,13 @@
+/**
+ * TrackerRow -- a collection of small, self-contained tracker widgets for
+ * player character stats: Pressure, Harm, Resources, Experience, and Luck.
+ * Each tracker can be read-only or editable and supports a compact layout.
+ */
+
 import { Coins, Heart, Sparkles, Star, CircleDot } from 'lucide-react';
 import type { ResourceLevel, HarmState } from '@shared/schemas/player-character';
 
+// Ordered resource tiers from worst to best
 const resourceLevels: ResourceLevel[] = ['screwed', 'dry', 'light', 'covered', 'flush', 'swimming'];
 
 const resourceLabels: Record<ResourceLevel, string> = {
@@ -19,11 +26,11 @@ interface PressureTrackerProps {
   onChange?: (value: number) => void;
 }
 
+/** 5-pip pressure tracker (0-5). Click a pip to fill/unfill; arrow keys navigate. */
 export function PressureTracker({ value, editable = false, compact = false, onChange }: PressureTrackerProps) {
   const handleClick = (index: number) => {
     if (!editable || !onChange) return;
-    // If clicking the currently filled pip, unfill it
-    // Otherwise, fill up to that pip
+    // Toggle: clicking the last filled pip clears it, otherwise fill up to that pip
     onChange(index + 1 === value ? index : index + 1);
   };
 
@@ -83,12 +90,15 @@ interface HarmTrackerProps {
   onChange?: (harm: HarmState) => void;
 }
 
+/** Four-slot harm tracker: Old Wounds, Mild, Moderate, Severe. Each slot holds free-text. */
 export function HarmTracker({ harm, editable = false, compact = false, onChange }: HarmTrackerProps) {
   const handleChange = (field: keyof HarmState, value: string) => {
     if (!onChange) return;
+    // Clear the field entirely when the input is emptied
     onChange({ ...harm, [field]: value || undefined });
   };
 
+  // Harm tiers from least to most severe, each with a color-coded border
   const slots = [
     { key: 'oldWounds' as const, label: 'Old Wounds', shortLabel: 'Old', color: 'border-muted-foreground/50' },
     { key: 'mild' as const, label: 'Mild', shortLabel: 'Mild', color: 'border-yellow-500' },
@@ -146,6 +156,7 @@ interface ResourceTrackerProps {
   onChange?: (value: ResourceLevel) => void;
 }
 
+/** Radio-group style resource tracker; one tier is active at a time. */
 export function ResourceTracker({ value, editable = false, compact: _compact = false, onChange }: ResourceTrackerProps) {
   const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
     if (!editable || !onChange) return;
@@ -197,6 +208,7 @@ interface ExperienceTrackerProps {
   onChange?: (value: number) => void;
 }
 
+/** 5-pip experience tracker. Same toggle/arrow behavior as PressureTracker. */
 export function ExperienceTracker({ value, editable = false, compact = false, onChange }: ExperienceTrackerProps) {
   const handleClick = (index: number) => {
     if (!editable || !onChange) return;
@@ -258,6 +270,7 @@ interface LuckTrackerProps {
   onChange?: (value: boolean) => void;
 }
 
+/** Boolean luck toggle: available (coin shown) or spent (empty circle). */
 export function LuckTracker({ value, editable = false, onChange }: LuckTrackerProps) {
   return (
     <div className="flex flex-col gap-1">

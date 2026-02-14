@@ -1,4 +1,12 @@
+/**
+ * Faction schema.
+ * Validates frontmatter for faction markdown files stored in the factions/ folder.
+ * Models organization types, crew affinity (-3 to +3), and DM-only notes.
+ */
+
 import { z } from 'zod';
+
+// ── Faction Types ───────────────────────────────────────────────────────────
 
 // Faction types - different categories of organizations
 export const factionTypeSchema = z.enum([
@@ -14,7 +22,9 @@ export const factionTypeSchema = z.enum([
 
 export type FactionType = z.infer<typeof factionTypeSchema>;
 
-// Affinity scale from -3 to +3
+// ── Affinity Scale ──────────────────────────────────────────────────────────
+
+// Affinity scale from -3 (Open Hostilities) to +3 (Allies)
 export const affinitySchema = z.number().int().min(-3).max(3).default(0);
 
 export const affinityLabels: Record<number, string> = {
@@ -33,7 +43,8 @@ export const factionDmOnlySchema = z.object({
   notes: z.string().optional(),
 });
 
-// Main faction schema
+// ── Main Faction Schema ─────────────────────────────────────────────────────
+
 export const factionSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -54,11 +65,14 @@ export const factionSchema = z.object({
 export type FactionFrontmatter = z.infer<typeof factionSchema>;
 export type FactionDmOnly = z.infer<typeof factionDmOnlySchema>;
 
+/** A fully parsed faction file (frontmatter + markdown body + path) */
 export interface FactionFile {
   frontmatter: FactionFrontmatter;
   content: string;
   filePath: string;
 }
+
+// ── Display Labels ──────────────────────────────────────────────────────────
 
 // Type labels for display
 export const FACTION_TYPE_LABELS: Record<FactionType, string> = {

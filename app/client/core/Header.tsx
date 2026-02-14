@@ -1,3 +1,8 @@
+/**
+ * Header -- top navigation bar.
+ * Contains the app logo, campaign selector dropdown, a shareable player link
+ * (with optional Cloudflare Tunnel for remote access), settings, and logout.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -14,7 +19,7 @@ export function Header() {
   const [playerLinkDropdown, setPlayerLinkDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Fetch tunnel URL for player link
+  // Poll for a Cloudflare Tunnel URL so the player link can point to a public address
   const { data: tunnelData } = useQuery({
     queryKey: ['tunnel-url'],
     queryFn: async () => {
@@ -22,10 +27,11 @@ export function Header() {
       const data = await res.json();
       return data.data?.url || null;
     },
-    refetchInterval: 30000, // Check every 30 seconds
+    refetchInterval: 30000,
     staleTime: 10000,
   });
 
+  // Fall back to the current origin when no tunnel is available
   const tunnelUrl = tunnelData as string | null;
   const playerUrl = tunnelUrl ? `${tunnelUrl}/player` : `${window.location.origin}/player`;
   const isRemoteAvailable = !!tunnelUrl;
@@ -132,7 +138,7 @@ export function Header() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      {isRemoteAvailable ? 'Remote Player Link (via ngrok)' : 'Local Player Link'}
+                      {isRemoteAvailable ? 'Remote Player Link (via Cloudflare)' : 'Local Player Link'}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
                       <code className="flex-1 truncate rounded bg-secondary px-2 py-1 text-xs text-foreground">
@@ -156,7 +162,7 @@ export function Header() {
 
                   {!isRemoteAvailable && (
                     <p className="text-xs text-muted-foreground">
-                      Players on your local network can use this link. For remote access, start Campaign Hub with the app launcher to enable ngrok.
+                      Players on your local network can use this link. For remote access, start Campaign Hub with the app launcher to enable Cloudflare Tunnel.
                     </p>
                   )}
 

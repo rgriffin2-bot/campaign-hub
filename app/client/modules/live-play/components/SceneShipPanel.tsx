@@ -1,3 +1,9 @@
+/**
+ * SceneShipPanel -- card for a ship present in the current live-play scene.
+ * Supports compact (square image, abbreviated buttons) and full (landscape image)
+ * layouts. DM controls include disposition selector (Hostile/Neutral/Friendly),
+ * visibility toggle, and a remove button.
+ */
 import { Link } from 'react-router-dom';
 import { Rocket, X, Eye, EyeOff, ExternalLink, Sparkles } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -13,7 +19,7 @@ interface SceneShipPanelProps {
   showControls?: boolean; // Whether to show DM controls (false for players)
 }
 
-// Get border color based on disposition
+// Border color varies by disposition to give quick visual context at a glance
 function getDispositionBorderClass(disposition?: ShipDisposition, isHidden?: boolean): string {
   if (isHidden) return 'border-amber-500/50';
   switch (disposition) {
@@ -27,7 +33,7 @@ function getDispositionBorderClass(disposition?: ShipDisposition, isHidden?: boo
   }
 }
 
-// Get background tint based on disposition
+// Subtle background tint matching the disposition border
 function getDispositionBgClass(disposition?: ShipDisposition, isHidden?: boolean): string {
   if (isHidden) return 'bg-amber-500/5';
   switch (disposition) {

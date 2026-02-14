@@ -1,3 +1,10 @@
+/**
+ * PlayerLocationDetail.tsx
+ *
+ * Player (read-only) detail page for a single location.
+ * Displays breadcrumb ancestry, hero image, location type/tags,
+ * child locations, and markdown content.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, MapPin, ChevronRight } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -5,6 +12,7 @@ import { useCampaign } from '../core/providers/CampaignProvider';
 import { MarkdownContent } from '../components/MarkdownContent';
 import type { LocationFrontmatter } from '@shared/schemas/location';
 
+/** Location detail page for the player view. */
 export function PlayerLocationDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();
@@ -41,7 +49,8 @@ export function PlayerLocationDetail() {
   const { content } = location;
   const frontmatter = location.frontmatter as unknown as LocationFrontmatter;
 
-  // Build breadcrumb
+  // Walk the parent chain to build a breadcrumb path.
+  // Safety cap at 20 to avoid infinite loops if data has cycles.
   const ancestors: { id: string; name: string }[] = [];
   let currentParentId = frontmatter.parent;
   while (currentParentId) {

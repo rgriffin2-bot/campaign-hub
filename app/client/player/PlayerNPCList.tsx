@@ -1,3 +1,10 @@
+/**
+ * PlayerNPCList.tsx
+ *
+ * Player (read-only) view listing all NPCs. Supports text search
+ * across name, occupation, location, personality, and tags.
+ * Each card shows portrait, occupation, and location.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Users, User, MapPin } from 'lucide-react';
@@ -5,6 +12,7 @@ import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import type { NPCFrontmatter } from '@shared/schemas/npc';
 
+/** Searchable NPC grid for players. */
 export function PlayerNPCList() {
   const { campaign } = useCampaign();
   const { list } = usePlayerFiles('npcs');
@@ -12,6 +20,7 @@ export function PlayerNPCList() {
 
   const npcs = list.data || [];
 
+  // Multi-field search: name, occupation, location, personality, tags
   const filteredNPCs = npcs.filter((npc) => {
     if (search === '') return true;
 
@@ -71,6 +80,7 @@ export function PlayerNPCList() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredNPCs.map((npc) => {
+            // Cast metadata to typed frontmatter for portrait/positioning
             const fm = npc as unknown as NPCFrontmatter;
             return (
               <Link

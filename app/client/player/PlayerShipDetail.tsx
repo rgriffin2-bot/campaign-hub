@@ -1,3 +1,10 @@
+/**
+ * PlayerShipDetail.tsx
+ *
+ * Player (read-only) detail page for a single ship/vehicle.
+ * Displays image, type/class, owner, characteristics, and -- for crew
+ * ships -- pressure and damage trackers in read-only mode.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Rocket, Users, Sparkles } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -7,6 +14,7 @@ import { ShipDamageTracker } from '../modules/ships/components/ShipDamageTracker
 import { PressureTracker } from '../modules/player-characters/components/TrackerRow';
 import type { ShipFrontmatter, ShipDamage } from '@shared/schemas/ship';
 
+/** Ship/vehicle detail page for the player view. */
 export function PlayerShipDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();
@@ -114,7 +122,7 @@ export function PlayerShipDetail() {
         </div>
       </div>
 
-      {/* Ship Status Section - Pressure and Damage (read-only) */}
+      {/* Ship Status -- only shown for the party's crew ship */}
       {isCrewShip && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Pressure */}

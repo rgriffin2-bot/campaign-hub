@@ -1,3 +1,10 @@
+/**
+ * PlayerLoreDetail.tsx
+ *
+ * Player (read-only) detail page for a single lore entry.
+ * Shows the lore type badge, tags, optional header image,
+ * and rendered markdown content.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -5,6 +12,7 @@ import { useCampaign } from '../core/providers/CampaignProvider';
 import { MarkdownContent } from '../components/MarkdownContent';
 import type { LoreType, LoreFrontmatter } from '@shared/schemas/lore';
 
+// Human-readable labels for lore type slugs
 const typeLabels: Record<LoreType, string> = {
   'cosmology-and-origins': 'Cosmology and Origins',
   'makers': 'Makers',
@@ -16,6 +24,7 @@ const typeLabels: Record<LoreType, string> = {
   'life-in-haven': 'Life in Haven',
 };
 
+/** Lore entry detail page for the player view. */
 export function PlayerLoreDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();

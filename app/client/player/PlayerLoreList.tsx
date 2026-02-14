@@ -1,9 +1,19 @@
+/**
+ * PlayerLoreList.tsx
+ *
+ * Player (read-only) view for browsing lore entries.
+ * Items are grouped by lore type (e.g. cosmology, faiths, relics)
+ * with search and type-filter controls.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Globe, Hammer, Shield, Crown, Heart, Wind, Gem, Home } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import type { LoreType } from '@shared/schemas/lore';
 
+// --- Lore type display mappings ---
+
+// Icon component for each lore type
 const typeIcons: Record<LoreType, React.ReactNode> = {
   'cosmology-and-origins': <Globe className="h-4 w-4" />,
   'makers': <Hammer className="h-4 w-4" />,
@@ -26,6 +36,7 @@ const typeLabels: Record<LoreType, string> = {
   'life-in-haven': 'Life in Haven',
 };
 
+/** Searchable, type-filterable lore list grouped by category. */
 export function PlayerLoreList() {
   const { list } = usePlayerFiles('lore');
   const [search, setSearch] = useState('');
@@ -46,7 +57,7 @@ export function PlayerLoreList() {
     return matchesSearch && matchesType;
   });
 
-  // Group by type
+  // Group filtered results by lore type for sectioned display
   const groupedItems = filteredItems.reduce(
     (acc, item) => {
       const type = (item.type as LoreType) || 'other';

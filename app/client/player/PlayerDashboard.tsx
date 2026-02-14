@@ -1,7 +1,14 @@
+/**
+ * PlayerDashboard.tsx
+ *
+ * Landing page for the player view. Shows the campaign name/description
+ * and a card grid linking to each enabled module.
+ */
 import { Link } from 'react-router-dom';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 
+/** Player home page with module navigation cards. */
 export function PlayerDashboard() {
   const { campaign, enabledModules } = useCampaign();
 

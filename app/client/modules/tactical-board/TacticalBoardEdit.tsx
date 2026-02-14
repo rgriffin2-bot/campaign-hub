@@ -1,3 +1,9 @@
+/**
+ * TacticalBoardEdit -- create / edit form for board settings.
+ * Handles board name, description, canvas dimensions, grid options,
+ * background image upload, and visibility. Does NOT edit tokens or connections
+ * (those are managed on the detail/canvas view).
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
@@ -51,11 +57,13 @@ export function TacticalBoardEdit() {
     }
   }, [parsedFile]);
 
+  // Persist the form -- creates a new board or updates the existing one
   const handleSave = async () => {
     if (!name.trim()) return;
 
     setIsSaving(true);
     try {
+      // Preserve existing tokens when saving settings for an existing board
       const existingBoard = parsedFile?.frontmatter as TacticalBoard | undefined;
       const boardData: Partial<TacticalBoard> = {
         name: name.trim(),

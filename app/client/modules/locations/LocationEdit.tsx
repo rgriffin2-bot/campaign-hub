@@ -1,3 +1,8 @@
+/**
+ * LocationEdit -- Create/edit form for locations.
+ * Handles name, type (with autocomplete suggestions), parent hierarchy,
+ * image uploads, celestial body data, tree-root flag, and DM-only fields.
+ */
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, X, FolderTree } from 'lucide-react';
@@ -20,7 +25,7 @@ export function LocationEdit() {
   const { data: existingLocation, isLoading } = get(isNew ? '' : fileId || '');
   const allLocations = list.data || [];
 
-  // Form state
+  // --- Form state: basic info ---
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [typeInputValue, setTypeInputValue] = useState('');
@@ -34,15 +39,15 @@ export function LocationEdit() {
   const [image, setImage] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
 
-  // DM Only fields
+  // --- Form state: DM-only fields ---
   const [secrets, setSecrets] = useState('');
   const [plotHooks, setPlotHooks] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Celestial data
+  // --- Form state: optional celestial body data (for map view) ---
   const [celestial, setCelestial] = useState<CelestialData | undefined>();
 
-  // Tree view settings
+  // Whether this location should appear at the top level of the tree despite having a parent
   const [treeRoot, setTreeRoot] = useState(false);
 
   const typeInputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +107,10 @@ export function LocationEdit() {
     t.toLowerCase().includes(typeInputValue.toLowerCase())
   );
 
-  // Core save function that accepts optional overrides for immediate values
+  /**
+   * Core save function. Accepts optional overrides so callers like image
+   * auto-save can pass the new path without waiting for a state update.
+   */
   const saveLocation = async (options?: { imageOverride?: string; skipNavigation?: boolean }) => {
     if (!name.trim()) return;
 
@@ -178,7 +186,7 @@ export function LocationEdit() {
     }
   };
 
-  // Auto-save function for image uploads - saves with the new image path
+  // Called after an image upload completes; persists the new path immediately
   const handleImageAutoSave = async (newImagePath: string) => {
     try {
       await saveLocation({ imageOverride: newImagePath, skipNavigation: true });
@@ -210,7 +218,7 @@ export function LocationEdit() {
     setParentName(undefined);
   };
 
-  // Exclude self and descendants from parent options
+  // Prevent circular hierarchy: exclude self and all descendants from parent picker
   const getDescendantIds = (locationId: string): string[] => {
     const children = allLocations.filter((loc) => loc.parent === locationId);
     return [

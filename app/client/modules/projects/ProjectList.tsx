@@ -1,3 +1,9 @@
+/**
+ * ProjectList -- grid view of downtime projects with progress clocks.
+ * Projects represent long-term goals tracked via segment-based clocks
+ * (4/6/8 segments). The list supports text search and alphabetical sorting.
+ */
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Clock } from 'lucide-react';
@@ -10,6 +16,7 @@ export function ProjectList() {
 
   const projects = list.data || [];
 
+  // Search across name, description, owner, and tags
   const filteredProjects = projects.filter((project) => {
     return (
       search === '' ||

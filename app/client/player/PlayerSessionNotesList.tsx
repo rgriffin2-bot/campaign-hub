@@ -1,9 +1,19 @@
+/**
+ * PlayerSessionNotesList.tsx
+ *
+ * Player view for session notes. Unlike most player views this is NOT
+ * read-only -- players can create new session notes via the "Add Notes"
+ * button. Notes are sorted newest-first by session date.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, StickyNote, Calendar, Plus } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import type { FileMetadata } from '@shared/types/file';
 
+// --- Helper components ---
+
+/** Card showing session note title, date, author, and tags. */
 function SessionNotesCard({ item }: { item: FileMetadata }) {
   return (
     <Link
@@ -45,6 +55,9 @@ function SessionNotesCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// --- Main list component ---
+
+/** Searchable session notes list with "Add Notes" action. */
 export function PlayerSessionNotesList() {
   const { list } = usePlayerFiles('session-notes');
   const [search, setSearch] = useState('');
@@ -63,7 +76,7 @@ export function PlayerSessionNotesList() {
     return matchesSearch;
   });
 
-  // Sort by date (most recent first) if available
+  // Sort by session date descending; undated notes sink to the bottom
   const sortedItems = [...filteredItems].sort((a, b) => {
     const dateA = a.date as string | undefined;
     const dateB = b.date as string | undefined;

@@ -1,3 +1,9 @@
+/**
+ * ProjectClock - SVG pie-chart clock for tracking project progress.
+ * Renders a segmented ring (4, 6, or 8 wedges). In editable mode, clicking
+ * a segment fills or unfills it and all segments before/after it.
+ */
+
 interface ProjectClockProps {
   size: number; // 4, 6, or 8 segments
   progress: number; // Number of filled segments

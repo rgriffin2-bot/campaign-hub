@@ -1,4 +1,12 @@
+/**
+ * Lore schema.
+ * Validates frontmatter for lore/worldbuilding markdown files stored in the lore/ folder.
+ * Each lore entry has a categorical type and optional header image.
+ */
+
 import { z } from 'zod';
+
+// ── Lore Categories ─────────────────────────────────────────────────────────
 
 export const loreTypes = [
   'cosmology-and-origins',
@@ -24,6 +32,7 @@ export const loreSchema = z.object({
 
 export type LoreFrontmatter = z.infer<typeof loreSchema>;
 
+/** A fully parsed lore file (frontmatter + markdown body + path) */
 export interface LoreFile {
   frontmatter: LoreFrontmatter;
   content: string;

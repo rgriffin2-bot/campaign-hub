@@ -1,3 +1,12 @@
+/**
+ * Tactical Board module: visual encounter maps with movable tokens.
+ *
+ * Board state (grid, background, tokens) is stored as frontmatter in
+ * markdown files under `tactical-boards/`. Token CRUD is handled via
+ * dedicated sub-routes rather than full-board updates, so the client
+ * can move individual tokens without overwriting the entire board.
+ */
+
 import type { RequestHandler } from 'express';
 import {
   tacticalBoardSchema,
@@ -13,12 +22,16 @@ import type { ModuleDefinition, ModuleRoute } from '../../../shared/types/module
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
 
-// Helper to generate unique token IDs
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Generate a unique token ID using timestamp + random suffix */
 function generateTokenId(): string {
   return `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Add a token to a board
+// ── Token Route Handlers ───────────────────────────────────────────────
+
+/** Add a new token to a board (assigns a server-generated ID) */
 const addTokenHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -62,7 +75,7 @@ const addTokenHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Update a token on a board
+/** Update a single token's properties (position, label, etc.) */
 const updateTokenHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -88,7 +101,7 @@ const updateTokenHandler: RequestHandler = async (req, res) => {
       return;
     }
 
-    // Merge the updates
+    // Merge client updates but preserve the canonical token ID
     const updatedToken = { ...tokens[tokenIndex], ...req.body, id: tokenId };
     const validated = boardTokenSchema.safeParse(updatedToken);
 
@@ -110,7 +123,11 @@ const updateTokenHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Bulk update tokens (for efficient position updates)
+/**
+ * Bulk-update multiple tokens in one request.
+ * Useful for drag-and-drop repositioning of several tokens at once
+ * without sending N individual PATCH requests.
+ */
 const bulkUpdateTokensHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -150,7 +167,7 @@ const bulkUpdateTokensHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Delete a token from a board
+/** Remove a token from a board by ID */
 const deleteTokenHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -171,6 +188,7 @@ const deleteTokenHandler: RequestHandler = async (req, res) => {
     const tokens: BoardToken[] = (boardData.tokens || []) as BoardToken[];
     const filteredTokens = tokens.filter((t) => t.id !== tokenId);
 
+    // If length didn't change, the token ID wasn't found
     if (filteredTokens.length === tokens.length) {
       res.status(404).json({ success: false, error: 'Token not found' });
       return;
@@ -187,10 +205,10 @@ const deleteTokenHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Get base routes
+// ── Route Assembly ─────────────────────────────────────────────────────
 const baseRoutes = createBaseRoutes('tactical-boards');
 
-// Add custom token routes
+// Append token sub-resource routes to the standard board CRUD routes
 const customRoutes: ModuleRoute[] = [
   ...baseRoutes,
   { method: 'POST', path: '/:fileId/tokens', handler: addTokenHandler },
@@ -198,6 +216,8 @@ const customRoutes: ModuleRoute[] = [
   { method: 'PATCH', path: '/:fileId/tokens', handler: bulkUpdateTokensHandler },
   { method: 'DELETE', path: '/:fileId/tokens/:tokenId', handler: deleteTokenHandler },
 ];
+
+// ── Module Definition ──────────────────────────────────────────────────
 
 export const tacticalBoardModule: ModuleDefinition = {
   id: 'tactical-board',

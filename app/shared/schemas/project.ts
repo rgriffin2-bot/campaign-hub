@@ -1,10 +1,20 @@
+/**
+ * Project (Downtime Clock) schema.
+ * Validates frontmatter for project clock files stored in the projects/ folder.
+ * Each project is a segmented clock (4, 6, or 8 segments) that tracks
+ * long-term progress across multiple phases.
+ */
+
 import { z } from 'zod';
+
+// ── Clock Configuration ─────────────────────────────────────────────────────
 
 // Clock sizes based on project complexity
 export const clockSizeSchema = z.enum(['4', '6', '8']);
 export type ClockSize = z.infer<typeof clockSizeSchema>;
 
-// Main project schema
+// ── Main Project Schema ─────────────────────────────────────────────────────
+
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -21,6 +31,7 @@ export const projectSchema = z.object({
 
 export type ProjectFrontmatter = z.infer<typeof projectSchema>;
 
+/** A fully parsed project file (frontmatter + markdown body + path) */
 export interface ProjectFile {
   frontmatter: ProjectFrontmatter;
   content: string;

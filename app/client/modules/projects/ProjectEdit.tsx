@@ -1,3 +1,9 @@
+/**
+ * ProjectEdit -- create/edit form for downtime projects.
+ * Includes a live clock preview, progress slider, multi-phase settings,
+ * tags, visibility toggle, DM notes, and extended markdown content.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Clock } from 'lucide-react';
@@ -13,6 +19,7 @@ export function ProjectEdit() {
   const isNew = fileId === 'new';
   const { data: existingProject, isLoading } = get(isNew ? '' : fileId || '');
 
+  // -- Form state -------------------------------------------------------------
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [clockSize, setClockSize] = useState<ClockSize>('6');
@@ -26,6 +33,7 @@ export function ProjectEdit() {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate form when editing an existing project
   useEffect(() => {
     if (existingProject && !isNew) {
       const fm = existingProject.frontmatter as unknown as ProjectFrontmatter;
@@ -43,7 +51,7 @@ export function ProjectEdit() {
     }
   }, [existingProject, isNew]);
 
-  // Reset progress if it exceeds new clock size
+  // Guard: shrinking the clock shouldn't leave progress above the new max
   useEffect(() => {
     const maxProgress = parseInt(clockSize);
     if (progress > maxProgress) {
@@ -51,6 +59,7 @@ export function ProjectEdit() {
     }
   }, [clockSize, progress]);
 
+  // -- Save handler -----------------------------------------------------------
   const handleSave = async () => {
     if (!name.trim()) return;
 

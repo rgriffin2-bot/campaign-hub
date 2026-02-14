@@ -1,3 +1,11 @@
+/**
+ * BoardCanvas.tsx
+ *
+ * Main canvas for the tactical board. Handles zoom/pan, token placement,
+ * fog-of-war painting, connection drawing, and minimap navigation.
+ * All coordinates go through screen-to-canvas transforms that account
+ * for the current pan offset and zoom level.
+ */
 import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle, memo } from 'react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import { BoardToken } from './BoardToken';
@@ -7,8 +15,9 @@ import { Minimap } from './Minimap';
 import { FloatingToolbar, InteractionMode } from './FloatingToolbar';
 import type { TacticalBoard, BoardToken as BoardTokenType, TextAlignment } from '@shared/schemas/tactical-board';
 
-// Wrapper component to provide stable callbacks for each token
-// This prevents re-renders of memoized BoardToken components
+// ─── TokenWrapper ─────────────────────────────────────────────────
+// Wraps each BoardToken with stable memoized callbacks keyed by token.id.
+// This prevents all tokens from re-rendering when only one token changes.
 interface TokenWrapperProps {
   token: BoardTokenType;
   isSelected: boolean;
@@ -38,6 +47,7 @@ const TokenWrapper = memo(function TokenWrapper({
   onUpdateToken,
   onTokenClickForConnection,
 }: TokenWrapperProps) {
+  // Highlight tokens that are valid connection targets or the connection origin
   const isConnectionTarget = interactionMode === 'connect' && connectionStart && connectionStart !== token.id;
   const isConnectionStart = connectionStart === token.id;
 
@@ -110,6 +120,9 @@ interface BoardCanvasProps {
   isPlayerView?: boolean;
 }
 
+// ─── BoardCanvas ──────────────────────────────────────────────────
+
+/** Ref handle that lets parent components query the current viewport center */
 export interface BoardCanvasRef {
   getViewportCenter: () => { x: number; y: number };
 }
@@ -135,16 +148,20 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
 ) {
   const { campaign } = useCampaign();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Viewport state ──
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // ── Interaction mode state ──
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('select');
-  const [connectionStart, setConnectionStart] = useState<string | null>(null); // Token ID to connect from
+  const [connectionStart, setConnectionStart] = useState<string | null>(null); // Token ID being connected from
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
-  // Fog painting state
+  // ── Fog painting state ──
   const [brushSize, setBrushSize] = useState(1);
   const [isPainting, setIsPainting] = useState(false);
   const [brushPreviewCells, setBrushPreviewCells] = useState<Set<string> | null>(null);
@@ -192,28 +209,27 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     }
   }, []); // Only on mount
 
-  // Handle wheel zoom - keeps the viewport center stable while zooming
+  // ── Zoom ──
+  // Zooms toward the viewport center so the user's focal point stays stable.
+  // Trackpad scrolls produce smaller deltas than mouse wheels, so sensitivity
+  // is adjusted based on the raw scroll amount.
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      // Use a smaller base delta and scale by actual scroll amount for smooth trackpad support
+      // Smaller sensitivity for fine-grained trackpad scrolling
       const scrollAmount = Math.abs(e.deltaY);
       const sensitivity = scrollAmount > 50 ? 0.05 : 0.02;
       const delta = e.deltaY > 0 ? -sensitivity : sensitivity;
       const newZoom = Math.max(0.1, Math.min(3, zoom + delta));
 
-      // Get viewport center in screen coords
+      // Convert viewport center from screen coords -> canvas coords -> new screen coords
       const viewportCenterX = rect.width / 2;
       const viewportCenterY = rect.height / 2;
-
-      // Convert to canvas coords at current zoom
       const canvasCenterX = (viewportCenterX - pan.x) / zoom;
       const canvasCenterY = (viewportCenterY - pan.y) / zoom;
-
-      // Calculate new pan to keep that canvas point at viewport center
       const newPanX = viewportCenterX - canvasCenterX * newZoom;
       const newPanY = viewportCenterY - canvasCenterY * newZoom;
 
@@ -223,8 +239,9 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [zoom, pan]
   );
 
-  // Handle pan start (mouse down on canvas background)
-  // Note: Fog painting is handled via a separate ref-based approach to avoid circular dependencies
+  // ── Panning ──
+  // Panning is initiated on mouse-down over the canvas background.
+  // Fog painting is handled via a separate handler to avoid circular deps.
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       // Fog painting is handled separately via handleCanvasMouseDown
@@ -294,7 +311,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     }
   }, [isPanning, handleMouseMove, handleMouseUp]);
 
-  // Handle double-click to add token
+  // ── Token creation ──
+  // Double-clicking on the canvas background creates a new token at that point.
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       if (!isEditable || !onAddToken || interactionMode !== 'select') return;
@@ -333,7 +351,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     onAddTextBox(centerX, centerY);
   }, [onAddTextBox, pan, zoom]);
 
-  // Handle token move
+  // ── Token transform callbacks ──
+  // Move handler with optional snap-to-grid quantization
   const handleTokenMove = useCallback(
     (tokenId: string, x: number, y: number) => {
       // Don't allow token movement in pan mode
@@ -402,7 +421,9 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [zoom]
   );
 
-  // Handle token click in connect mode
+  // ── Connection mode ──
+  // Two-click workflow: first click sets the source token, second click
+  // on a different token creates the connection. Clicking the same token cancels.
   const handleTokenClickForConnection = useCallback(
     (tokenId: string) => {
       if (interactionMode !== 'connect' || !onAddConnection) return;
@@ -438,7 +459,9 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     }
   }, [interactionMode]);
 
-  // Fog painting: convert mouse position to grid cells affected by brush
+  // ── Fog-of-war painting ──
+  // Converts a screen-space mouse position into the set of grid cells
+  // covered by the current brush (brushSize x brushSize square).
   const getAffectedCells = useCallback(
     (clientX: number, clientY: number): Set<string> => {
       const rect = containerRef.current?.getBoundingClientRect();
@@ -473,7 +496,7 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [pan, zoom, board.gridSize, board.canvasWidth, board.canvasHeight, brushSize]
   );
 
-  // Apply fog changes
+  // Merge painted cells into (or remove from) the fog set and push upstream
   const applyFogChange = useCallback(
     (cells: Set<string>, isAdding: boolean) => {
       if (!onUpdateFog) return;
@@ -510,7 +533,9 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     [interactionMode, board.gridEnabled, getAffectedCells, applyFogChange]
   );
 
-  // Handle fog painting mouse move
+  // While painting, continuously update the brush preview and apply fog changes.
+  // Only new cells (not already painted this stroke) trigger a fog update to
+  // avoid redundant state writes.
   const handleFogMouseMove = useCallback(
     (e: MouseEvent) => {
       if (interactionMode !== 'addFog' && interactionMode !== 'clearFog') {
@@ -522,7 +547,6 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
       setBrushPreviewCells(cells);
 
       if (isPainting) {
-        // Only apply change if we've moved to new cells
         const newCells = new Set<string>();
         cells.forEach((cell) => {
           if (!lastPaintedCellsRef.current.has(cell)) {
@@ -558,15 +582,13 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     }
   }, [interactionMode, handleFogMouseMove, handleFogMouseUp]);
 
-  // Generate grid pattern
+  // ── Derived values for rendering ──
   const gridSize = board.gridSize || 50;
   const gridPatternId = `grid-${board.id}`;
-
-  // Visible tokens (for players, filter hidden tokens)
   const visibleTokens = board.tokens;
   const connections = board.connections || [];
 
-  // Determine cursor based on interaction mode
+  // Map interaction mode to the appropriate CSS cursor
   const getCursor = () => {
     if (isPanning) return 'grabbing';
     if (interactionMode === 'pan') return 'grab';
@@ -575,7 +597,7 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     return 'default';
   };
 
-  // Combined mouse down handler for both panning and fog painting
+  // Dispatches mouse-down to either the fog painter or the pan handler
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
       // Handle fog painting modes
@@ -766,7 +788,8 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
   );
 });
 
-// Export zoom controls as separate component for toolbar
+// ─── Canvas Controls Hook ─────────────────────────────────────────
+// Provides zoom-in, zoom-out, and reset-view actions for external toolbars.
 export function useCanvasControls(
   setZoom: React.Dispatch<React.SetStateAction<number>>,
   setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>

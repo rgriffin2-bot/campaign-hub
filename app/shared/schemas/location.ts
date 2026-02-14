@@ -1,4 +1,13 @@
+/**
+ * Location schema.
+ * Validates frontmatter for location markdown files stored in the locations/ folder.
+ * Supports hierarchical parent-child locations, celestial body map data,
+ * and a separate map configuration file.
+ */
+
 import { z } from 'zod';
+
+// ── Location Type Suggestions ───────────────────────────────────────────────
 
 // Suggested location types (user can also enter custom)
 export const LOCATION_TYPE_SUGGESTIONS = [
@@ -24,6 +33,8 @@ export const LOCATION_TYPE_SUGGESTIONS = [
   'Mountain',
   'Island',
 ] as const;
+
+// ── Celestial Body Map Data ──────────────────────────────────────────────────
 
 // Celestial body types for map rendering
 export const celestialBodyTypes = [
@@ -58,6 +69,8 @@ export const locationDmOnlySchema = z.object({
   notes: z.string().optional(),
 });
 
+// ── Main Location Schema ────────────────────────────────────────────────────
+
 export const locationFrontmatterSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -80,7 +93,8 @@ export type LocationFrontmatter = z.infer<typeof locationFrontmatterSchema>;
 export type CelestialData = z.infer<typeof celestialDataSchema>;
 export type LocationDmOnly = z.infer<typeof locationDmOnlySchema>;
 
-// Map configuration schema (stored in _map-config.md)
+// ── Map Configuration (stored in _map-config.md) ────────────────────────────
+
 export const mapBackgroundTypes = [
   'color',
   'starfield',

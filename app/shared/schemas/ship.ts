@@ -1,4 +1,12 @@
+/**
+ * Ship schema.
+ * Validates frontmatter for ship/vehicle markdown files stored in the ships/ folder.
+ * Models six subsystem damage tracks, pressure, disposition, and DM-only notes.
+ */
+
 import { z } from 'zod';
+
+// ── Disposition & Damage ────────────────────────────────────────────────────
 
 // Disposition type for ships in scenes
 export const shipDispositionSchema = z.enum(['hostile', 'friendly', 'neutral']);
@@ -29,7 +37,8 @@ export const shipDmOnlySchema = z.object({
   notes: z.string().optional(),
 });
 
-// Main ship schema
+// ── Main Ship Schema ────────────────────────────────────────────────────────
+
 export const shipSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -56,11 +65,14 @@ export type ShipDmOnly = z.infer<typeof shipDmOnlySchema>;
 export type ShipDamage = z.infer<typeof shipDamageSchema>;
 export type SubsystemDamage = z.infer<typeof subsystemDamageSchema>;
 
+/** A fully parsed ship file (frontmatter + markdown body + path) */
 export interface ShipFile {
   frontmatter: ShipFrontmatter;
   content: string;
   filePath: string;
 }
+
+// ── Display Labels ──────────────────────────────────────────────────────────
 
 // Subsystem labels for display
 export const SUBSYSTEM_LABELS = {

@@ -1,9 +1,18 @@
+/**
+ * PlayerFactionList.tsx
+ *
+ * Player (read-only) view for browsing factions.
+ * Includes an affinity legend, search, type filter, and cards sorted
+ * by affinity (highest first) then name. Color-coded badges indicate
+ * the party's standing with each faction.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Users } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { affinityLabels, FACTION_TYPE_LABELS, type FactionType } from '@shared/schemas/faction';
 
+/** Searchable faction grid with affinity indicators for the player view. */
 export function PlayerFactionList() {
   const { list } = usePlayerFiles('factions');
   const [search, setSearch] = useState('');
@@ -25,7 +34,7 @@ export function PlayerFactionList() {
     return matchesSearch && matchesType;
   });
 
-  // Sort by affinity (highest first), then by name
+  // Sort highest-affinity factions first; break ties alphabetically
   const sortedFactions = [...filteredFactions].sort((a, b) => {
     const affinityA = (a.affinity as number | undefined) ?? 0;
     const affinityB = (b.affinity as number | undefined) ?? 0;
@@ -181,6 +190,10 @@ export function PlayerFactionList() {
   );
 }
 
+// --- Affinity color helpers ---
+// Maps the -3..+3 affinity scale to Tailwind color classes.
+
+/** Solid background color for the affinity legend pip. */
 function getAffinityColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500';
   if (affinity === 2) return 'bg-green-500';
@@ -191,6 +204,7 @@ function getAffinityColor(affinity: number): string {
   return 'bg-red-500'; // -3
 }
 
+/** Semi-transparent background + text color for the affinity badge. */
 function getAffinityBgColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500/20 text-emerald-400';
   if (affinity === 2) return 'bg-green-500/20 text-green-400';
@@ -201,6 +215,7 @@ function getAffinityBgColor(affinity: number): string {
   return 'bg-red-500/20 text-red-400'; // -3
 }
 
+/** Text-only color for the affinity label beneath the badge. */
 function getAffinityTextColor(affinity: number): string {
   if (affinity >= 3) return 'text-emerald-400';
   if (affinity === 2) return 'text-green-400';

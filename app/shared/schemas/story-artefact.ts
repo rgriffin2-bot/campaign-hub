@@ -1,4 +1,12 @@
+/**
+ * Story Artefact schema.
+ * Validates frontmatter for in-world prop/collectible files stored in story-artefacts/.
+ * Supports a multi-image gallery with thumbnails and DM-only secrets.
+ */
+
 import { z } from 'zod';
+
+// ── Tag Suggestions ─────────────────────────────────────────────────────────
 
 // Suggested tags for story artefacts (shown as clickable suggestions in UI)
 export const SUGGESTED_ARTEFACT_TAGS = [
@@ -17,6 +25,8 @@ export const SUGGESTED_ARTEFACT_TAGS = [
   'photograph',
   'artifact',
 ] as const;
+
+// ── Image Gallery ───────────────────────────────────────────────────────────
 
 // Individual image within an artefact's gallery
 export const artefactImageSchema = z.object({
@@ -37,7 +47,8 @@ export const storyArtefactDmOnlySchema = z.object({
 
 export type StoryArtefactDmOnly = z.infer<typeof storyArtefactDmOnlySchema>;
 
-// Main schema for story artefacts
+// ── Main Artefact Schema ────────────────────────────────────────────────────
+
 export const storyArtefactSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -55,6 +66,7 @@ export const storyArtefactSchema = z.object({
 
 export type StoryArtefactFrontmatter = z.infer<typeof storyArtefactSchema>;
 
+/** A fully parsed story artefact file (frontmatter + markdown body + path) */
 export interface StoryArtefactFile {
   frontmatter: StoryArtefactFrontmatter;
   content: string;

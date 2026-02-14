@@ -1,3 +1,10 @@
+/**
+ * ImageGallery -- responsive thumbnail grid with a full-screen lightbox.
+ * Supports keyboard navigation (arrow keys, Escape), an editable mode
+ * with set-primary and delete controls, and a bottom thumbnail strip
+ * in the lightbox for multi-image collections.
+ */
+
 import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Star, Trash2 } from 'lucide-react';
 import type { ArtefactImage } from '@shared/schemas/story-artefact';
@@ -20,10 +27,12 @@ export function ImageGallery({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Strip the "assets/" prefix to build the correct API asset URL
   const getImageUrl = (path: string) => {
     return `/api/campaigns/${campaignId}/assets/${path.replace('assets/', '')}`;
   };
 
+  // -- Lightbox open/close and navigation -------------------------------------
   const openLightbox = (index: number) => {
     setCurrentIndex(index);
     setLightboxOpen(true);
@@ -33,6 +42,7 @@ export function ImageGallery({
     setLightboxOpen(false);
   };
 
+  // Wrap around at both ends for continuous navigation
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
   }, [images.length]);

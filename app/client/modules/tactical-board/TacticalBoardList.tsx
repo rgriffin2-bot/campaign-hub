@@ -1,3 +1,8 @@
+/**
+ * TacticalBoardList -- browsable grid of all tactical boards in the campaign.
+ * Renders a search bar, a card for each board with a token preview, and a
+ * "New Board" action. Boards are sorted alphabetically.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, LayoutGrid, Layers } from 'lucide-react';
@@ -5,7 +10,7 @@ import { useFiles } from '../../hooks/useFiles';
 import type { FileMetadata } from '@shared/types/file';
 import type { BoardToken } from '@shared/schemas/tactical-board';
 
-// Board metadata with optional extended fields
+// Extends the generic file metadata with tactical-board-specific fields
 interface BoardMetadata extends FileMetadata {
   tokens?: BoardToken[];
   description?: string;
@@ -16,6 +21,7 @@ interface BoardMetadata extends FileMetadata {
   tags?: string[];
 }
 
+/** A single card in the board grid, showing a token dot preview and board info */
 function BoardCard({ board }: { board: BoardMetadata }) {
   const tokens = (board.tokens || []) as BoardToken[];
   const tokenCount = tokens.length;
@@ -94,12 +100,14 @@ function BoardCard({ board }: { board: BoardMetadata }) {
   );
 }
 
+/** Top-level list page for tactical boards */
 export function TacticalBoardList() {
   const { list } = useFiles('tactical-board');
   const [search, setSearch] = useState('');
 
   const boards = (list.data || []) as BoardMetadata[];
 
+  // Filter boards by name, description, or tags matching the search query
   const filteredBoards = boards.filter((board) => {
     if (search === '') return true;
     const searchLower = search.toLowerCase();

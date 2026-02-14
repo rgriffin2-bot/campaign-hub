@@ -1,3 +1,8 @@
+/**
+ * Player Characters module: character sheet CRUD, playbook moves,
+ * tracker updates (for Live Play), and NPC relationship lookups.
+ */
+
 import type { RequestHandler } from 'express';
 import { playerCharacterSchema } from '../../../shared/schemas/player-character.js';
 import { createBaseRoutes } from '../base-routes.js';
@@ -10,7 +15,9 @@ import type { ParsedFile, FileMetadata } from '../../../shared/types/file.js';
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
 
-// Get playbook moves for a character (fetches full rule data)
+// ── Custom Route Handlers ──────────────────────────────────────────────
+
+/** Fetch full rule data for each playbook move assigned to a character */
 const getMovesHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -29,7 +36,7 @@ const getMovesHandler: RequestHandler = async (req, res) => {
 
     const playbookMoves = (pc.frontmatter.playbookMoves as string[]) || [];
 
-    // Fetch each move from the rules module
+    // Cross-module lookup: resolve move IDs against the rules module
     const moves: ParsedFile[] = [];
     for (const moveId of playbookMoves) {
       try {
@@ -49,7 +56,11 @@ const getMovesHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Quick update for tracker values only (used by Live Play)
+/**
+ * Partial update limited to tracker fields (pressure, harm, etc.).
+ * Used by Live Play to rapidly update values without touching the
+ * full character sheet.
+ */
 const updateTrackersHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -66,7 +77,7 @@ const updateTrackersHandler: RequestHandler = async (req, res) => {
       return;
     }
 
-    // Only allow updating tracker fields
+    // Allowlist prevents clients from overwriting non-tracker fields
     const allowedFields = ['pressure', 'harm', 'resources', 'experience', 'luck', 'gear'];
     const updates: Record<string, unknown> = {};
 
@@ -92,7 +103,7 @@ const updateTrackersHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Get available playbook moves (all rules in playbook-move category)
+/** List all rules tagged as playbook-moves (for the move picker UI) */
 const getAvailableMovesHandler: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -113,7 +124,7 @@ const getAvailableMovesHandler: RequestHandler = async (_req, res) => {
   }
 };
 
-// Get related NPCs for a character
+/** Resolve a character's npcConnections into full NPC metadata */
 const getRelatedNPCsHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -132,7 +143,7 @@ const getRelatedNPCsHandler: RequestHandler = async (req, res) => {
 
     const npcConnections = (pc.frontmatter.npcConnections as string[]) || [];
 
-    // Fetch metadata for each NPC
+    // Load all NPCs once, then match by ID to avoid N+1 queries
     const npcs: FileMetadata[] = [];
     const allNPCs = await fileStore.list(campaign.id, 'npcs');
 
@@ -150,7 +161,8 @@ const getRelatedNPCsHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Custom routes
+// ── Route Assembly ─────────────────────────────────────────────────────
+// Custom routes first so specific paths match before the generic /:fileId
 const customRoutes: ModuleRoute[] = [
   { method: 'GET', path: '/:fileId/moves', handler: getMovesHandler },
   { method: 'PATCH', path: '/:fileId/trackers', handler: updateTrackersHandler },
@@ -160,6 +172,8 @@ const customRoutes: ModuleRoute[] = [
 
 // Base routes for CRUD
 const baseRoutes = createBaseRoutes('player-characters');
+
+// ── Module Definition ──────────────────────────────────────────────────
 
 export const playerCharactersModule: ModuleDefinition = {
   id: 'player-characters',

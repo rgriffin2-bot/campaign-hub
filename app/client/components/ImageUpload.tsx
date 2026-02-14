@@ -1,3 +1,9 @@
+/**
+ * ImageUpload -- generic image uploader used for lore entries, locations, etc.
+ * Simpler than PortraitUpload: no pan/zoom -- just select, preview, and upload.
+ * Supports an optional `autoSave` callback that is invoked immediately after
+ * a successful upload (useful for auto-persisting the new image path).
+ */
 import { useState, useRef } from 'react';
 import { Upload, X, ImageIcon } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
@@ -55,6 +61,7 @@ export function ImageUpload({
     setPreviewUrl(url);
   };
 
+  // Upload the file and call onUploadComplete (+ optional autoSave) on success
   const handleUpload = async () => {
     if (!selectedFile || !campaign) return;
 

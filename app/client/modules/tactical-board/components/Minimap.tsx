@@ -1,3 +1,8 @@
+/**
+ * Minimap -- small inset overview of the full canvas, shown bottom-right.
+ * Displays token positions as color-coded dots, fog coverage, an optional
+ * background image, and a draggable viewport rectangle for quick navigation.
+ */
 import { useCallback, useRef, useState, useEffect, memo } from 'react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { TacticalBoard } from '@shared/schemas/tactical-board';
@@ -26,17 +31,16 @@ export const Minimap = memo(function Minimap({
   const minimapRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Calculate scale to fit canvas in minimap
+  // Scale factor to fit the full canvas into the fixed minimap dimensions
   const scaleX = MINIMAP_WIDTH / board.canvasWidth;
   const scaleY = MINIMAP_HEIGHT / board.canvasHeight;
   const scale = Math.min(scaleX, scaleY);
 
-  // Actual minimap canvas area
+  // Actual drawn area inside the minimap (may be smaller than MINIMAP_WIDTH/HEIGHT)
   const minimapCanvasWidth = board.canvasWidth * scale;
   const minimapCanvasHeight = board.canvasHeight * scale;
 
-  // Calculate viewport rectangle in minimap coordinates
-  // The viewport in canvas coords is the visible area
+  // Convert current pan/zoom into canvas-space coordinates for the viewport rect
   const viewportCanvasX = -pan.x / zoom;
   const viewportCanvasY = -pan.y / zoom;
   const viewportCanvasWidth = containerWidth / zoom;
@@ -116,7 +120,7 @@ export const Minimap = memo(function Minimap({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Get token color based on source type
+  // Map token source types to distinguishable dot colors on the minimap
   const getTokenColor = (sourceType: string) => {
     switch (sourceType) {
       case 'pc':

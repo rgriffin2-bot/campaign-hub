@@ -1,9 +1,17 @@
+/**
+ * PlayerSessionNotesDetail.tsx
+ *
+ * Player view for a single session-notes entry.
+ * Players can edit or delete their own session notes from this page.
+ * Displays date, author, tags, and rendered markdown content.
+ */
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, StickyNote, Calendar, User } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { MarkdownContent } from '../components/MarkdownContent';
 import type { SessionNotesFrontmatter } from '@shared/schemas/session-notes';
 
+/** Session notes detail page with edit/delete actions. */
 export function PlayerSessionNotesDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
@@ -11,6 +19,7 @@ export function PlayerSessionNotesDetail() {
 
   const { data: notes, isLoading } = get(fileId || '');
 
+  /** Confirm and delete this session note, then redirect to the list. */
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete these session notes?')) return;

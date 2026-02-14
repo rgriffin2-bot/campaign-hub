@@ -1,3 +1,10 @@
+/**
+ * ShipDetail -- read-only detail view for a single ship/vehicle.
+ * Shows header with image, ship status (pressure + damage tracker),
+ * appearance, DM-only secrets, and general notes. Supports inline
+ * pressure/damage updates so the DM can adjust values during play.
+ */
+
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Rocket, Lock, Eye, EyeOff, Users, Sparkles } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -14,12 +21,13 @@ export function ShipDetail() {
   const navigate = useNavigate();
   const { campaign } = useCampaign();
 
-  // Check if we came from live-play
+  // Back-link destination depends on whether the user navigated from live-play
   const fromLivePlay = searchParams.get('from') === 'live-play';
   const { get, delete: deleteMutation, toggleVisibility, update } = useFiles('ships');
 
   const { data: ship, isLoading } = get(fileId || '');
 
+  // -- Mutation handlers -------------------------------------------------------
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this ship?')) return;
@@ -53,12 +61,14 @@ export function ShipDetail() {
     );
   }
 
+  // -- Derived state from frontmatter ------------------------------------------
   const { content } = ship;
   const frontmatter = ship.frontmatter as unknown as ShipFrontmatter;
   const dmOnly = frontmatter.dmOnly;
   const isHidden = frontmatter.hidden === true;
   const isCrewShip = frontmatter.isCrewShip === true;
 
+  // Inline update handlers let DM adjust ship status without opening the edit page
   const handleToggleVisibility = () => {
     if (!fileId) return;
     toggleVisibility.mutate({ fileId, hidden: !isHidden });

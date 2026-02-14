@@ -1,3 +1,8 @@
+/**
+ * MapSidebar -- Sidebar panel used alongside the star-system map.
+ * Shows image, description, orbital data, and tags for the selected
+ * celestial body, with a link to the full location detail page.
+ */
 import { Link } from 'react-router-dom';
 import { MapPin, ExternalLink, X } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -9,6 +14,7 @@ interface MapSidebarProps {
   onClose: () => void;
 }
 
+// Human-readable labels for celestial body types
 const BODY_TYPE_LABELS: Record<string, string> = {
   star: 'Star',
   planet: 'Planet',

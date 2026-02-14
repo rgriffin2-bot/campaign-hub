@@ -1,3 +1,9 @@
+/**
+ * PortraitUpload -- circular image uploader with pan/zoom for character portraits.
+ * The user selects a file, adjusts crop position and scale in the circular preview,
+ * then uploads. The crop position is stored alongside the image path for
+ * consistent rendering elsewhere in the app.
+ */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
@@ -116,6 +122,7 @@ export function PortraitUpload({
     }));
   };
 
+  // Upload the image and its crop position to the server
   const handleUpload = async () => {
     if (!selectedFile || !campaign) return;
 

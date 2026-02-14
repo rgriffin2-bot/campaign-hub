@@ -1,3 +1,9 @@
+/**
+ * PlayerCharacterEdit -- create/edit form for a player character.
+ * Handles both "new" creation and editing an existing PC. Manages all
+ * frontmatter fields including stats, trackers, harm, gear, and playbook moves.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Users, X } from 'lucide-react';
@@ -12,6 +18,7 @@ import type {
 } from '@shared/schemas/player-character';
 import { useQuery } from '@tanstack/react-query';
 
+// Ordered list of resource tiers, from worst to best
 const resourceLevels: ResourceLevel[] = ['screwed', 'dry', 'light', 'covered', 'flush', 'swimming'];
 
 const resourceLabels: Record<ResourceLevel, string> = {
@@ -23,6 +30,7 @@ const resourceLabels: Record<ResourceLevel, string> = {
   swimming: 'Swimming in it',
 };
 
+/** Derives a URL-safe slug from the character name (e.g., "Captain Vex" -> "captain-vex"). */
 function generateId(name: string): string {
   return name
     .toLowerCase()
@@ -39,7 +47,7 @@ export function PlayerCharacterEdit() {
   const isNew = fileId === 'new';
   const { data: existingPC, isLoading } = get(isNew ? '' : fileId || '');
 
-  // Fetch available playbook moves
+  // Fetch the global set of playbook moves so the DM can assign them
   const { data: availableMoves } = useQuery({
     queryKey: ['available-moves', campaign?.id],
     queryFn: async () => {
@@ -51,6 +59,7 @@ export function PlayerCharacterEdit() {
     enabled: !!campaign,
   });
 
+  // -- Form state (mirrors every frontmatter field) --------------------------
   const [form, setForm] = useState<Partial<PlayerCharacterFrontmatter>>({
     name: '',
     player: '',
@@ -73,6 +82,7 @@ export function PlayerCharacterEdit() {
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Populate form fields when editing an existing character
   useEffect(() => {
     if (existingPC && !isNew) {
       const fm = existingPC.frontmatter as unknown as PlayerCharacterFrontmatter;
@@ -99,6 +109,7 @@ export function PlayerCharacterEdit() {
     }
   }, [existingPC, isNew]);
 
+  // -- Save handler -----------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.player) return;
@@ -130,6 +141,7 @@ export function PlayerCharacterEdit() {
     }
   };
 
+  // -- Playbook move management -----------------------------------------------
   const handleAddMove = (moveId: string) => {
     if (!form.playbookMoves?.includes(moveId)) {
       setForm((prev) => ({

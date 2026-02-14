@@ -1,3 +1,10 @@
+/**
+ * ShipImageUpload -- image upload widget with drag-to-reposition and zoom.
+ * Uses portrait orientation to match the live-play display. After selecting
+ * a file, the user can pan/zoom to frame the image, then upload it to the
+ * server. The crop position is stored alongside the image path.
+ */
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Rocket, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -31,11 +38,12 @@ export function ShipImageUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs for drag state, preview container, and hidden file input
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Build the image URL
+  // Prefer the local preview blob URL; fall back to the saved asset URL
   const getImageUrl = useCallback(() => {
     if (previewUrl) return previewUrl;
     if (currentImage && campaign) {
@@ -44,6 +52,7 @@ export function ShipImageUpload({
     return null;
   }, [previewUrl, currentImage, campaign]);
 
+  // -- File selection and validation -------------------------------------------
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -64,6 +73,7 @@ export function ShipImageUpload({
     setPosition({ x: 0, y: 0, scale: 1 });
   };
 
+  // -- Drag-to-reposition handling ---------------------------------------------
   const handleDragStart = (e: React.MouseEvent) => {
     if (!previewUrl && !currentImage) return;
 
@@ -98,6 +108,7 @@ export function ShipImageUpload({
     dragStartRef.current = null;
   }, []);
 
+  // Attach/detach window-level mouse listeners while dragging
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDragMove);
@@ -109,6 +120,7 @@ export function ShipImageUpload({
     }
   }, [isDragging, handleDragMove, handleDragEnd]);
 
+  // Clamp zoom between 0.5x and 3x
   const handleZoom = (delta: number) => {
     setPosition((prev) => ({
       ...prev,
@@ -116,6 +128,7 @@ export function ShipImageUpload({
     }));
   };
 
+  // -- Upload to server -------------------------------------------------------
   const handleUpload = async () => {
     if (!selectedFile || !campaign) return;
 

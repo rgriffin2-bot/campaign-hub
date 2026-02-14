@@ -1,9 +1,16 @@
+/**
+ * RulesDetail -- Read-only view of a single rule entry.
+ * Shows category badge, subcategory, source, tags, markdown content,
+ * and a grid of related rules (same category or shared tags).
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Eye, EyeOff, Cog, Zap, Users, Sword, Clock, Heart, Package, Rocket, BookMarked, Pencil } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
 import type { RuleCategory, RuleFrontmatter } from '@shared/schemas/rules';
+
+// --- Icon and label mappings ---
 
 const categoryIcons: Record<RuleCategory, React.ReactNode> = {
   'core-mechanic': <Cog className="h-5 w-5" />,
@@ -61,19 +68,20 @@ export function RulesDetail() {
     );
   }
 
+  // --- Extract frontmatter fields ---
   const { content } = rule;
   const frontmatter = rule.frontmatter as unknown as RuleFrontmatter;
   const category = frontmatter.category;
   const isHidden = frontmatter.playerVisible === false;
 
+  /** Toggle whether players can see this rule */
   const handleToggleVisibility = () => {
     if (!fileId) return;
-    // When isHidden (playerVisible=false), we want to show it (pass hidden=false to toggle to visible)
-    // When visible (playerVisible=true), we want to hide it (pass hidden=true to toggle to hidden)
+    // hidden=true maps to playerVisible=false internally
     toggleVisibility.mutate({ fileId, hidden: !isHidden });
   };
 
-  // Find related rules (same category or shared tags)
+  // Surface related rules by matching category or overlapping tags (max 6)
   const relatedRules = allRules?.filter((r) => {
     if (r.id === fileId) return false;
 

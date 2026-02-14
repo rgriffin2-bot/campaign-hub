@@ -1,3 +1,9 @@
+/**
+ * StatsBlock - Displays a player character's five stats (Poise, Insight, Grit,
+ * Presence, Resonance) in a grid. Supports both read-only and editable modes
+ * with +/- buttons clamped to the 0-4 range.
+ */
+
 import type { Stats, StatName } from '@shared/schemas/player-character';
 
 const statLabels: Record<StatName, string> = {

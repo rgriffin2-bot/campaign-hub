@@ -1,3 +1,9 @@
+/**
+ * FactionCard -- compact card for the faction grid. Shows name, type,
+ * affinity badge with +/- controls, a description preview, and tags.
+ * Affinity can be adjusted directly from the card without opening the detail view.
+ */
+
 import { Link } from 'react-router-dom';
 import { EyeOff } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +24,7 @@ export function FactionCard({ faction }: FactionCardProps) {
   const description = faction.description as string | undefined;
   const isHidden = faction.hidden as boolean | undefined;
 
-  // Mutation for updating affinity
+  // Direct API mutation so affinity changes are saved without a full form submit
   const updateAffinity = useMutation({
     mutationFn: async (newAffinity: number) => {
       if (!campaign) throw new Error('No active campaign');
@@ -46,6 +52,7 @@ export function FactionCard({ faction }: FactionCardProps) {
     },
   });
 
+  // Clamp to -3..+3 and only fire the mutation if the value actually changed
   const handleAffinityChange = (delta: number) => {
     const newAffinity = Math.max(-3, Math.min(3, affinity + delta));
     if (newAffinity !== affinity) {
@@ -139,6 +146,7 @@ export function FactionCard({ faction }: FactionCardProps) {
   );
 }
 
+// -- Affinity color helpers (badge background + text color) ------------------
 function getAffinityBgColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500/20 text-emerald-400';
   if (affinity === 2) return 'bg-green-500/20 text-green-400';

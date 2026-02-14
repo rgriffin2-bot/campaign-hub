@@ -1,3 +1,8 @@
+/**
+ * ModuleRouter -- resolves the current URL params (moduleId, fileId) into
+ * the correct module view (list, detail, edit, or generate). Each module
+ * registers its view components in the `moduleViews` registry below.
+ */
 import { useParams } from 'react-router-dom';
 import { useCampaign } from './providers/CampaignProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -143,6 +148,8 @@ export function ModuleRouter() {
       </div>
     );
   }
+
+  // --- Route resolution: generate > edit/new > detail > list ---
 
   // Check for generate route
   if (fileId === 'generate' && views.generate) {

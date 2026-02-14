@@ -1,3 +1,10 @@
+/**
+ * SceneNPCsProvider -- Manages the list of NPCs in the current live-play scene.
+ *
+ * Polls the server every 3 seconds for the latest scene state. DM clients can
+ * add, remove, update stats/disposition, and toggle visibility. Player clients
+ * receive a filtered view (hidden NPCs are excluded server-side).
+ */
 import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -8,8 +15,8 @@ import type { SceneNPC, Disposition } from '@shared/types/scene';
 // Re-export types for consumers
 export type { SceneNPC, Disposition };
 
-// Polling interval for live updates (3 seconds)
-const POLL_INTERVAL = 3000;
+// Polling interval for live updates (1 second)
+const POLL_INTERVAL = 1000;
 
 interface SceneNPCsContextValue {
   sceneNPCs: SceneNPC[];
@@ -31,16 +38,12 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const location = useLocation();
 
-  // Determine if we're in player mode based on route
-  // Player routes start with /player, even if user has DM role
+  // ── Role detection ─────────────────────────────────────────────────
+  // Route-based: /player/* always uses the player endpoint, even for DM users
   const isPlayerRoute = location.pathname.startsWith('/player');
-
-  // Determine if user should see DM data:
-  // - Must not be on a player route
-  // - Must either have auth disabled OR be logged in as DM
   const isDm = !isPlayerRoute && (!authEnabled || role === 'dm');
 
-  // Use different endpoints for DM vs player
+  // Player endpoint filters out hidden NPCs server-side
   const endpoint = isDm
     ? '/api/modules/live-play/scene-npcs'
     : '/api/player/scene-npcs';
@@ -60,7 +63,8 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
     refetchIntervalInBackground: true,
   });
 
-  // Mutation for adding NPC to scene (DM only)
+  // ── Mutations (DM-only writes) ──────────────────────────────────────
+
   const addMutation = useMutation({
     mutationFn: async (npc: SceneNPC) => {
       const res = await fetch('/api/modules/live-play/scene-npcs', {
@@ -129,8 +133,10 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // ── Public callbacks (DM-gated) ─────────────────────────────────────
+
   const addToScene = useCallback((npc: SceneNPC) => {
-    if (!isDm) return; // Only DM can add
+    if (!isDm) return;
     addMutation.mutate(npc);
   }, [addMutation, isDm]);
 
@@ -173,9 +179,10 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
     [updateMutation, isDm]
   );
 
+  /** Flip the NPC's player-visibility flag (DM only). */
   const toggleVisibility = useCallback(
     (npcId: string) => {
-      if (!isDm) return; // Only DM can toggle visibility
+      if (!isDm) return;
       const npc = sceneNPCs.find((n: SceneNPC) => n.id === npcId);
       if (npc) {
         updateMutation.mutate({
@@ -206,6 +213,7 @@ export function SceneNPCsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Hook to consume scene NPC state. Must be inside a SceneNPCsProvider. */
 export function useSceneNPCs() {
   const context = useContext(SceneNPCsContext);
   if (!context) {

@@ -1,3 +1,8 @@
+/**
+ * NPCDetail -- Full read-only view of a single NPC.
+ * Shows portrait, metadata, antagonist combat stats, DM-only secrets,
+ * related characters, and markdown body content.
+ */
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff, Swords, Shield, Heart } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -13,12 +18,13 @@ export function NPCDetail() {
   const navigate = useNavigate();
   const { campaign } = useCampaign();
 
-  // Check if we came from live-play
+  // Determine back-link target: live-play passes ?from=live-play so we can return there
   const fromLivePlay = searchParams.get('from') === 'live-play';
   const { get, delete: deleteMutation, toggleVisibility } = useFiles('npcs');
 
   const { data: npc, isLoading } = get(fileId || '');
 
+  /** Delete NPC after user confirmation, then redirect to the list */
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this NPC?')) return;
@@ -27,6 +33,7 @@ export function NPCDetail() {
     navigate('/modules/npcs');
   };
 
+  // --- Loading state ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -52,11 +59,13 @@ export function NPCDetail() {
     );
   }
 
+  // --- Extract frontmatter fields ---
   const { content } = npc;
   const frontmatter = npc.frontmatter as unknown as NPCFrontmatter;
   const dmOnly = frontmatter.dmOnly;
   const isHidden = frontmatter.hidden === true;
 
+  /** Toggle player-facing visibility of this NPC */
   const handleToggleVisibility = () => {
     if (!fileId) return;
     toggleVisibility.mutate({ fileId, hidden: !isHidden });
@@ -77,7 +86,7 @@ export function NPCDetail() {
       <div className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
-            {/* Portrait */}
+            {/* Portrait -- uses custom position/scale if set by the DM */}
             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-primary/10">
               {frontmatter.portrait && campaign ? (
                 <div
@@ -229,7 +238,7 @@ export function NPCDetail() {
               </div>
             </div>
 
-            {/* Status */}
+            {/* Status -- derived from damage thresholds: >=max = Defeated, >=50% = Wounded */}
             <div className="rounded-lg border border-border bg-background p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Status

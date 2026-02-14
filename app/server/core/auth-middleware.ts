@@ -1,13 +1,23 @@
+/**
+ * Auth middleware for DM/player role-based access control.
+ *
+ * Uses in-memory sessions with Bearer tokens or cookies.
+ * When no passwords are configured, auth is bypassed entirely
+ * to keep local development frictionless.
+ */
+
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 
-// Simple in-memory session store (fine for single-server local use)
+// ── Session Store ──────────────────────────────────────────────────────
+// In-memory store is sufficient here because CampaignHub runs as a
+// single-process local server; no need for Redis or a DB-backed store.
 const sessions = new Map<string, { role: 'dm' | 'player'; expires: number }>();
 
 // Session duration: 24 hours
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
 
-// Clean up expired sessions periodically
+// Evict expired sessions every hour to prevent unbounded memory growth
 setInterval(() => {
   const now = Date.now();
   for (const [token, session] of sessions) {
@@ -17,27 +27,32 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // Every hour
 
-/**
- * Generate a secure random token
- */
+// ── Token Helpers ──────────────────────────────────────────────────────
+
+/** Generate a cryptographically secure random session token */
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
 /**
- * Constant-time string comparison to prevent timing attacks
+ * Constant-time string comparison to prevent timing attacks.
+ * Even when lengths differ we run timingSafeEqual so the function
+ * takes roughly the same amount of time regardless of input.
  */
 function secureCompare(a: string, b: string): boolean {
   if (a.length !== b.length) {
-    // Still do the comparison to maintain constant time
+    // Run a dummy comparison so total elapsed time stays constant
     crypto.timingSafeEqual(Buffer.from(a), Buffer.from(a));
     return false;
   }
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
+// ── Login / Logout / Session Validation ────────────────────────────────
+
 /**
- * Verify password and create a session
+ * Verify password against configured DM and player passwords.
+ * DM password is checked first, so if both are the same the user gets DM role.
  */
 export function login(
   password: string,
@@ -91,9 +106,9 @@ export function logout(token: string): void {
   sessions.delete(token);
 }
 
-/**
- * Extract token from request (cookie or Authorization header)
- */
+// ── Token Extraction ───────────────────────────────────────────────────
+
+/** Extract session token from Authorization header (Bearer) or cookie */
 function getTokenFromRequest(req: Request): string | null {
   // Check Authorization header first
   const authHeader = req.headers.authorization;
@@ -111,9 +126,9 @@ function getTokenFromRequest(req: Request): string | null {
   return null;
 }
 
-/**
- * Middleware to require DM authentication
- */
+// ── Express Middleware ──────────────────────────────────────────────────
+
+/** Middleware: rejects requests that don't carry a valid DM session */
 export function requireDm(req: Request, res: Response, next: NextFunction): void {
   const token = getTokenFromRequest(req);
 
@@ -136,9 +151,7 @@ export function requireDm(req: Request, res: Response, next: NextFunction): void
   next();
 }
 
-/**
- * Middleware to require player OR DM authentication
- */
+/** Middleware: allows both DM and player roles through */
 export function requirePlayer(req: Request, res: Response, next: NextFunction): void {
   const token = getTokenFromRequest(req);
 
@@ -157,9 +170,12 @@ export function requirePlayer(req: Request, res: Response, next: NextFunction): 
   next();
 }
 
+// ── Auth Factory ───────────────────────────────────────────────────────
+
 /**
- * Middleware to check if auth is enabled
- * If no passwords are set, allow access (for easy local development)
+ * Creates auth middleware configured for the current environment.
+ * When neither password is set, returns no-op middleware so the app
+ * works without any authentication (convenient for local development).
  */
 export function createAuthMiddleware(dmPassword?: string, playerPassword?: string) {
   const authEnabled = Boolean(dmPassword || playerPassword);

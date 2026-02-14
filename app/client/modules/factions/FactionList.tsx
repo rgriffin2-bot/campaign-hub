@@ -1,3 +1,9 @@
+/**
+ * FactionList -- grid view of all factions with search, type filter,
+ * and an affinity-color legend. Factions are sorted by affinity (highest
+ * first) so allies float to the top.
+ */
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Users } from 'lucide-react';
@@ -12,6 +18,7 @@ export function FactionList() {
 
   const factions = list.data || [];
 
+  // Filter by search text (name, description, tags) and type dropdown
   const filteredFactions = factions.filter((faction) => {
     const matchesSearch =
       search === '' ||
@@ -142,6 +149,7 @@ export function FactionList() {
   );
 }
 
+/** Maps affinity value (-3..+3) to a Tailwind background color for the legend dots. */
 function getAffinityColor(affinity: number): string {
   if (affinity >= 3) return 'bg-emerald-500';
   if (affinity === 2) return 'bg-green-500';

@@ -1,3 +1,10 @@
+/**
+ * Story Artefacts module definition.
+ * Provides CRUD for in-world props, clues, and collectibles.
+ * Overrides the default delete handler to also clean up the artefact's
+ * image folder on disk when an artefact is deleted.
+ */
+
 import type { RequestHandler } from 'express';
 import { storyArtefactSchema } from '../../../shared/schemas/story-artefact.js';
 import { createBaseRoutes } from '../base-routes.js';

@@ -1,3 +1,8 @@
+/**
+ * FogLayer -- SVG overlay that renders fog-of-war cells on the canvas.
+ * In DM view, fog is semi-transparent; in player view it's nearly opaque.
+ * Also draws a brush preview (green for add, red for clear) while painting.
+ */
 import { memo, useMemo } from 'react';
 
 interface BrushPreview {

@@ -1,3 +1,10 @@
+/**
+ * PlayerProjectList.tsx
+ *
+ * Player (read-only) view for browsing downtime projects.
+ * Each card shows a progress clock, owner, description, and
+ * phase info. Completed projects are visually highlighted.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Clock, Check } from 'lucide-react';
@@ -5,6 +12,7 @@ import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { ProjectClock } from '../modules/projects/components/ProjectClock';
 import { type ClockSize } from '@shared/schemas/project';
 
+/** Searchable downtime project grid for the player view. */
 export function PlayerProjectList() {
   const { list } = usePlayerFiles('projects');
   const [search, setSearch] = useState('');

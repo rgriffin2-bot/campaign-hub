@@ -1,9 +1,21 @@
+/**
+ * Factory for standard CRUD route handlers shared by all modules.
+ *
+ * Each module gets five routes (list, get, create, update, delete) backed
+ * by the file store. Modules that need custom behaviour (e.g. cycle
+ * detection for locations) override individual handlers after calling
+ * this factory.
+ */
+
 import type { RequestHandler } from 'express';
 import { fileStore } from '../core/file-store.js';
 import { campaignManager } from '../core/campaign-manager.js';
 import type { ModuleRoute } from '../../shared/types/module.js';
 
+/** Generate the five standard CRUD routes for a given module folder */
 export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
+
+  // ── LIST ───────────────────────────────────────────────────────────
   const listHandler: RequestHandler = async (_req, res) => {
     try {
       const campaign = campaignManager.getActive();
@@ -20,6 +32,7 @@ export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
     }
   };
 
+  // ── GET by ID ─────────────────────────────────────────────────────
   const getHandler: RequestHandler = async (req, res) => {
     try {
       const campaign = campaignManager.getActive();
@@ -43,6 +56,7 @@ export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
     }
   };
 
+  // ── CREATE ──────────────────────────────────────────────────────────
   const createHandler: RequestHandler = async (req, res) => {
     try {
       const campaign = campaignManager.getActive();
@@ -59,6 +73,7 @@ export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
     }
   };
 
+  // ── UPDATE ──────────────────────────────────────────────────────────
   const updateHandler: RequestHandler = async (req, res) => {
     try {
       const campaign = campaignManager.getActive();
@@ -82,6 +97,7 @@ export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
     }
   };
 
+  // ── DELETE ──────────────────────────────────────────────────────────
   const deleteHandler: RequestHandler = async (req, res) => {
     try {
       const campaign = campaignManager.getActive();
@@ -105,6 +121,7 @@ export function createBaseRoutes(moduleFolder: string): ModuleRoute[] {
     }
   };
 
+  // ── Route table ───────────────────────────────────────────────────
   return [
     { method: 'GET', path: '/', handler: listHandler },
     { method: 'GET', path: '/:fileId', handler: getHandler },

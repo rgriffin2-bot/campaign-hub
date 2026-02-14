@@ -1,3 +1,9 @@
+/**
+ * ProjectCard -- compact card for the project grid. Displays a progress clock,
+ * the project name, owner, description preview, and +/- buttons for adjusting
+ * progress directly from the list without opening the detail view.
+ */
+
 import { Link } from 'react-router-dom';
 import { EyeOff, Minus, Plus, Check } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +20,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
 
+  // -- Extract typed fields from generic FileMetadata -----------------------
   const clockSize = parseInt((project.clockSize as ClockSize) || '6');
   const progress = (project.progress as number) ?? 0;
   const owner = project.owner as string | undefined;
@@ -24,7 +31,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   const isComplete = progress >= clockSize;
 
-  // Mutation for updating progress
+  // Direct API mutation so progress can be ticked from the card without navigation
   const updateProgress = useMutation({
     mutationFn: async (newProgress: number) => {
       if (!campaign) throw new Error('No active campaign');

@@ -1,9 +1,15 @@
+/**
+ * RulesList -- Browsable listing of campaign rules, grouped by category.
+ * Supports search, category filter, and a toggle to show/hide GM-only rules.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Eye, EyeOff, Cog, Zap, Users, Sword, Clock, Heart, Package, Rocket, BookMarked, Plus } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import type { RuleCategory } from '@shared/schemas/rules';
 import type { FileMetadata } from '@shared/types/file';
+
+// --- Icon and label mappings for rule categories ---
 
 const categoryIcons: Record<RuleCategory, React.ReactNode> = {
   'core-mechanic': <Cog className="h-4 w-4" />,
@@ -29,16 +35,20 @@ const categoryLabels: Record<RuleCategory, string> = {
   'gm-reference': 'GM Reference',
 };
 
+// ============================================================
+// Individual rule card
+// ============================================================
+
 function RuleCard({ item }: { item: FileMetadata }) {
   const { toggleVisibility } = useFiles('rules');
+  // Rules use playerVisible (default true), inverted from the hidden convention
   const isHidden = item.playerVisible === false;
   const category = item.category as RuleCategory;
 
   const handleToggleVisibility = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // When isHidden (playerVisible=false), we want to show it (pass hidden=false to toggle to visible)
-    // When visible (playerVisible=true), we want to hide it (pass hidden=true to toggle to hidden)
+    // hidden=true maps to playerVisible=false internally
     toggleVisibility.mutate({ fileId: item.id, hidden: !isHidden });
   };
 
@@ -101,6 +111,10 @@ function RuleCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// ============================================================
+// Main rules list component
+// ============================================================
+
 export function RulesList() {
   const { list } = useFiles('rules');
   const [search, setSearch] = useState('');
@@ -109,6 +123,7 @@ export function RulesList() {
 
   const ruleItems = list.data || [];
 
+  // Combined filter: search text + category + GM-only visibility toggle
   const filteredItems = ruleItems.filter((item) => {
     const matchesSearch =
       search === '' ||
@@ -124,7 +139,7 @@ export function RulesList() {
     return matchesSearch && matchesCategory && matchesVisibility;
   });
 
-  // Group by category
+  // Group rules by category for sectioned display
   const groupedItems = filteredItems.reduce(
     (acc, item) => {
       const category = (item.category as RuleCategory) || 'core-mechanic';

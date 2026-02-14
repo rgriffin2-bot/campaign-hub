@@ -1,9 +1,19 @@
+/**
+ * PlayerRulesList.tsx
+ *
+ * Player (read-only) view for browsing game rules.
+ * Rules are grouped by category (core mechanic, action, downtime, etc.)
+ * with search and category-filter controls.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Cog, Zap, Users, Sword, Clock, Heart, Package, Rocket, BookMarked } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import type { RuleCategory } from '@shared/schemas/rules';
 
+// --- Category display mappings ---
+
+// Icon component for each rule category
 const categoryIcons: Record<RuleCategory, React.ReactNode> = {
   'core-mechanic': <Cog className="h-4 w-4" />,
   'action': <Zap className="h-4 w-4" />,
@@ -28,6 +38,7 @@ const categoryLabels: Record<RuleCategory, string> = {
   'gm-reference': 'GM Reference',
 };
 
+/** Searchable, category-filterable rules list grouped by category. */
 export function PlayerRulesList() {
   const { list } = usePlayerFiles('rules');
   const [search, setSearch] = useState('');
@@ -48,7 +59,7 @@ export function PlayerRulesList() {
     return matchesSearch && matchesCategory;
   });
 
-  // Group by category
+  // Group filtered results by rule category for sectioned display
   const groupedItems = filteredItems.reduce(
     (acc, item) => {
       const category = (item.category as RuleCategory) || 'core-mechanic';

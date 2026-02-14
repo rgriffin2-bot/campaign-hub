@@ -1,3 +1,9 @@
+/**
+ * CopyableId - Displays an entity's cross-reference link syntax (e.g. [[npcs:some-id]])
+ * with a one-click copy-to-clipboard button. Used in detail views so users can
+ * easily paste references into markdown content.
+ */
+
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 

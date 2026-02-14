@@ -1,3 +1,7 @@
+/**
+ * NPCList -- Grid listing of all NPCs with search filtering.
+ * Provides quick access to create new NPCs manually or via AI generation.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Users, Sparkles } from 'lucide-react';
@@ -10,6 +14,7 @@ export function NPCList() {
 
   const npcs = list.data || [];
 
+  // Filter NPCs across multiple fields so the search bar feels comprehensive
   const filteredNPCs = npcs.filter((npc) => {
     if (search === '') return true;
 
@@ -25,6 +30,7 @@ export function NPCList() {
     );
   });
 
+  // --- Loading state ---
   if (list.isLoading) {
     return (
       <div className="flex items-center justify-center p-12">

@@ -1,3 +1,9 @@
+/**
+ * Lore module definition.
+ * Provides CRUD for campaign setting, factions, history, and world lore entries.
+ * Uses standard base routes with no custom route overrides.
+ */
+
 import { loreSchema } from '../../../shared/schemas/lore.js';
 import { createBaseRoutes } from '../base-routes.js';
 import { moduleRegistry } from '../registry.js';

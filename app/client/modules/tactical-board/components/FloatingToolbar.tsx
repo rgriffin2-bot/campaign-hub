@@ -1,3 +1,9 @@
+/**
+ * FloatingToolbar -- vertical tool palette pinned to the top-left of the canvas.
+ * Provides interaction-mode switching (select/pan/connect/fog), text-box creation,
+ * and contextual actions for the selected token (lock, visibility, delete,
+ * text alignment & font-size).
+ */
 import { useState } from 'react';
 import { Lock, Unlock, Eye, EyeOff, Trash2, MousePointer2, Hand, Type, Cable, CloudFog, Eraser, Plus, Minus, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import type { BoardToken, TextAlignment } from '@shared/schemas/tactical-board';
@@ -19,6 +25,7 @@ interface FloatingToolbarProps {
   gridEnabled?: boolean;
 }
 
+/** Reusable icon button with a hover tooltip shown to the right */
 interface TooltipButtonProps {
   onClick: () => void;
   icon: React.ReactNode;

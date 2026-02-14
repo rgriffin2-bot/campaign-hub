@@ -1,8 +1,16 @@
+/**
+ * SessionNotesList -- Grid listing of session notes sorted by date.
+ * Each card shows title, session date, author, and tags.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, StickyNote, Calendar } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import type { FileMetadata } from '@shared/types/file';
+
+// ============================================================
+// Individual session note card
+// ============================================================
 
 function SessionNotesCard({ item }: { item: FileMetadata }) {
   return (
@@ -45,12 +53,17 @@ function SessionNotesCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// ============================================================
+// Main session notes list component
+// ============================================================
+
 export function SessionNotesList() {
   const { list } = useFiles('session-notes');
   const [search, setSearch] = useState('');
 
   const items = list.data || [];
 
+  // Search across name, tags, and author
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       search === '' ||
@@ -63,7 +76,7 @@ export function SessionNotesList() {
     return matchesSearch;
   });
 
-  // Sort by date (most recent first) if available
+  // Sort reverse-chronologically so the most recent session appears first
   const sortedItems = [...filteredItems].sort((a, b) => {
     const dateA = a.date as string | undefined;
     const dateB = b.date as string | undefined;

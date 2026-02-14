@@ -1,3 +1,9 @@
+/**
+ * CrewShipPanel -- the party's own ship, shown in the live-play scene.
+ * Collapsible: when collapsed, displays just a name badge with a damage
+ * indicator. When expanded, shows a pressure tracker and a subsystem damage
+ * table (6 subsystems x minor/major) that the DM can edit inline.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Rocket, Sparkles, ExternalLink } from 'lucide-react';
@@ -45,6 +51,7 @@ export function CrewShipPanel({
     return subsystem?.minor || subsystem?.major;
   });
 
+  // Clicking a filled dot clears it; clicking an empty one fills up to it
   const handlePressureClick = (index: number) => {
     if (!editable || !onUpdatePressure) return;
     onUpdatePressure(index + 1 === pressure ? index : index + 1);

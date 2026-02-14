@@ -1,3 +1,15 @@
+/**
+ * File Store
+ *
+ * Core data access layer for campaign content. All campaign data is stored
+ * as markdown files with YAML frontmatter (parsed by markdown-parser). This
+ * module provides CRUD operations over those files.
+ *
+ * A three-level in-memory cache (campaign -> module -> fileId -> filePath)
+ * enables O(1) lookups by ID. The cache is populated on list() and falls
+ * back to an O(n) directory scan when a cache miss occurs.
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config.js';
@@ -6,10 +18,10 @@ import { generateFileId } from '../../shared/utils/ids.js';
 import type { ParsedFile, FileMetadata, CreateFileInput, UpdateFileInput } from '../../shared/types/file.js';
 
 // =============================================================================
-// ID Index Cache for O(1) file lookups
+// ID Index Cache — Maps fileId to its on-disk path for O(1) lookups
 // =============================================================================
 
-// Cache structure: campaignId -> moduleFolder -> fileId -> filePath
+// Three-level map: campaignId -> moduleFolder -> fileId -> absolute filePath
 const idIndex = new Map<string, Map<string, Map<string, string>>>();
 
 
@@ -67,8 +79,9 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Find a file by ID, using cached index when available
- * Falls back to scanning if not in cache
+ * Find a file by ID. Tries the in-memory cache first (O(1)), then falls back
+ * to scanning every .md file in the directory (O(n)). Stale cache entries
+ * (pointing to deleted files) are automatically evicted.
  */
 async function findFileById(
   campaignId: string,
@@ -108,7 +121,12 @@ async function findFileById(
   }
 }
 
+// =============================================================================
+// CRUD Operations
+// =============================================================================
+
 export const fileStore = {
+  /** List all files in a module folder, rebuilding the ID cache along the way. */
   async list(campaignId: string, moduleFolder: string): Promise<FileMetadata[]> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
 
@@ -157,6 +175,7 @@ export const fileStore = {
     return metadata.sort((a, b) => a.name.localeCompare(b.name));
   },
 
+  /** Read and parse a single file by ID. Returns frontmatter + markdown content. */
   async get(campaignId: string, moduleFolder: string, fileId: string): Promise<ParsedFile | null> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
     const filePath = await findFileById(campaignId, moduleFolder, dirPath, fileId);
@@ -175,6 +194,7 @@ export const fileStore = {
     };
   },
 
+  /** Create a new markdown file. The filename is derived from the entry name. */
   async create(
     campaignId: string,
     moduleFolder: string,
@@ -205,6 +225,11 @@ export const fileStore = {
     };
   },
 
+  /**
+   * Merge-update a file. Frontmatter fields are shallow-merged: only keys
+   * present in data.frontmatter are overwritten; omitted keys are preserved.
+   * Setting a key to undefined explicitly removes it.
+   */
   async update(
     campaignId: string,
     moduleFolder: string,
@@ -256,6 +281,7 @@ export const fileStore = {
     };
   },
 
+  /** Delete a file and remove it from the ID cache. */
   async delete(campaignId: string, moduleFolder: string, fileId: string): Promise<boolean> {
     const dirPath = path.join(config.campaignsDir, campaignId, moduleFolder);
     const filePath = await findFileById(campaignId, moduleFolder, dirPath, fileId);
@@ -270,6 +296,7 @@ export const fileStore = {
     return true;
   },
 
+  /** Resolve a campaign-relative path to an absolute filesystem path. */
   getPath(campaignId: string, relativePath: string): string {
     return path.join(config.campaignsDir, campaignId, relativePath);
   },

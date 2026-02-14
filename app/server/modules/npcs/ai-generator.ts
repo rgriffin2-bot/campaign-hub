@@ -1,13 +1,30 @@
+/**
+ * AI-powered NPC generator using the Anthropic API.
+ *
+ * Feeds campaign lore as context so generated NPCs fit naturally
+ * into the existing world. Returns structured JSON that the client
+ * can review before saving.
+ */
+
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../../config.js';
 import { fileStore } from '../../core/file-store.js';
 import { campaignManager } from '../../core/campaign-manager.js';
 import type { GeneratedNPC, NPCGenerateInput } from '../../../shared/schemas/npc.js';
 
+// ── Anthropic Client ───────────────────────────────────────────────────
+
 const client = new Anthropic({
   apiKey: config.anthropic.apiKey,
 });
 
+// ── Lore Context Gathering ─────────────────────────────────────────────
+
+/**
+ * Build a text summary of the campaign's lore to inject into the prompt.
+ * Only includes world/faction/religion/other lore types since those are
+ * most relevant for NPC personality and backstory.
+ */
 async function getLoreContext(campaignId: string): Promise<string> {
   try {
     const loreFiles = await fileStore.list(campaignId, 'lore');
@@ -39,6 +56,9 @@ async function getLoreContext(campaignId: string): Promise<string> {
   }
 }
 
+// ── NPC Generation ─────────────────────────────────────────────────────
+
+/** Generate a fully-fleshed-out NPC from a free-text prompt via Claude */
 export async function generateNPC(input: NPCGenerateInput): Promise<GeneratedNPC> {
   const campaign = campaignManager.getActive();
   if (!campaign) {
@@ -82,15 +102,15 @@ Make the character interesting, memorable, and useful for gameplay. Include spec
     ],
   });
 
-  // Extract text content from response
+  // ── Response Parsing ────────────────────────────────────────────────
+  // Claude returns a JSON object inside a text content block
   const textBlock = message.content.find((block) => block.type === 'text');
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('No text response from Claude');
   }
 
-  // Parse JSON response
+  // Parse the JSON response, stripping accidental markdown fences
   try {
-    // Remove any markdown code blocks if present
     let jsonText = textBlock.text.trim();
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');

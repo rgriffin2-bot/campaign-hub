@@ -1,14 +1,22 @@
+/**
+ * PlayerSessionNotesEdit.tsx
+ *
+ * Create/edit form for player session notes. Handles both "new" and
+ * "edit existing" flows. One of the few player pages that writes data.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, StickyNote } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import type { SessionNotesFrontmatter } from '@shared/schemas/session-notes';
 
+/** Session notes create/edit form. */
 export function PlayerSessionNotesEdit() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
   const { get, create, update } = usePlayerFiles('session-notes');
 
+  // "new" is a magic route param meaning "create" rather than "edit"
   const isNew = fileId === 'new';
   const { data: existingNotes, isLoading } = get(isNew ? '' : fileId || '');
 
@@ -19,6 +27,7 @@ export function PlayerSessionNotesEdit() {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate form fields from existing data when editing
   useEffect(() => {
     if (existingNotes && !isNew) {
       const fm = existingNotes.frontmatter as unknown as SessionNotesFrontmatter;
@@ -30,11 +39,13 @@ export function PlayerSessionNotesEdit() {
     }
   }, [existingNotes, isNew]);
 
+  /** Validate, create-or-update the note, and redirect on success. */
   const handleSave = async () => {
     if (!name.trim()) return;
 
     setIsSaving(true);
     try {
+      // Parse comma-separated tag string into an array
       const tagsArray = tags
         .split(',')
         .map((t) => t.trim())

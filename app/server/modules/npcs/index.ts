@@ -1,3 +1,7 @@
+/**
+ * NPC module: CRUD for NPCs/entities plus AI-powered NPC generation.
+ */
+
 import type { RequestHandler } from 'express';
 import { npcSchema } from '../../../shared/schemas/npc.js';
 import { createBaseRoutes } from '../base-routes.js';
@@ -10,10 +14,11 @@ import type { ModuleDefinition, ModuleRoute } from '../../../shared/types/module
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
 
-// Register relationship fields for NPCs
+// Tell the relationship index which frontmatter fields link NPCs together
 relationshipIndex.registerFields('npcs', ['relatedCharacters']);
 
-// Custom route for AI generation
+// ── AI Generation Route ────────────────────────────────────────────────
+
 const generateHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -38,11 +43,14 @@ const generateHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Combine base CRUD routes with custom routes
+// ── Route Assembly ─────────────────────────────────────────────────────
+// Merge generic CRUD routes with the AI generation endpoint
 const baseRoutes = createBaseRoutes('npcs');
 const customRoutes: ModuleRoute[] = [
   { method: 'POST', path: '/generate', handler: generateHandler },
 ];
+
+// ── Module Definition ──────────────────────────────────────────────────
 
 export const npcsModule: ModuleDefinition = {
   id: 'npcs',

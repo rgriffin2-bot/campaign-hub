@@ -1,8 +1,15 @@
+/**
+ * Settings -- campaign settings page.
+ * Allows the DM to rename the campaign, update its description, and
+ * toggle which modules are enabled. Changes are saved via a PUT to the
+ * campaign endpoint and invalidate relevant query caches.
+ */
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCampaign } from './providers/CampaignProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 
+/** Send a partial update to the campaign settings endpoint */
 async function updateCampaign(
   campaignId: string,
   updates: Record<string, unknown>

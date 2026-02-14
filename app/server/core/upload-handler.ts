@@ -1,17 +1,32 @@
+/**
+ * Upload Handler
+ *
+ * Image processing pipeline for all uploaded assets. Uses Sharp to resize,
+ * crop, and convert images before persisting them to the campaign's assets/
+ * directory. Each asset type (portraits, maps, ships, boards, artefacts) has
+ * its own target dimensions and format to balance quality vs. file size.
+ *
+ * All images are stored in memory via multer during upload, processed by
+ * Sharp, then written to disk -- the original upload is never saved.
+ */
+
 import multer from 'multer';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs/promises';
 import { config } from '../config.js';
 
-// Ensure uploads directory exists
+// ============================================================================
+// Multer Configuration
+// ============================================================================
+
 async function ensureUploadDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'portraits');
   await fs.mkdir(uploadDir, { recursive: true });
   return uploadDir;
 }
 
-// Configure multer for memory storage (we'll process before saving)
+// Memory storage so we can pipe the buffer through Sharp before writing to disk
 const storage = multer.memoryStorage();
 
 export const upload = multer({
@@ -29,12 +44,17 @@ export const upload = multer({
   },
 });
 
+// ============================================================================
+// NPC Portraits — 500x500 square JPEG
+// ============================================================================
+
 interface CropPosition {
   x: number;
   y: number;
   scale: number;
 }
 
+/** Resize an NPC portrait to a 500x500 center-cropped JPEG. */
 export async function processAndSavePortrait(
   campaignId: string,
   npcId: string,
@@ -45,9 +65,8 @@ export async function processAndSavePortrait(
   const filename = `${npcId}.jpg`;
   const filepath = path.join(uploadDir, filename);
 
-  // Simply resize to 500x500, cropping from center
-  // The position/zoom is stored in the NPC frontmatter and applied via CSS on display
-  // This avoids complex server-side crop calculations
+  // Server does a simple center crop; fine positioning (pan/zoom) is stored
+  // in NPC frontmatter and applied client-side via CSS object-position.
   await sharp(buffer)
     .resize(500, 500, {
       fit: 'cover',
@@ -72,7 +91,10 @@ export async function deletePortrait(
   }
 }
 
-// Ensure lore images directory exists
+// ============================================================================
+// Lore Images — max 1200x600, aspect-ratio-preserving JPEG
+// ============================================================================
+
 async function ensureLoreImageDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'lore');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -114,7 +136,10 @@ export async function deleteLoreImage(
   }
 }
 
-// Ensure location images directory exists
+// ============================================================================
+// Location Images — 1200x600 landscape cover-crop JPEG
+// ============================================================================
+
 async function ensureLocationImageDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'locations');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -156,7 +181,11 @@ export async function deleteLocationImage(
   }
 }
 
-// Ensure map images directory exists
+// ============================================================================
+// Map Images — Small 200x200 PNG icons for the star system map.
+// GIFs are saved as-is to preserve animation (Sharp can't re-encode them).
+// ============================================================================
+
 async function ensureMapImageDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'map-images');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -214,7 +243,10 @@ export async function deleteMapImage(
   }
 }
 
-// Ensure PC portraits directory exists
+// ============================================================================
+// Player Character Portraits — 500x500 square JPEG (same as NPC portraits)
+// ============================================================================
+
 async function ensurePCPortraitDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'pc-portraits');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -255,7 +287,10 @@ export async function deletePCPortrait(
   }
 }
 
-// Ensure ship images directory exists
+// ============================================================================
+// Ship Images — 800x450 landscape (~16:9) cover-crop JPEG
+// ============================================================================
+
 async function ensureShipImageDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'ships');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -297,7 +332,10 @@ export async function deleteShipImage(
   }
 }
 
-// Ensure board backgrounds directory exists
+// ============================================================================
+// Board Backgrounds — Up to 4000x4000 JPEG for zoomable battle maps
+// ============================================================================
+
 async function ensureBoardBackgroundDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'board-backgrounds');
   await fs.mkdir(uploadDir, { recursive: true });
@@ -339,17 +377,24 @@ export async function deleteBoardBackground(
   }
 }
 
-// Ensure board token images directory exists
+// ============================================================================
+// Board Token Images — 500x500 max PNG (preserves transparency).
+// Returns a "normalizedSize" hint so the UI can render the token at an
+// appropriate default scale based on the original image dimensions.
+// ============================================================================
+
 async function ensureBoardTokenImageDir(campaignId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'board-tokens');
   await fs.mkdir(uploadDir, { recursive: true });
   return uploadDir;
 }
 
-// Standard size range for board token images (to avoid giant or tiny images)
-const TOKEN_IMAGE_MIN_SIZE = 100; // pixels
-const TOKEN_IMAGE_MAX_SIZE = 400; // pixels
-const TOKEN_IMAGE_DEFAULT_SIZE = 200; // target size for normalization
+// Size range for normalized token display size (in board-space pixels).
+// The original image dimensions are mapped into this range so large uploads
+// don't dominate the board and tiny icons are still legible.
+const TOKEN_IMAGE_MIN_SIZE = 100;
+const TOKEN_IMAGE_MAX_SIZE = 400;
+const TOKEN_IMAGE_DEFAULT_SIZE = 200;
 
 export async function processAndSaveBoardTokenImage(
   campaignId: string,
@@ -367,18 +412,14 @@ export async function processAndSaveBoardTokenImage(
   // Determine the larger dimension
   const largerDimension = Math.max(originalWidth, originalHeight);
 
-  // Calculate the normalized token size based on the image's original size
-  // Large images get capped, small images get scaled up
+  // Linear interpolation: map the original image's larger dimension (50-1000px)
+  // onto the display-size range (100-400px), clamping at the extremes.
   let normalizedSize: number;
   if (largerDimension > 1000) {
-    // Very large image - use max size
     normalizedSize = TOKEN_IMAGE_MAX_SIZE;
   } else if (largerDimension < 50) {
-    // Very small image - use min size
     normalizedSize = TOKEN_IMAGE_MIN_SIZE;
   } else {
-    // Scale proportionally between min and max
-    // Map 50-1000 pixel range to 100-400 token size range
     const ratio = (largerDimension - 50) / (1000 - 50);
     normalizedSize = Math.round(TOKEN_IMAGE_MIN_SIZE + ratio * (TOKEN_IMAGE_MAX_SIZE - TOKEN_IMAGE_MIN_SIZE));
   }
@@ -422,10 +463,11 @@ export async function deleteBoardTokenImage(
 }
 
 // =============================================================================
-// Story Artefact Images (Multi-image gallery support)
+// Story Artefact Images — Multi-image gallery with full + thumbnail versions.
+// Each artefact gets its own subdirectory under assets/artefacts/<artefactId>/
 // =============================================================================
 
-// Ensure artefact images directory exists for a specific artefact
+// Each artefact stores images in its own folder for easy bulk cleanup on delete
 async function ensureArtefactImageDir(campaignId: string, artefactId: string): Promise<string> {
   const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'artefacts', artefactId);
   await fs.mkdir(uploadDir, { recursive: true });
@@ -451,7 +493,7 @@ export async function processAndSaveArtefactImage(
   const uploadDir = await ensureArtefactImageDir(campaignId, artefactId);
   const imageId = generateImageId();
 
-  // Full-size image: preserve aspect ratio, max 2000px on longest side
+  // Full-size version: aspect-ratio-preserving, max 2000px on longest side
   const fullFilename = `${imageId}.jpg`;
   const fullFilepath = path.join(uploadDir, fullFilename);
 
@@ -463,7 +505,7 @@ export async function processAndSaveArtefactImage(
     .jpeg({ quality: 85 })
     .toFile(fullFilepath);
 
-  // Thumbnail: 500x500 square crop from center
+  // Thumbnail: 500x500 center-crop for gallery grid display
   const thumbFilename = `${imageId}-thumb.jpg`;
   const thumbFilepath = path.join(uploadDir, thumbFilename);
 

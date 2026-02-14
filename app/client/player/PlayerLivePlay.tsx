@@ -1,3 +1,10 @@
+/**
+ * PlayerLivePlay -- Player-side live play dashboard.
+ *
+ * Shows the player's party, scene NPCs/ships (read-only), crew ships
+ * (editable), a dice roller, and the initiative tracker (if DM has made it
+ * visible). Polls the server every 3 seconds for DM-side updates.
+ */
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Play, LayoutGrid, LayoutList, Columns, Lock, Users, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
@@ -18,13 +25,13 @@ import type { ShipDamage } from '@shared/schemas/ship';
 
 type LayoutMode = 'grid' | 'list' | 'compact';
 
-// Polling interval for live updates (3 seconds)
-const POLL_INTERVAL = 3000;
+// Polling interval for live updates (1 second)
+const POLL_INTERVAL = 1000;
 
-// Define disposition order for sorting
+// Sort hostile entities first so threats are prominent in the player view
 const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 } as const;
 
-// Scene entity type for combined sorting
+// Discriminated union so NPCs and ships can share one sorted list
 type SceneEntity =
   | { type: 'npc'; data: SceneNPC }
   | { type: 'ship'; data: SceneShip };
@@ -38,12 +45,11 @@ export function PlayerLivePlay() {
   const { sceneShips, updateShip } = useSceneShips();
   const { initiative } = useInitiative();
 
-  // For now, we'll allow editing of any PC in player mode
-  // In a full implementation, you'd check the logged-in player against pc.player
-  // and only allow editing if they match
+  // Track which PC panel is "active" for editing -- clicking a panel selects it.
+  // TODO: restrict editing to the logged-in player's own character.
   const [editablePCId, setEditablePCId] = useState<string | null>(null);
 
-  // Use a query with polling for live play
+  // ── Character data (polled) ────────────────────────────────────────
   const { data: characters = [], isLoading, error } = useQuery({
     queryKey: ['player-live-play', campaign?.id, 'player-characters'],
     queryFn: async () => {
@@ -56,12 +62,13 @@ export function PlayerLivePlay() {
       return data.data || [];
     },
     enabled: !!campaign,
-    refetchInterval: POLL_INTERVAL, // Poll every 3 seconds for live updates
+    refetchInterval: POLL_INTERVAL, // Poll every 1 second for live updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
     retry: false, // Don't retry on auth errors
   });
 
-  // Mutation for updating trackers (uses player endpoint)
+  // ── Tracker mutation ────────────────────────────────────────────────
+  // PATCH-only mutation for tracker fields (pressure, harm, etc.)
   const updateTrackers = useMutation({
     mutationFn: async ({
       pcId,
@@ -99,6 +106,7 @@ export function PlayerLivePlay() {
     updateTrackers.mutate({ pcId, updates });
   };
 
+  // ── Loading / error states ──────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -121,6 +129,8 @@ export function PlayerLivePlay() {
     );
   }
 
+  // ── Render ──────────────────────────────────────────────────────────
+  // CSS grid/flex classes per layout mode
   const layoutClasses = {
     grid: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3',
     list: 'flex flex-col gap-4',
@@ -288,12 +298,12 @@ export function PlayerLivePlay() {
         </div>
       )}
 
-      {/* Scene NPCs & Ships (read-only view for players, sorted by disposition) */}
+      {/* Scene NPCs & Ships -- read-only for players, sorted hostile-first */}
       {(() => {
-        // Filter non-crew ships and combine with NPCs
+        // Crew ships are shown separately above; only non-crew ships appear here
         const nonCrewShips = sceneShips.filter(s => !s.isCrewShip);
 
-        // Combine NPCs and non-crew ships, sorted by disposition
+        // Merge NPCs and ships into a single disposition-sorted list
         const sceneEntities: SceneEntity[] = [
           ...sceneNPCs.map(npc => ({ type: 'npc' as const, data: npc })),
           ...nonCrewShips.map(ship => ({ type: 'ship' as const, data: ship })),

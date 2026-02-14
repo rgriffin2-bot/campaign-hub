@@ -1,3 +1,8 @@
+/**
+ * NPCGenerate -- AI-powered NPC creation.
+ * The DM describes the NPC they want, the server generates structured data
+ * (name, personality, secrets, etc.), and the DM can preview then save it.
+ */
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Save, RefreshCw } from 'lucide-react';
@@ -8,6 +13,7 @@ export function NPCGenerate() {
   const navigate = useNavigate();
   const { create } = useFiles('npcs');
 
+  // --- Form and generation state ---
   const [prompt, setPrompt] = useState('');
   const [includeSecrets, setIncludeSecrets] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -15,6 +21,7 @@ export function NPCGenerate() {
   const [error, setError] = useState<string | null>(null);
   const [generated, setGenerated] = useState<GeneratedNPC | null>(null);
 
+  /** Send the prompt to the server and receive a structured NPC back */
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
@@ -43,6 +50,7 @@ export function NPCGenerate() {
     }
   };
 
+  /** Persist the generated NPC to the campaign files and navigate to it */
   const handleSave = async () => {
     if (!generated) return;
 
@@ -50,6 +58,7 @@ export function NPCGenerate() {
     try {
       const tagsArray = generated.tags || [];
 
+      // Map generated fields into frontmatter; omit empty values
       const frontmatter = {
         occupation: generated.occupation || undefined,
         location: generated.location || undefined,

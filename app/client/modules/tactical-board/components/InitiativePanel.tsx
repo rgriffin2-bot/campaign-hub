@@ -1,3 +1,10 @@
+/**
+ * InitiativePanel - Side or bottom panel that displays the initiative tracker
+ * within the tactical board view. Can be positioned on the right or bottom
+ * edge of the board and delegates all initiative logic to the shared
+ * InitiativeTracker component.
+ */
+
 import { memo } from 'react';
 import { X, Swords } from 'lucide-react';
 import { InitiativeTracker } from '../../../components/InitiativeTracker';

@@ -1,3 +1,10 @@
+/**
+ * GearList -- displays a character's inventory with optional inline editing.
+ * Each item can have comma-separated tags (e.g., "melee, heavy"). Supports
+ * read-only mode (detail view) and editable mode (edit form) via the
+ * `editable` prop. A `compact` layout is available for tighter spaces.
+ */
+
 import { useState } from 'react';
 import { Plus, X, Package, Pencil, Check } from 'lucide-react';
 import type { GearItem } from '@shared/schemas/player-character';
@@ -10,15 +17,19 @@ interface GearListProps {
 }
 
 export function GearList({ gear, editable = false, compact = false, onChange }: GearListProps) {
+  // State for the "add new" inputs at the bottom of the list
   const [newItem, setNewItem] = useState('');
   const [newTags, setNewTags] = useState('');
+  // State for inline editing of an existing item
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editItem, setEditItem] = useState('');
   const [editTags, setEditTags] = useState('');
 
+  // -- Add / remove / edit handlers -------------------------------------------
   const handleAdd = () => {
     if (!newItem.trim() || !onChange) return;
 
+    // Parse comma-separated tags string into an array
     const tags = newTags
       .split(',')
       .map((t) => t.trim())
@@ -69,6 +80,7 @@ export function GearList({ gear, editable = false, compact = false, onChange }: 
     setEditTags('');
   };
 
+  // -- Keyboard shortcuts: Enter to add, Enter/Escape in edit mode -----------
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();

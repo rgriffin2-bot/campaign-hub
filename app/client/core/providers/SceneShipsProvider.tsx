@@ -1,3 +1,10 @@
+/**
+ * SceneShipsProvider -- Manages the list of ships in the current live-play scene.
+ *
+ * Mirrors SceneNPCsProvider but for ships. Key difference: players are allowed
+ * to update *crew* ships (their own vessels) while other ships are DM-only.
+ * Polls the server every 3 seconds like the other scene providers.
+ */
 import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -9,8 +16,8 @@ import type { SceneShip } from '@shared/types/scene';
 // Re-export type for consumers
 export type { SceneShip };
 
-// Polling interval for live updates (3 seconds)
-const POLL_INTERVAL = 3000;
+// Polling interval for live updates (1 second)
+const POLL_INTERVAL = 1000;
 
 interface SceneShipsContextValue {
   sceneShips: SceneShip[];
@@ -32,13 +39,11 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const location = useLocation();
 
-  // Determine if we're in player mode based on route
+  // ── Role detection ─────────────────────────────────────────────────
   const isPlayerRoute = location.pathname.startsWith('/player');
-
-  // Determine if user should see DM data
   const isDm = !isPlayerRoute && (!authEnabled || role === 'dm');
 
-  // Use different endpoints for DM vs player
+  // Player endpoint filters hidden ships server-side
   const endpoint = isDm
     ? '/api/modules/live-play/scene-ships'
     : '/api/player/scene-ships';
@@ -58,7 +63,8 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
     refetchIntervalInBackground: true,
   });
 
-  // Mutation for adding ship to scene (DM only)
+  // ── Mutations ───────────────────────────────────────────────────────
+
   const addMutation = useMutation({
     mutationFn: async (ship: SceneShip) => {
       const res = await fetch('/api/modules/live-play/scene-ships', {
@@ -93,7 +99,7 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Mutation for updating ship (DM only, or players for crew ships)
+  // Update ship -- DM can update any, players can update crew ships only
   const updateMutation = useMutation({
     mutationFn: async ({ shipId, updates }: { shipId: string; updates: Partial<SceneShip> }) => {
       const res = await fetch(`/api/modules/live-play/scene-ships/${shipId}`, {
@@ -127,6 +133,8 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // ── Public callbacks ────────────────────────────────────────────────
+
   const addToScene = useCallback((ship: SceneShip) => {
     if (!isDm) return;
     addMutation.mutate(ship);
@@ -149,9 +157,9 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
     clearMutation.mutate();
   }, [clearMutation, isDm]);
 
+  /** Update a ship's fields. Players may only update ships flagged as crew ships. */
   const updateShip = useCallback(
     (shipId: string, updates: Partial<SceneShip>) => {
-      // Players can update crew ships, DM can update any
       const ship = sceneShips.find((s: SceneShip) => s.id === shipId);
       if (!ship) return;
       if (!isDm && !ship.isCrewShip) return;
@@ -201,6 +209,7 @@ export function SceneShipsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Hook to consume scene ship state. Must be inside a SceneShipsProvider. */
 export function useSceneShips() {
   const context = useContext(SceneShipsContext);
   if (!context) {

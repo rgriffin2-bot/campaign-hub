@@ -1,3 +1,13 @@
+/**
+ * PlayerLocationList -- Player-facing location browser.
+ *
+ * Three view modes:
+ *  - Tree: hierarchical list with expand/collapse and search highlight
+ *  - Cards: flat grid of location cards with images
+ *  - Map: full-screen star-system map rendered in a sandboxed iframe
+ *
+ * Locations are fetched via the player files hook and displayed read-only.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, List, LayoutGrid, Globe, X, ExternalLink } from 'lucide-react';
@@ -13,7 +23,9 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-// Build tree structure from flat list
+// ── Tree helpers ─────────────────────────────────────────────────────
+
+/** Build a parent-child tree from the flat locations list, using `parent` and `treeRoot` fields. */
 function buildTree(locations: FileMetadata[]): TreeNode[] {
   const childrenMap = new Map<string, FileMetadata[]>();
 
@@ -43,7 +55,7 @@ function buildTree(locations: FileMetadata[]): TreeNode[] {
   );
 }
 
-// Check if node or descendants match search
+/** Recursively check if node or any descendant matches the search term. */
 function nodeMatchesSearch(node: TreeNode, searchLower: string): boolean {
   const loc = node.location;
   if (
@@ -64,6 +76,8 @@ interface TreeNodeProps {
   toggleExpanded: (id: string) => void;
 }
 
+// ── TreeNodeComponent ────────────────────────────────────────────────
+/** Renders one row in the tree view, with expand/collapse and optional thumbnail. */
 function TreeNodeComponent({
   node,
   level,
@@ -167,6 +181,9 @@ function TreeNodeComponent({
   );
 }
 
+// ── Map sidebar ──────────────────────────────────────────────────────
+
+// Human-readable labels for celestial body types
 const BODY_TYPE_LABELS: Record<string, string> = {
   star: 'Star',
   planet: 'Planet',
@@ -180,6 +197,7 @@ interface MapSidebarProps {
   onClose: () => void;
 }
 
+/** Detail sidebar shown when a celestial body is selected on the map. */
 function PlayerMapSidebar({ location, onClose }: MapSidebarProps) {
   const { campaign } = useCampaign();
 
@@ -263,7 +281,13 @@ function PlayerMapSidebar({ location, onClose }: MapSidebarProps) {
   );
 }
 
-// Full-screen map view for players using iframe
+// ── Full-screen map view ─────────────────────────────────────────────
+
+/**
+ * Renders the star-system map in a sandboxed iframe. The HTML is fetched from
+ * the server's player map endpoint. "Go to Entry" messages from the iframe
+ * are forwarded via postMessage to navigate to the location detail page.
+ */
 function PlayerFullMapView({ locations, onClose }: { locations: FileMetadata[]; onClose: () => void }) {
   const { campaign } = useCampaign();
   const navigate = useNavigate();
@@ -382,6 +406,8 @@ function PlayerFullMapView({ locations, onClose }: { locations: FileMetadata[]; 
   );
 }
 
+// ── Main exported component ──────────────────────────────────────────
+
 export function PlayerLocationList() {
   const { list } = usePlayerFiles('locations');
   const { campaign } = useCampaign();
@@ -389,14 +415,17 @@ export function PlayerLocationList() {
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // ── Data preparation ───────────────────────────────────────────────
   const locations = list.data || [];
   const tree = buildTree(locations);
 
+  // Filter tree nodes by search term (keeps parents if any descendant matches)
   const searchLower = search.toLowerCase();
   const filteredTree = searchLower
     ? tree.filter((node) => nodeMatchesSearch(node, searchLower))
     : tree;
 
+  // Flat-filtered list used by the cards view
   const filteredLocations = locations.filter((loc) => {
     if (!search) return true;
     return (
@@ -418,7 +447,8 @@ export function PlayerLocationList() {
     });
   };
 
-  // Auto-expand when searching
+  // Auto-expand ancestor nodes when a search term matches a descendant,
+  // so the matching node is always visible without manual expansion.
   const effectiveExpanded = searchLower
     ? new Set([
         ...expandedIds,

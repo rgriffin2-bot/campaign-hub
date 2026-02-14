@@ -1,3 +1,9 @@
+/**
+ * NoCampaignView - Landing page shown when no campaign is selected.
+ * Displays a list of existing campaigns to switch to and a button
+ * to create a new campaign.
+ */
+
 import { useState } from 'react';
 import { Scroll, Plus, FolderOpen } from 'lucide-react';
 import { useCampaign } from './providers/CampaignProvider';

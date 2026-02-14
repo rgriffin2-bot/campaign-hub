@@ -1,3 +1,8 @@
+/**
+ * FullMapView -- Full-screen interactive star-system map.
+ * Generates (or loads a cached) HTML/JS map via the server, renders it in an
+ * iframe, and overlays a selection sidebar when the user clicks a celestial body.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ExternalLink, X, RefreshCw, MapPin } from 'lucide-react';
@@ -15,6 +20,7 @@ interface MapSidebarProps {
   onClose: () => void;
 }
 
+// Human-readable labels for celestial body types
 const BODY_TYPE_LABELS: Record<string, string> = {
   star: 'Star',
   planet: 'Planet',
@@ -22,6 +28,10 @@ const BODY_TYPE_LABELS: Record<string, string> = {
   station: 'Station',
   asteroid_ring: 'Asteroid Belt',
 };
+
+// ============================================================
+// Inline sidebar shown when a celestial body is selected
+// ============================================================
 
 function InlineMapSidebar({ location, onClose }: MapSidebarProps) {
   const { campaign } = useCampaign();
@@ -106,6 +116,10 @@ function InlineMapSidebar({ location, onClose }: MapSidebarProps) {
   );
 }
 
+// ============================================================
+// Main full-screen map component
+// ============================================================
+
 export function FullMapView({ locations, onClose }: FullMapViewProps) {
   const { campaign } = useCampaign();
   const navigate = useNavigate();
@@ -114,7 +128,7 @@ export function FullMapView({ locations, onClose }: FullMapViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle messages from iframe (for "Go to Entry" button)
+  // The iframe sends postMessage events when the user clicks "Go to Entry"
   const handleIframeMessage = useCallback((event: MessageEvent) => {
     if (event.data?.type === 'navigate-to-location' && event.data?.locationId) {
       // Close the map and navigate to the location
@@ -129,7 +143,7 @@ export function FullMapView({ locations, onClose }: FullMapViewProps) {
     return () => window.removeEventListener('message', handleIframeMessage);
   }, [handleIframeMessage]);
 
-  // Check if generated map exists
+  // On mount, check if a previously generated map HTML file exists for this campaign
   useEffect(() => {
     if (campaign) {
       checkForGeneratedMap();
@@ -150,6 +164,7 @@ export function FullMapView({ locations, onClose }: FullMapViewProps) {
     }
   };
 
+  /** Request the server to (re)generate the star-system map HTML */
   const generateMap = async () => {
     if (!campaign) return;
 
@@ -175,6 +190,7 @@ export function FullMapView({ locations, onClose }: FullMapViewProps) {
     }
   };
 
+  // Only locations with celestial data are relevant to the map
   const celestialLocations = locations.filter(
     (loc) => loc.celestial !== undefined && loc.celestial !== null
   );

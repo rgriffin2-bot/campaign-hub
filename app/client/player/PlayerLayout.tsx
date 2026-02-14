@@ -1,13 +1,22 @@
+/**
+ * PlayerLayout.tsx
+ *
+ * Top-level layout shell for the player (read-only) view.
+ * Provides the header, sidebar navigation, and content outlet.
+ * Only modules with player-facing views are shown in the sidebar.
+ */
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { Scroll, Home, LogOut } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { useAuth } from '../core/providers/AuthProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 
+/** Root layout component for the player view. */
 export function PlayerLayout() {
   const { campaign, enabledModules, isLoading } = useCampaign();
   const { authEnabled, logout } = useAuth();
 
+  // --- Loading and empty states ---
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -84,9 +93,9 @@ export function PlayerLayout() {
                 </NavLink>
               </li>
 
-              {/* Module Links */}
+              {/* Module Links — only modules with a player-facing view are listed */}
               {enabledModules.length > 0 && (() => {
-                // Only show modules that have player views
+                // Whitelist of module IDs that have corresponding player views
                 const playerViewModules = ['npcs', 'lore', 'locations', 'rules', 'player-characters', 'live-play', 'ships', 'session-notes', 'factions', 'projects', 'tactical-board'];
                 const visibleModules = enabledModules.filter(m => playerViewModules.includes(m.id));
 

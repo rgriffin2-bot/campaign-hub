@@ -1,3 +1,9 @@
+/**
+ * PlaybookMoveCard and PlaybookMoveGrid - Components for displaying a
+ * character's assigned playbook moves as a clickable card grid.
+ * Each card links to the full move detail page.
+ */
+
 import { Link } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 

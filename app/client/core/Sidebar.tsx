@@ -1,3 +1,8 @@
+/**
+ * Sidebar -- left navigation panel listing the Dashboard link and all
+ * enabled modules for the active campaign. DMs can drag-and-drop modules
+ * to reorder them; players see a read-only list.
+ */
 import { useState, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, GripVertical } from 'lucide-react';
@@ -10,7 +15,7 @@ export function Sidebar() {
   const { role, authEnabled } = useAuth();
   const isDm = !authEnabled || role === 'dm';
 
-  // Drag state
+  // --- Drag-and-drop reordering state ---
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const dragNode = useRef<HTMLLIElement | null>(null);

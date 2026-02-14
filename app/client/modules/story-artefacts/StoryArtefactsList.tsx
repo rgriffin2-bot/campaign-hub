@@ -1,3 +1,9 @@
+/**
+ * StoryArtefactsList -- grid view of story artefacts (letters, maps, evidence, etc.).
+ * Each card shows a thumbnail from the primary image, tags, and a visibility toggle.
+ * Supports text search and tag-based filtering with quick-filter buttons.
+ */
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Scroll, Eye, EyeOff } from 'lucide-react';
@@ -7,16 +13,18 @@ import { SUGGESTED_ARTEFACT_TAGS } from '@shared/schemas/story-artefact';
 import type { FileMetadata } from '@shared/types/file';
 import type { ArtefactImage } from '@shared/schemas/story-artefact';
 
+/** Card for a single artefact, showing thumbnail, tags, and visibility toggle. */
 function ArtefactCard({ item }: { item: FileMetadata }) {
   const { toggleVisibility } = useFiles('story-artefacts');
   const { campaign } = useCampaign();
   const isHidden = item.hidden === true;
 
-  // Get the primary image or first image for thumbnail
+  // Use the primary image for the thumbnail, falling back to the first image
   const images = (item.images as ArtefactImage[] | undefined) || [];
   const primaryImage = images.find((img) => img.isPrimary) || images[0];
   const thumbnailPath = primaryImage?.thumbPath || primaryImage?.path;
 
+  // Prevent the Link navigation when clicking the visibility button
   const handleToggleVisibility = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -106,6 +114,7 @@ function ArtefactCard({ item }: { item: FileMetadata }) {
   );
 }
 
+/** Top-level list page for story artefacts with search and tag filtering. */
 export function StoryArtefactsList() {
   const { list } = useFiles('story-artefacts');
   const [search, setSearch] = useState('');
@@ -113,7 +122,7 @@ export function StoryArtefactsList() {
 
   const artefacts = list.data || [];
 
-  // Collect all unique tags from artefacts
+  // Build a set of all tags that appear in the data for the filter dropdown
   const allTags = new Set<string>();
   artefacts.forEach((item) => {
     (item.tags as string[] | undefined)?.forEach((tag) => allTags.add(tag));

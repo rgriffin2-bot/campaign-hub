@@ -1,3 +1,9 @@
+/**
+ * ShipDamageTracker -- table-based tracker for ship subsystem damage.
+ * Each of the 6 subsystems can have a minor and/or major damage entry.
+ * Supports a collapsible compact mode for tight layouts (e.g., live-play panel).
+ */
+
 import { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { SUBSYSTEM_LABELS, SUBSYSTEM_SHORT_LABELS, type SubsystemKey, type ShipDamage } from '@shared/schemas/ship';
@@ -26,6 +32,7 @@ export function ShipDamageTracker({
 }: ShipDamageTrackerProps) {
   const [expanded, setExpanded] = useState(!compact);
 
+  // Update a single damage field, clearing it when the value is empty
   const handleSubsystemChange = (
     key: SubsystemKey,
     field: 'minor' | 'major',
@@ -43,7 +50,7 @@ export function ShipDamageTracker({
     onChange(updated);
   };
 
-  // Count damaged subsystems
+  // Summary: count how many subsystems have any damage for the header badge
   const damagedCount = SUBSYSTEM_KEYS.filter((key) => {
     const subsystem = damage[key];
     return subsystem?.minor || subsystem?.major;
@@ -51,6 +58,7 @@ export function ShipDamageTracker({
 
   const hasDamage = damagedCount > 0;
 
+  // Compact collapsed state: show only a summary button
   if (compact && !expanded) {
     return (
       <button

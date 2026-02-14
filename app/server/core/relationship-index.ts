@@ -1,26 +1,53 @@
+/**
+ * Relationship Index
+ *
+ * Maintains an in-memory directed graph of cross-references between campaign
+ * files. For example, an NPC's frontmatter might reference a location ID or
+ * a faction ID -- this index lets the UI show "related items" panels.
+ *
+ * The graph is built by scanning every .md file in the campaign and extracting
+ * IDs from configured frontmatter fields (registered per module). It supports
+ * incremental updates when a single file changes, and full rebuilds on
+ * campaign activation.
+ *
+ * Two edge directions are tracked:
+ *   - outgoing: "this file references these other files"
+ *   - incoming: "these files reference this file" (reverse lookup)
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config.js';
 import { markdownParser } from './markdown-parser.js';
 import type { FileMetadata, ParsedFile } from '../../shared/types/file.js';
 
+// ============================================================================
+// Types & State
+// ============================================================================
+
 interface RelationshipGraph {
-  // fileId -> Set of fileIds it references
-  outgoing: Map<string, Set<string>>;
-  // fileId -> Set of fileIds that reference it
-  incoming: Map<string, Set<string>>;
-  // fileId -> FileMetadata
-  metadata: Map<string, FileMetadata>;
+  outgoing: Map<string, Set<string>>; // fileId -> Set of referenced fileIds
+  incoming: Map<string, Set<string>>; // fileId -> Set of fileIds that reference it
+  metadata: Map<string, FileMetadata>; // fileId -> file metadata snapshot
 }
 
+// Modules register which frontmatter fields contain reference IDs
 interface RelationshipFieldConfig {
   moduleId: string;
-  fields: string[];
+  fields: string[];  // e.g., ["location", "faction", "allies"]
 }
 
+// One graph per campaign, lazily built on first access
 const graphs = new Map<string, RelationshipGraph>();
+
+// Accumulated field registrations from all modules
 const fieldConfigs: RelationshipFieldConfig[] = [];
 
+// ============================================================================
+// Helpers — Extract reference IDs from frontmatter values
+// ============================================================================
+
+// A reference field value can be a single ID string or an array of IDs
 function extractIds(value: unknown): string[] {
   if (typeof value === 'string') {
     return [value];
@@ -31,6 +58,7 @@ function extractIds(value: unknown): string[] {
   return [];
 }
 
+// Collect all referenced IDs across the configured relationship fields
 function extractReferences(
   frontmatter: Record<string, unknown>,
   fields: string[]
@@ -44,6 +72,8 @@ function extractReferences(
   return refs;
 }
 
+// Scan all .md files across every module folder in a campaign.
+// Skips the assets/ directory (binary files only).
 async function scanCampaignFiles(campaignId: string): Promise<ParsedFile[]> {
   const campaignPath = path.join(config.campaignsDir, campaignId);
   const files: ParsedFile[] = [];
@@ -82,7 +112,12 @@ async function scanCampaignFiles(campaignId: string): Promise<ParsedFile[]> {
   return files;
 }
 
+// ============================================================================
+// Public API
+// ============================================================================
+
 export const relationshipIndex = {
+  /** Register which frontmatter fields in a module contain reference IDs. */
   registerFields(moduleId: string, fields: string[]): void {
     const existing = fieldConfigs.find((c) => c.moduleId === moduleId);
     if (existing) {
@@ -92,6 +127,7 @@ export const relationshipIndex = {
     }
   },
 
+  /** Full rebuild: scan every file and reconstruct the entire graph. */
   async rebuild(campaignId: string): Promise<void> {
     const graph: RelationshipGraph = {
       outgoing: new Map(),
@@ -127,6 +163,7 @@ export const relationshipIndex = {
     graphs.set(campaignId, graph);
   },
 
+  /** Incremental update: remove old edges for this file, then re-add. */
   async updateFile(campaignId: string, file: ParsedFile): Promise<void> {
     let graph = graphs.get(campaignId);
     if (!graph) {
@@ -137,13 +174,13 @@ export const relationshipIndex = {
     const fileId = file.frontmatter.id;
     const allFields = fieldConfigs.flatMap((c) => c.fields);
 
-    // Remove old outgoing references
+    // First, clean up old outgoing edges from the incoming maps
     const oldRefs = graph.outgoing.get(fileId) || new Set();
     for (const refId of oldRefs) {
       graph.incoming.get(refId)?.delete(fileId);
     }
 
-    // Update metadata
+    // Refresh the metadata snapshot
     graph.metadata.set(fileId, {
       ...file.frontmatter,
       id: fileId,
@@ -164,6 +201,7 @@ export const relationshipIndex = {
     }
   },
 
+  /** Remove a file and all its edges (both directions) from the graph. */
   async removeFile(campaignId: string, fileId: string): Promise<void> {
     const graph = graphs.get(campaignId);
     if (!graph) return;
@@ -184,6 +222,10 @@ export const relationshipIndex = {
     graph.metadata.delete(fileId);
   },
 
+  /**
+   * Query both directions: files this entry references, and files that
+   * reference this entry. Lazily rebuilds the graph if not yet cached.
+   */
   async getRelated(
     campaignId: string,
     fileId: string
@@ -213,6 +255,7 @@ export const relationshipIndex = {
     return { references, referencedBy };
   },
 
+  /** Batch-resolve an array of file IDs to their metadata. */
   async resolveIds(campaignId: string, ids: string[]): Promise<FileMetadata[]> {
     let graph = graphs.get(campaignId);
     if (!graph) {

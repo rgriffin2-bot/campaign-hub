@@ -1,3 +1,9 @@
+/**
+ * LoginPage - Password-based authentication screen.
+ * Displayed when the user has not yet authenticated.
+ * Supports both DM and Player passwords (configured via server .env).
+ */
+
 import { useState, type FormEvent } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';

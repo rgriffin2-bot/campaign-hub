@@ -1,3 +1,9 @@
+/**
+ * Downtime Projects module definition.
+ * Provides CRUD for project clocks that track long-term progress.
+ * Uses standard base routes with no custom route overrides.
+ */
+
 import { projectSchema } from '../../../shared/schemas/project.js';
 import { createBaseRoutes } from '../base-routes.js';
 import { moduleRegistry } from '../registry.js';

@@ -1,3 +1,10 @@
+/**
+ * PlayerCharacterDetail.tsx
+ *
+ * Player view for a single character sheet. Displays portrait, stats,
+ * trackers (pressure, harm, resources, XP, luck), gear, playbook moves,
+ * and biography sections. Players can navigate to the edit page from here.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Edit, Users } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -16,6 +23,7 @@ import { PlaybookMoveGrid } from '../modules/player-characters/components/Playbo
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
 import { useQuery } from '@tanstack/react-query';
 
+/** Full character sheet detail page (player view). */
 export function PlayerCharacterDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();
@@ -23,7 +31,8 @@ export function PlayerCharacterDetail() {
 
   const { data: pc, isLoading } = get(fileId || '');
 
-  // Fetch character's playbook moves (using player endpoint)
+  // Fetch playbook moves linked to this character via player endpoint.
+  // Falls back to an empty array if the endpoint is unavailable.
   const { data: moves } = useQuery({
     queryKey: ['player-pc-moves', campaign?.id, fileId],
     queryFn: async () => {
@@ -32,7 +41,6 @@ export function PlayerCharacterDetail() {
         `/api/player/campaigns/${campaign.id}/files/player-characters/${fileId}/moves`,
         { credentials: 'include' }
       );
-      // If the endpoint doesn't exist, return empty array
       if (!res.ok) return [];
       const data = await res.json();
       return data.success ? data.data : [];
@@ -66,6 +74,7 @@ export function PlayerCharacterDetail() {
   }
 
   const { content } = pc;
+  // Cast to typed frontmatter for safe property access
   const fm = pc.frontmatter as unknown as PlayerCharacterFrontmatter;
 
   return (

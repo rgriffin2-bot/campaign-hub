@@ -1,3 +1,10 @@
+/**
+ * PlayerStoryArtefactList.tsx
+ *
+ * Player (read-only) view for browsing story artefacts.
+ * Features search, tag-based filtering, and thumbnail cards
+ * using the primary (or first) image from each artefact.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Scroll } from 'lucide-react';
@@ -6,10 +13,13 @@ import { useCampaign } from '../hooks/useCampaign';
 import type { FileMetadata } from '@shared/types/file';
 import type { ArtefactImage } from '@shared/schemas/story-artefact';
 
+// --- Helper components ---
+
+/** Card with thumbnail and tags for a single story artefact. */
 function ArtefactCard({ item }: { item: FileMetadata }) {
   const { campaign } = useCampaign();
 
-  // Get the primary image or first image for thumbnail
+  // Use the designated primary image; fall back to the first available
   const images = (item.images as ArtefactImage[] | undefined) || [];
   const primaryImage = images.find((img) => img.isPrimary) || images[0];
   const thumbnailPath = primaryImage?.thumbPath || primaryImage?.path;
@@ -58,6 +68,9 @@ function ArtefactCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// --- Main list component ---
+
+/** Searchable, tag-filterable story artefact list for the player view. */
 export function PlayerStoryArtefactList() {
   const { list } = usePlayerFiles('story-artefacts');
   const [search, setSearch] = useState('');
@@ -65,7 +78,7 @@ export function PlayerStoryArtefactList() {
 
   const artefacts = list.data || [];
 
-  // Collect all unique tags from artefacts
+  // Build a deduplicated set of tags for the filter dropdown
   const allTags = new Set<string>();
   artefacts.forEach((item) => {
     (item.tags as string[] | undefined)?.forEach((tag) => allTags.add(tag));

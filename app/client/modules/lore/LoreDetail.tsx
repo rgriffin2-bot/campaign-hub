@@ -1,3 +1,7 @@
+/**
+ * LoreDetail -- Read-only view of a single lore entry.
+ * Displays type badge, tags, optional header image, and markdown content.
+ */
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, BookOpen, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -25,6 +29,7 @@ export function LoreDetail() {
 
   const { data: lore, isLoading } = get(fileId || '');
 
+  /** Delete the lore entry after confirmation, then redirect to list */
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this lore entry?')) return;
@@ -33,6 +38,7 @@ export function LoreDetail() {
     navigate('/modules/lore');
   };
 
+  // --- Loading state ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -58,11 +64,13 @@ export function LoreDetail() {
     );
   }
 
+  // --- Extract frontmatter fields ---
   const { content } = lore;
   const frontmatter = lore.frontmatter as unknown as LoreFrontmatter;
   const type = frontmatter.type;
   const isHidden = frontmatter.hidden === true;
 
+  /** Toggle player-facing visibility of this lore entry */
   const handleToggleVisibility = () => {
     if (!fileId) return;
     toggleVisibility.mutate({ fileId, hidden: !isHidden });

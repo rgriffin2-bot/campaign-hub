@@ -1,10 +1,23 @@
+/**
+ * PlayerTacticalBoard.tsx
+ *
+ * Player (read-only) view for tactical boards. Contains two components:
+ *   - PlayerTacticalBoardList: grid of available boards
+ *   - PlayerTacticalBoardDetail: full-screen canvas for a single board
+ *
+ * Hidden boards and hidden tokens are filtered out server-side and
+ * client-side respectively. The detail view polls every 3 seconds so
+ * players see DM token/fog changes in near-real-time.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, LayoutGrid } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { BoardCanvas } from '../modules/tactical-board/components/BoardCanvas';
 import type { TacticalBoard, BoardToken } from '@shared/schemas/tactical-board';
 
-// Fetch board for players (read-only, filters hidden tokens)
+// --- Data fetching ---
+
+/** Fetch a single board (read-only); returns null on error. */
 async function fetchPlayerBoard(boardId: string): Promise<TacticalBoard | null> {
   const res = await fetch(`/api/player/tactical-boards/${boardId}`, {
     credentials: 'include',
@@ -14,7 +27,7 @@ async function fetchPlayerBoard(boardId: string): Promise<TacticalBoard | null> 
   return data.data || null;
 }
 
-// Fetch list of boards for players (filters hidden boards)
+/** Fetch all boards, filtering out ones the DM has marked hidden. */
 async function fetchPlayerBoards(): Promise<TacticalBoard[]> {
   const res = await fetch('/api/player/tactical-boards', {
     credentials: 'include',
@@ -24,7 +37,9 @@ async function fetchPlayerBoards(): Promise<TacticalBoard[]> {
   return (data.data || []).filter((b: TacticalBoard) => !b.hidden);
 }
 
-// Board list for players
+// --- Board list ---
+
+/** Grid of available tactical boards for the player view. */
 export function PlayerTacticalBoardList() {
   const { data: boards = [], isLoading } = useQuery({
     queryKey: ['player', 'tactical-boards'],
@@ -64,6 +79,7 @@ export function PlayerTacticalBoardList() {
               to={`/player/tactical-board/${board.id}`}
               className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:border-primary/50 hover:shadow-md"
             >
+              {/* Mini preview -- show up to 12 visible tokens as dots */}
               <div className="relative aspect-video bg-neutral-800">
                 {board.tokens
                   ?.filter((t) => t.visibleToPlayers)
@@ -97,7 +113,9 @@ export function PlayerTacticalBoardList() {
   );
 }
 
-// Board detail view for players (read-only)
+// --- Board detail ---
+
+/** Full-screen read-only board canvas with 1-second polling. */
 export function PlayerTacticalBoardDetail() {
   const { boardId } = useParams<{ boardId: string }>();
 
@@ -105,7 +123,7 @@ export function PlayerTacticalBoardDetail() {
     queryKey: ['player', 'tactical-board', boardId],
     queryFn: () => fetchPlayerBoard(boardId!),
     enabled: !!boardId,
-    refetchInterval: 3000, // Poll every 3 seconds for fog/token updates
+    refetchInterval: 1000, // Poll every 1 second for fog/token updates
   });
 
   if (isLoading) {
@@ -133,7 +151,7 @@ export function PlayerTacticalBoardDetail() {
     );
   }
 
-  // Filter to only show visible tokens
+  // Strip tokens the DM has hidden from the player's view
   const playerBoard: TacticalBoard = {
     ...board,
     tokens: (board.tokens || []).filter((t: BoardToken) => t.visibleToPlayers !== false),

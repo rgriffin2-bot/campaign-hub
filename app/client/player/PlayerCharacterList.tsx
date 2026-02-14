@@ -1,3 +1,10 @@
+/**
+ * PlayerCharacterList.tsx
+ *
+ * Player (read-only) view for browsing player characters.
+ * Shows a searchable grid of character cards with status indicators
+ * for pressure, resources, and harm.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Users, Heart, Coins, Sparkles } from 'lucide-react';
@@ -6,6 +13,9 @@ import { useCampaign } from '../core/providers/CampaignProvider';
 import type { FileMetadata } from '@shared/types/file';
 import type { ResourceLevel, HarmState } from '@shared/schemas/player-character';
 
+// --- Color mappings ---
+
+// Maps resource level to a Tailwind background color for the pip indicator
 const resourceColors: Record<ResourceLevel, string> = {
   screwed: 'bg-red-500',
   dry: 'bg-orange-500',
@@ -15,6 +25,9 @@ const resourceColors: Record<ResourceLevel, string> = {
   swimming: 'bg-purple-500',
 };
 
+// --- Helper components ---
+
+/** Renders 5 small dots; filled up to `value` to indicate pressure level. */
 function PressurePips({ value }: { value: number }) {
   return (
     <div className="flex gap-1">
@@ -30,12 +43,14 @@ function PressurePips({ value }: { value: number }) {
   );
 }
 
+/** Shows the worst active harm tier as a colored label (e.g. "Severe"). */
 function HarmIndicator({ harm }: { harm?: HarmState }) {
   if (!harm) return null;
 
   const hasHarm = harm.oldWounds || harm.mild || harm.moderate || harm.severe;
   if (!hasHarm) return null;
 
+  // Display only the most severe active tier
   const severity = harm.severe ? 'Severe' : harm.moderate ? 'Moderate' : harm.mild ? 'Mild' : 'Old Wounds';
   const color = harm.severe ? 'text-red-500' : harm.moderate ? 'text-orange-500' : harm.mild ? 'text-yellow-500' : 'text-muted-foreground';
 
@@ -47,6 +62,7 @@ function HarmIndicator({ harm }: { harm?: HarmState }) {
   );
 }
 
+/** Card showing a single character's portrait, playbook, and status row. */
 function PlayerCharacterCard({ item }: { item: FileMetadata }) {
   const { campaign } = useCampaign();
   const portrait = item.portrait as string | undefined;
@@ -109,12 +125,16 @@ function PlayerCharacterCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// --- Main list component ---
+
+/** Searchable grid of all player characters. */
 export function PlayerCharacterList() {
   const { list } = usePlayerFiles('player-characters');
   const [search, setSearch] = useState('');
 
   const characters = list.data || [];
 
+  // Filter by name, player, or playbook
   const filteredItems = characters.filter((item) => {
     if (!search) return true;
     const searchLower = search.toLowerCase();

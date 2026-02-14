@@ -1,3 +1,19 @@
+/**
+ * Map Generator
+ *
+ * Bridges TypeScript location data with a Python-based star system map
+ * renderer. The pipeline is:
+ *   1. Convert location FileMetadata into a CSV (the format the Python
+ *      generator expects).
+ *   2. Write the CSV to a temp file in the campaign directory.
+ *   3. Spawn python3, which runs the CSVStarSystemGenerator to produce
+ *      a self-contained interactive HTML file.
+ *   4. Clean up the temp CSV regardless of outcome.
+ *
+ * The Python generator handles orbital mechanics, SVG rendering, and
+ * interactive pan/zoom — this module is just the data-marshalling layer.
+ */
+
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -6,7 +22,7 @@ import type { FileMetadata } from '@shared/types/file';
 import type { CelestialData, MapConfig } from '@shared/schemas/location';
 import { DEFAULT_MAP_CONFIG } from '@shared/schemas/location';
 
-// Get the directory of this file for locating the Python generator
+// Resolve __dirname for ESM (needed to locate the Python script)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface MapGeneratorOptions {
@@ -17,13 +33,17 @@ interface MapGeneratorOptions {
 }
 
 /**
- * Generates a CSV file from location data for the Python map generator
+ * Generates a CSV string from location metadata and map configuration.
+ * The first data row is a special "System Config" row that carries global
+ * styling options (background, orbit defaults, font). Subsequent rows
+ * are individual celestial bodies with their orbital parameters.
  */
 async function generateCsv(
   locations: FileMetadata[],
   campaignPath: string,
   config: MapConfig
 ): Promise<string> {
+  // Column order must match what the Python generator expects
   const headers = [
     'name',
     'type',
@@ -54,12 +74,8 @@ async function generateCsv(
 
   const rows: string[][] = [];
 
-  // Add config row for background styling (from map config)
-  // Column positions: 1=name, 2=type, 3=parent, 4=orbit_distance, 5=radius, 6=color,
-  // 7=image_path, 8=description, 9=region, 10=faction, 11=population, 12=start_position,
-  // 13=show_label, 14=orbit_color, 15=orbit_style, 16=background_color, 17=background_image,
-  // 18=font_family, 19=ring_width, 20=background_type, 21=nebula_colors,
-  // 22=orbit_shape, 23=orbit_eccentricity, 24=orbit_rotation
+  // First row: global styling config (type="config"). The Python generator
+  // reads this row to set background, orbit defaults, font, etc.
   const nebulaColorsStr = (config.nebulaColors || DEFAULT_MAP_CONFIG.nebulaColors || []).join(',');
   rows.push([
     'System Config',        // 1: name
@@ -89,12 +105,13 @@ async function generateCsv(
     '',                     // 25: location_id
   ]);
 
-  // Add celestial body rows
+  // One row per celestial body. Non-celestial locations are skipped.
   for (const loc of locations) {
     const celestial = loc.celestial as CelestialData | undefined;
     if (!celestial) continue;
 
-    // Resolve image path if provided
+    // Map images stored as relative paths (assets/...) need resolving to
+    // absolute paths so the Python generator can embed them.
     let imagePath = '';
     const mapImage = celestial.mapImage;
     if (mapImage) {
@@ -106,7 +123,7 @@ async function generateCsv(
       }
     }
 
-    // Find parent name (convert ID to name)
+    // The CSV uses parent names (not IDs) for the orbit hierarchy
     let parentName = '';
     const parentId = loc.parent as string | undefined;
     if (parentId) {
@@ -147,12 +164,11 @@ async function generateCsv(
     rows.push(row);
   }
 
-  // Convert to CSV string
+  // Assemble CSV with proper escaping for commas/quotes/newlines in cell values
   const csvContent = [
     headers.join(','),
     ...rows.map((row) =>
       row.map((cell) => {
-        // Escape cells that contain commas or quotes
         if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
           return `"${cell.replace(/"/g, '""')}"`;
         }
@@ -209,13 +225,13 @@ export async function generateStarSystemMap(
   }
 
   return new Promise((resolve) => {
-    // We need to call Python in a way that doesn't use the GUI
-    // Pass all paths as command-line arguments to avoid code injection
+    // All file paths are passed as CLI arguments (not interpolated into the
+    // Python source) to prevent path-injection vulnerabilities.
     const mapWidth = mapConfig.mapWidth || DEFAULT_MAP_CONFIG.mapWidth;
     const mapHeight = mapConfig.mapHeight || DEFAULT_MAP_CONFIG.mapHeight;
 
-    // Use a safe Python wrapper script that takes arguments instead of string interpolation
-    // This prevents path injection vulnerabilities
+    // Inline Python wrapper that reads paths from sys.argv, imports the
+    // generator, and writes the output HTML.
     const pythonCode = `
 import sys
 import os
@@ -255,7 +271,7 @@ with open(output_path, 'w') as f:
 print('SUCCESS')
 `;
 
-    // Pass paths as arguments instead of embedding them in the code
+    // Spawn Python with all paths as positional arguments
     const python = spawn('python3', [
       '-c', pythonCode,
       path.dirname(generatorPath),  // arg 1: generator directory

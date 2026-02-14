@@ -1,3 +1,15 @@
+/**
+ * LivePlayDashboard.tsx
+ *
+ * Top-level orchestration component for a live play session. Brings together:
+ *   - Player character panels (polled for real-time updates)
+ *   - Scene NPCs and ships (hostile/neutral/friendly)
+ *   - Crew ships / vehicles
+ *   - Combat tools: dice roller + initiative tracker
+ *
+ * PC data is polled every 3 seconds so that changes made by players
+ * (e.g. tracker updates) appear in near-real-time for the DM.
+ */
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
@@ -16,19 +28,25 @@ import type { ShipDamage, ShipDisposition } from '@shared/schemas/ship';
 import type { FileMetadata } from '@shared/types/file';
 import type { ApiResponse } from '@shared/types/api';
 
+// ─── Constants ────────────────────────────────────────────────────
+
 type LayoutMode = 'grid' | 'list' | 'compact';
 
-// Polling interval for live updates (3 seconds)
-const POLL_INTERVAL = 3000;
+// How often to refetch PC data for near-real-time updates
+const POLL_INTERVAL = 1000;
 
-// Define disposition order for sorting (hostile first, then neutral, then friendly)
+// Sort order for mixed NPC/ship lists: hostiles first so DM sees threats at the top
 const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 };
 
 export function LivePlayDashboard() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
+
+  // ── UI state ──
   const [layout, setLayout] = useState<LayoutMode>('compact');
   const [combatToolsExpanded, setCombatToolsExpanded] = useState(true);
+
+  // ── Scene providers ──
   const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
   const { sceneShips, removeFromScene: removeShipFromScene, clearScene: clearShipScene, updateShip, updateDisposition: updateShipDisposition, toggleVisibility: toggleShipVisibility } = useSceneShips();
   const {
@@ -44,11 +62,11 @@ export function LivePlayDashboard() {
     moveEntryDown,
   } = useInitiative();
 
-  // Separate crew ships from other ships
+  // ── Derived data ──
+  // Crew ships get their own top-level section; all other entities are
+  // merged and sorted by disposition for the scene panel.
   const crewShips = sceneShips.filter((ship: SceneShip) => ship.isCrewShip);
   const nonCrewShips = sceneShips.filter((ship: SceneShip) => !ship.isCrewShip);
-
-  // Combine NPCs and non-crew ships, sorted by disposition
   type SceneEntity =
     | { type: 'npc'; data: typeof sceneNPCs[0] }
     | { type: 'ship'; data: SceneShip };
@@ -62,7 +80,9 @@ export function LivePlayDashboard() {
     return dispositionOrder[aDisp] - dispositionOrder[bDisp];
   });
 
-  // Use a separate query with polling for live play
+  // ── Player character polling ──
+  // Uses a dedicated query key so polling doesn't interfere with the
+  // main file-list cache. Continues polling even when the tab loses focus.
   const { data: characters = [], isLoading, error } = useQuery({
     queryKey: ['live-play', campaign?.id, 'player-characters'],
     queryFn: async () => {
@@ -75,12 +95,12 @@ export function LivePlayDashboard() {
       return data.data || [];
     },
     enabled: !!campaign,
-    refetchInterval: POLL_INTERVAL, // Poll every 3 seconds for live updates
+    refetchInterval: POLL_INTERVAL, // Poll every 1 second for live updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
     retry: false, // Don't retry on auth errors
   });
 
-  // Mutation for updating trackers
+  // PATCH a PC's tracker values (HP, stress, etc.) and refresh immediately
   const updateTrackers = useMutation({
     mutationFn: async ({
       pcId,
@@ -122,8 +142,10 @@ export function LivePlayDashboard() {
     clearShipScene();
   };
 
-  // Handle adding all scene entities to initiative (PCs always, + scene NPCs + all scene ships including crew)
-  // Uses batch API to add all at once and prevent duplicates server-side
+  // ── "Add In Scene" ──
+  // Collects all PCs, scene NPCs, and scene ships into a single batch
+  // request. The server handles duplicate prevention, so this is safe to
+  // call repeatedly without clearing initiative first.
   const handleAddInScene = useCallback(() => {
     const entriesToAdd: Array<Omit<import('@shared/types/initiative').InitiativeEntry, 'id'>> = [];
 
@@ -194,15 +216,17 @@ export function LivePlayDashboard() {
     );
   }
 
+  // CSS class map for the three layout modes
   const layoutClasses = {
     grid: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3',
     list: 'flex flex-col gap-4',
     compact: 'flex flex-wrap gap-2',
   };
 
+  // ── Render ──
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Page header + layout toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Play className="h-6 w-6 text-primary" />

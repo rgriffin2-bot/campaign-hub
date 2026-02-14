@@ -1,9 +1,16 @@
+/**
+ * LoreList -- Browsable listing of campaign lore entries.
+ * Groups entries by lore type (e.g. Cosmology, Makers, Faiths),
+ * with search and type-filter controls.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, BookOpen, Globe, Hammer, Shield, Crown, Heart, Wind, Gem, Home, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import type { LoreType } from '@shared/schemas/lore';
 import type { FileMetadata } from '@shared/types/file';
+
+// --- Icon and label mappings for lore categories ---
 
 const typeIcons: Record<LoreType, React.ReactNode> = {
   'cosmology-and-origins': <Globe className="h-4 w-4" />,
@@ -26,6 +33,10 @@ const typeLabels: Record<LoreType, string> = {
   'relics-and-artifacts': 'Relics and Artifacts',
   'life-in-haven': 'Life in Haven',
 };
+
+// ============================================================
+// Individual lore card
+// ============================================================
 
 function LoreCard({ item }: { item: FileMetadata }) {
   const { toggleVisibility } = useFiles('lore');
@@ -87,6 +98,10 @@ function LoreCard({ item }: { item: FileMetadata }) {
   );
 }
 
+// ============================================================
+// Main lore list component
+// ============================================================
+
 export function LoreList() {
   const { list } = useFiles('lore');
   const [search, setSearch] = useState('');
@@ -94,6 +109,7 @@ export function LoreList() {
 
   const loreItems = list.data || [];
 
+  // Apply combined search + type filter
   const filteredItems = loreItems.filter((item) => {
     const matchesSearch =
       search === '' ||
@@ -107,7 +123,7 @@ export function LoreList() {
     return matchesSearch && matchesType;
   });
 
-  // Group by type
+  // Group filtered entries by their lore type for sectioned display
   const groupedItems = filteredItems.reduce(
     (acc, item) => {
       const type = (item.type as LoreType) || 'other';

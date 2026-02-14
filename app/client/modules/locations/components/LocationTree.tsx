@@ -1,3 +1,8 @@
+/**
+ * LocationTree -- Renders locations as an expandable/collapsible tree.
+ * Converts the flat location list into a hierarchy based on parent IDs.
+ * Supports search highlighting and auto-expansion of matching branches.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, ChevronDown, MapPin, Eye, EyeOff } from 'lucide-react';
@@ -15,7 +20,11 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-// Build tree structure from flat list
+// ============================================================
+// Tree construction helpers
+// ============================================================
+
+/** Build a nested tree from the flat location list, respecting treeRoot overrides */
 function buildTree(locations: FileMetadata[]): TreeNode[] {
   const locationMap = new Map<string, FileMetadata>();
   const childrenMap = new Map<string, FileMetadata[]>();
@@ -25,7 +34,7 @@ function buildTree(locations: FileMetadata[]): TreeNode[] {
     locationMap.set(loc.id, loc);
   }
 
-  // Group by parent (treating treeRoot items as having no parent for tree purposes)
+  // Group by parent. Locations marked treeRoot are treated as roots regardless of their parent.
   for (const loc of locations) {
     const isTreeRoot = loc.treeRoot === true;
     const parentId = isTreeRoot ? undefined : (loc.parent as string | undefined);
@@ -53,7 +62,7 @@ function buildTree(locations: FileMetadata[]): TreeNode[] {
   );
 }
 
-// Check if a node or any of its descendants match the search
+/** Recursively check whether a node or any descendant matches the search term */
 function nodeMatchesSearch(node: TreeNode, searchLower: string): boolean {
   const loc = node.location;
   if (
@@ -69,6 +78,10 @@ function nodeMatchesSearch(node: TreeNode, searchLower: string): boolean {
   return node.children.some((child) => nodeMatchesSearch(child, searchLower));
 }
 
+// ============================================================
+// Single tree row component
+// ============================================================
+
 interface TreeNodeComponentProps {
   node: TreeNode;
   level: number;
@@ -77,6 +90,7 @@ interface TreeNodeComponentProps {
   toggleExpanded: (id: string) => void;
 }
 
+/** Renders one row of the tree plus its children (recursively) */
 function TreeNodeComponent({
   node,
   level,
@@ -214,18 +228,22 @@ function TreeNodeComponent({
   );
 }
 
+// ============================================================
+// Main LocationTree component
+// ============================================================
+
 export function LocationTree({ locations, searchTerm }: LocationTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const tree = buildTree(locations);
 
-  // Filter tree based on search
+  // Remove root branches that have no match in them
   const searchLower = searchTerm?.toLowerCase() || '';
   const filteredTree = searchLower
     ? tree.filter((node) => nodeMatchesSearch(node, searchLower))
     : tree;
 
-  // Auto-expand nodes with matching descendants when searching
+  // When searching, auto-expand any ancestor that has a matching descendant
   const expandedWithSearch = searchLower
     ? new Set([
         ...expandedIds,

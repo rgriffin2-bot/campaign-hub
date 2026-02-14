@@ -1,15 +1,18 @@
+/**
+ * Cycle detection for the location parent-child hierarchy.
+ *
+ * Locations form a tree (each location has at most one parent).
+ * Before setting a parent we walk up the ancestor chain to make sure
+ * we won't accidentally create a loop (A -> B -> ... -> A).
+ */
+
 import type { FileMetadata } from '../../../shared/types/file.js';
 
+// ── Cycle Check ────────────────────────────────────────────────────────
+
 /**
- * Checks if setting a proposed parent would create a cycle in the location hierarchy.
- *
- * A cycle would occur if the proposed parent is actually a descendant of the child,
- * meaning we'd have A -> B -> ... -> A.
- *
- * @param locations - All locations in the campaign
- * @param childId - The location being edited
- * @param proposedParentId - The ID of the proposed parent location
- * @returns true if setting this parent would create a cycle
+ * Returns true if assigning `proposedParentId` as the parent of `childId`
+ * would create a circular reference in the location tree.
  */
 export function wouldCreateCycle(
   locations: FileMetadata[],
@@ -21,15 +24,16 @@ export function wouldCreateCycle(
     return true;
   }
 
-  // Build a map for efficient lookup
+  // Index locations by ID for O(1) lookups during ancestor walk
   const locationMap = new Map<string, FileMetadata>();
   for (const loc of locations) {
     locationMap.set(loc.id, loc);
   }
 
-  // Walk up from proposed parent, checking if we ever reach the child
+  // Walk the ancestor chain starting from the proposed parent.
+  // If we encounter `childId`, assigning this parent would form a cycle.
   let current: string | undefined = proposedParentId;
-  const visited = new Set<string>();
+  const visited = new Set<string>(); // guards against pre-existing cycles in data
 
   while (current) {
     // If we find the child in the ancestor chain, it would create a cycle
@@ -51,9 +55,11 @@ export function wouldCreateCycle(
   return false;
 }
 
+// ── Validation Wrapper ─────────────────────────────────────────────────
+
 /**
- * Validates that a parent assignment is valid.
- * Returns an error message if invalid, or null if valid.
+ * Validate a proposed parent assignment.
+ * @returns A human-readable error string, or null if the assignment is safe.
  */
 export function validateParentAssignment(
   locations: FileMetadata[],

@@ -1,3 +1,11 @@
+/**
+ * Rules module: CRUD for game rules/moves with category filtering and search.
+ *
+ * Rules are categorised (e.g. "basic-move", "playbook-move") and can be
+ * searched by name or tag. This module also exposes data to the player site
+ * so players can look up moves during play.
+ */
+
 import type { RequestHandler } from 'express';
 import { ruleSchema, ruleCategories } from '../../../shared/schemas/rules.js';
 import { createBaseRoutes } from '../base-routes.js';
@@ -9,7 +17,9 @@ import type { ModuleDefinition, ModuleRoute } from '../../../shared/types/module
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
 
-// Get all categories currently in use
+// ── Custom Route Handlers ──────────────────────────────────────────────
+
+/** Return all known categories and which ones have at least one rule */
 const getCategoriesHandler: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -42,7 +52,7 @@ const getCategoriesHandler: RequestHandler = async (_req, res) => {
   }
 };
 
-// Search rules by name and content
+/** Search rules by name and tags (metadata-only; full-text search is a TODO) */
 const searchHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -60,8 +70,8 @@ const searchHandler: RequestHandler = async (req, res) => {
     const files = await fileStore.list(campaign.id, 'rules');
     const results = [];
 
+    // Match against name and tags from metadata (avoids loading full content)
     for (const file of files) {
-      // Search in name, tags, and we'd need to load content for full-text
       const nameMatch = file.name.toLowerCase().includes(query);
       const tagsMatch = (file.tags as string[] || []).some((tag) =>
         tag.toLowerCase().includes(query)
@@ -72,9 +82,6 @@ const searchHandler: RequestHandler = async (req, res) => {
       }
     }
 
-    // For full-text content search, load each file (this could be optimized)
-    // For now, just search metadata
-
     res.json({ success: true, data: results });
   } catch (error) {
     console.error('Error searching rules:', error);
@@ -82,7 +89,7 @@ const searchHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Filter rules by category
+/** Filter rules to only those matching a specific category */
 const byCategoryHandler: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -102,7 +109,9 @@ const byCategoryHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// Custom routes
+// ── Route Assembly ─────────────────────────────────────────────────────
+// Custom routes are registered before base routes so that more-specific
+// paths (e.g. /categories, /search) match before the generic /:fileId.
 const customRoutes: ModuleRoute[] = [
   { method: 'GET', path: '/categories', handler: getCategoriesHandler },
   { method: 'GET', path: '/search', handler: searchHandler },
@@ -111,6 +120,8 @@ const customRoutes: ModuleRoute[] = [
 
 // Base routes for CRUD
 const baseRoutes = createBaseRoutes('rules');
+
+// ── Module Definition ──────────────────────────────────────────────────
 
 export const rulesModule: ModuleDefinition = {
   id: 'rules',

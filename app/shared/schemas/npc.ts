@@ -1,10 +1,20 @@
+/**
+ * NPC (Non-Player Character) schema.
+ * Validates frontmatter for NPC markdown files stored in the npcs/ folder.
+ * Supports combat stats, portraits, related characters, and DM-only secrets.
+ */
+
 import { z } from 'zod';
+
+// ── DM-Only Fields ──────────────────────────────────────────────────────────
 
 export const npcDmOnlySchema = z.object({
   secrets: z.string().optional(),
   voice: z.string().optional(),
   notes: z.string().optional(),
 });
+
+// ── Disposition & Combat Stats ──────────────────────────────────────────────
 
 // Disposition for NPCs in scenes
 export const dispositionSchema = z.enum(['hostile', 'friendly', 'neutral']);
@@ -28,6 +38,8 @@ export const relatedCharacterSchema = z.object({
 });
 
 export type RelatedCharacter = z.infer<typeof relatedCharacterSchema>;
+
+// ── Main NPC Schema ─────────────────────────────────────────────────────────
 
 export const npcSchema = z.object({
   id: z.string(),
@@ -61,21 +73,25 @@ export const npcSchema = z.object({
 export type NPCFrontmatter = z.infer<typeof npcSchema>;
 export type NPCDmOnly = z.infer<typeof npcDmOnlySchema>;
 export type NPCStats = z.infer<typeof npcStatsSchema>;
-export type AntagonistStats = z.infer<typeof antagonistStatsSchema>; // Deprecated alias
+/** @deprecated Use NPCStats instead */
+export type AntagonistStats = z.infer<typeof antagonistStatsSchema>;
 
+// ── File & AI Generation Types ──────────────────────────────────────────────
+
+/** A fully parsed NPC file (frontmatter + markdown body + path) */
 export interface NPCFile {
   frontmatter: NPCFrontmatter;
   content: string;
   filePath: string;
 }
 
-// For AI generation input
+/** Input prompt for AI-assisted NPC generation */
 export interface NPCGenerateInput {
   prompt: string;
   includeSecrets?: boolean;
 }
 
-// For AI generation output
+/** Output shape from AI NPC generation */
 export interface GeneratedNPC {
   name: string;
   occupation?: string;

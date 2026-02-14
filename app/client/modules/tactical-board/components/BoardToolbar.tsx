@@ -1,3 +1,8 @@
+/**
+ * BoardToolbar -- top bar for the tactical board detail view.
+ * Contains navigation, the board title, and toggle buttons for grid,
+ * snap-to-grid, animations, fog-of-war, and initiative panel.
+ */
 import { Link } from 'react-router-dom';
 import {
   Grid3X3,
@@ -36,6 +41,7 @@ export function BoardToolbar({
   onToggleInitiativePanel,
   onSetInitiativePanelPosition,
 }: BoardToolbarProps) {
+  // Derive toggle states with sensible defaults
   const animationsEnabled = board.animationsEnabled ?? true;
   const fogEnabled = board.fogEnabled ?? true;
   const hasFog = (board.fogCells?.length ?? 0) > 0;

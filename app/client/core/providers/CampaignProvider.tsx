@@ -1,3 +1,11 @@
+/**
+ * CampaignProvider -- Central context for campaign selection and data.
+ *
+ * Loads the list of campaigns (DM only), the currently active campaign, and
+ * available modules. Exposes helpers to switch, create, and reorder campaigns.
+ * Both DM and player UIs consume this provider; the API endpoints are chosen
+ * based on the user's role.
+ */
 import {
   createContext,
   useContext,
@@ -25,7 +33,9 @@ interface CampaignContextValue {
 
 const CampaignContext = createContext<CampaignContextValue | null>(null);
 
-// Fetch functions that use the appropriate API base path
+// ── API fetch helpers ────────────────────────────────────────────────
+// Each helper selects the DM or player endpoint based on the caller's role.
+
 async function fetchCampaigns(isDm: boolean): Promise<CampaignMeta[]> {
   // Only DMs can list all campaigns
   if (!isDm) return [];
@@ -85,9 +95,10 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
   const { role, authenticated, authEnabled } = useAuth();
   const [campaign, setCampaign] = useState<CampaignConfig | null>(null);
 
-  // Determine if user has DM access
+  // When auth is disabled everyone is treated as DM
   const isDm = !authEnabled || role === 'dm';
 
+  // ── Queries ────────────────────────────────────────────────────────
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
     queryKey: ['campaigns', isDm],
     queryFn: () => fetchCampaigns(isDm),
@@ -106,6 +117,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     enabled: authenticated || !authEnabled,
   });
 
+  // ── Mutations ───────────────────────────────────────────────────────
   const activateMutation = useMutation({
     mutationFn: activateCampaign,
     onSuccess: (data) => {
@@ -123,6 +135,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     },
   });
 
+  // Sync local state when the server-side active campaign changes
   useEffect(() => {
     if (activeCampaign) {
       setCampaign(activeCampaign);
@@ -143,7 +156,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     [createMutation]
   );
 
-  // Reorder modules - updates the campaign's module order
+  // Reorder modules with optimistic update; reverts on failure
   const reorderModules = useCallback(
     async (newOrder: string[]) => {
       if (!campaign) return;
@@ -178,7 +191,8 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     [campaign, queryClient]
   );
 
-  // Sort modules by their order in campaign.modules
+  // ── Derived state ──────────────────────────────────────────────────
+  // Resolve module IDs in campaign.modules to full ModuleInfo objects
   const enabledModules = campaign
     ? campaign.modules
         .map((id) => allModules.find((m) => m.id === id))
@@ -211,6 +225,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
   );
 }
 
+/** Hook to consume campaign data. Must be inside a CampaignProvider. */
 export function useCampaign() {
   const context = useContext(CampaignContext);
   if (!context) {

@@ -1,3 +1,8 @@
+/**
+ * ModeProvider -- determines whether the app is running in DM or player mode
+ * based on the URL path prefix (/player). Exposes the mode, derived booleans,
+ * and appropriate API / link base paths to the rest of the component tree.
+ */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 

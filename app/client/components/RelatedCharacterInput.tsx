@@ -1,3 +1,9 @@
+/**
+ * RelatedCharacterInput -- autocomplete-driven picker for linking NPCs
+ * as "related characters" on an NPC's edit form. Each relation can have
+ * an optional description (e.g., "rival", "mentor"). Uses LinkAutocomplete
+ * internally for the search UI.
+ */
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -11,7 +17,7 @@ interface RelatedCharacterInputProps {
   currentNpcId?: string;
 }
 
-// Helper to normalize old string format to new object format
+/** Convert legacy string-only relations to the current {id, description} format */
 export function normalizeRelatedCharacters(
   chars: (string | RelatedCharacter)[]
 ): RelatedCharacter[] {
@@ -70,6 +76,7 @@ export function RelatedCharacterInput({
     setDescriptionValue('');
   };
 
+  // Exclude already-related NPCs and the current NPC from search results
   const existingIds = value.map((c) => c.id);
   if (currentNpcId) {
     existingIds.push(currentNpcId);

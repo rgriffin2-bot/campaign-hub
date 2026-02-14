@@ -1,3 +1,9 @@
+/**
+ * PlayerCharacterDetail -- read-only detail view for a single player character.
+ * Displays portrait, basic info, stat block, tracker row, gear, playbook moves,
+ * and biography/notes sections. All data comes from the file's frontmatter.
+ */
+
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Users } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -23,9 +29,10 @@ export function PlayerCharacterDetail() {
   const { campaign } = useCampaign();
   const { get, delete: deleteMutation } = useFiles('player-characters');
 
+  // -- Data fetching ----------------------------------------------------------
   const { data: pc, isLoading } = get(fileId || '');
 
-  // Fetch character's playbook moves
+  // Fetch character's playbook moves from a dedicated endpoint
   const { data: moves } = useQuery({
     queryKey: ['pc-moves', campaign?.id, fileId],
     queryFn: async () => {
@@ -39,6 +46,7 @@ export function PlayerCharacterDetail() {
     enabled: !!campaign && !!fileId,
   });
 
+  // -- Delete handler ---------------------------------------------------------
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this character?')) return;
@@ -47,6 +55,7 @@ export function PlayerCharacterDetail() {
     navigate('/modules/player-characters');
   };
 
+  // -- Loading / not-found states ---------------------------------------------
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -72,6 +81,7 @@ export function PlayerCharacterDetail() {
     );
   }
 
+  // -- Render -----------------------------------------------------------------
   const { content } = pc;
   const fm = pc.frontmatter as unknown as PlayerCharacterFrontmatter;
 

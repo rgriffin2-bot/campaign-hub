@@ -1,3 +1,8 @@
+/**
+ * RulesEdit -- Create/edit form for rule entries.
+ * Supports name, category, subcategory, source, tags, player-visibility
+ * toggle, and markdown content with template placeholder.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, BookOpen } from 'lucide-react';
@@ -28,6 +33,7 @@ const categoryLabels: Record<RuleCategory, string> = {
   'gm-reference': 'GM Reference',
 };
 
+/** Derive a URL-safe slug from the rule name (used as file ID for new rules) */
 function generateId(name: string): string {
   return name
     .toLowerCase()
@@ -43,6 +49,7 @@ export function RulesEdit() {
   const isNew = fileId === 'new';
   const { data: existingRule, isLoading } = get(isNew ? '' : fileId || '');
 
+  // --- Form state ---
   const [form, setForm] = useState<Partial<RuleFrontmatter>>({
     name: '',
     category: 'core-mechanic',
@@ -55,6 +62,7 @@ export function RulesEdit() {
   const [tagsInput, setTagsInput] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Populate form when editing an existing rule
   useEffect(() => {
     if (existingRule && !isNew) {
       const fm = existingRule.frontmatter as unknown as RuleFrontmatter;
@@ -71,6 +79,7 @@ export function RulesEdit() {
     }
   }, [existingRule, isNew]);
 
+  /** Validate and persist the rule (create or update) */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.category) return;
@@ -79,7 +88,7 @@ export function RulesEdit() {
     try {
       const id = isNew ? generateId(form.name) : fileId!;
 
-      // Parse tags from comma-separated input
+      // Parse comma-separated tags into an array
       const tags = tagsInput
         .split(',')
         .map((t) => t.trim())

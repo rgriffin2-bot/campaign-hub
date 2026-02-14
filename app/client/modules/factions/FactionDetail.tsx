@@ -1,3 +1,10 @@
+/**
+ * FactionDetail -- read-only detail view for a single faction.
+ * Features an interactive affinity scale (+/- buttons and a clickable
+ * 7-step bar) that persists changes immediately. Also displays
+ * description, DM-only secrets, and markdown notes.
+ */
+
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Users, Lock, Eye, EyeOff, MapPin, User } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -51,11 +58,13 @@ export function FactionDetail() {
   const isHidden = frontmatter.hidden === true;
   const affinity = frontmatter.affinity ?? 0;
 
+  // -- Inline mutation handlers ------------------------------------------------
   const handleToggleVisibility = () => {
     if (!fileId) return;
     toggleVisibility.mutate({ fileId, hidden: !isHidden });
   };
 
+  // Clamp affinity to the -3..+3 range before persisting
   const handleAffinityChange = (delta: number) => {
     if (!fileId) return;
     const newAffinity = Math.max(-3, Math.min(3, affinity + delta));
@@ -275,6 +284,7 @@ export function FactionDetail() {
   );
 }
 
+// -- Affinity color helpers (border, bg, text) for the -3..+3 scale ----------
 function getAffinityBorderColor(affinity: number): string {
   if (affinity >= 3) return 'border-emerald-500/50 bg-emerald-500/5';
   if (affinity === 2) return 'border-green-500/50 bg-green-500/5';

@@ -8,7 +8,7 @@ A modular campaign management dashboard for tabletop RPG game masters. Built wit
 - **Markdown-based content** - All entries stored as human-readable markdown files with YAML frontmatter
 - **Real-time live play dashboard** - Track party status, NPCs, ships, and dice rolls during sessions
 - **Player view mode** - Separate read-only interface for players with filtered content
-- **Remote access** - Built-in ngrok support for sharing with remote players
+- **Remote access** - Built-in Cloudflare Tunnel support for sharing with remote players
 - **Password protection** - Separate DM and player passwords for access control
 
 ### Modules
@@ -125,14 +125,14 @@ The `templates/` directory contains markdown templates for each module type. The
 3. Players log in with the player password
 4. They see a filtered, read-only view (hidden entries excluded)
 
-### Remote Access (ngrok)
+### Remote Access (Cloudflare Tunnel)
 
 For remote players:
 
-1. Install ngrok: `brew install ngrok` (macOS) or download from ngrok.com
-2. Run ngrok: `ngrok http 3001`
-3. Share the generated URL with players
-4. The app detects ngrok URLs and displays them in the dashboard
+1. Install cloudflared: `brew install cloudflared` (macOS)
+2. Run a quick tunnel: `cloudflared tunnel --url http://localhost:5173`
+3. Share the generated `*.trycloudflare.com` URL with players
+4. The app detects Cloudflare Tunnel URLs and displays them in the dashboard
 
 ### Live Play Session
 

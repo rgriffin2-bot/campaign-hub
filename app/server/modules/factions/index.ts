@@ -1,3 +1,9 @@
+/**
+ * Factions module definition.
+ * Provides CRUD for organizations, polities, and power groups.
+ * Registers relationship fields so factions appear in cross-module affiliation lookups.
+ */
+
 import { factionSchema } from '../../../shared/schemas/faction.js';
 import { createBaseRoutes } from '../base-routes.js';
 import { moduleRegistry } from '../registry.js';

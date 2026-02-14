@@ -1,3 +1,8 @@
+/**
+ * Locations module: CRUD for places/regions with parent-child hierarchy,
+ * cycle detection on parent assignment, and star-system map generation.
+ */
+
 import type { RequestHandler } from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -19,15 +24,20 @@ import type { ModuleDefinition, ModuleRoute } from '../../../shared/types/module
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
 
-// Register relationship fields for locations (parent field for hierarchy)
+// The `parent` field establishes the location hierarchy for the relationship index
 relationshipIndex.registerFields('locations', ['parent']);
 
-// Helper to filter out system files (IDs starting with _)
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Exclude internal system files (e.g. `_map-config`) from API responses */
 function filterSystemFiles<T extends { id: string }>(files: T[]): T[] {
   return files.filter((f) => !f.id.startsWith('_'));
 }
 
-// Helper to invalidate cached player map when locations change
+/**
+ * Delete the cached player-facing map HTML so it regenerates on next access.
+ * Called whenever location data changes.
+ */
 async function invalidatePlayerMapCache(campaignId: string) {
   const campaignPath = path.join(process.cwd(), 'campaigns', campaignId);
   const playerMapPath = path.join(campaignPath, 'player-system-map.html');
@@ -38,7 +48,9 @@ async function invalidatePlayerMapCache(campaignId: string) {
   }
 }
 
-// Custom list handler that excludes system files like _map-config
+// ── Custom Route Handlers ──────────────────────────────────────────────
+
+// Overrides the base list handler to filter out system files like _map-config
 const listLocationsHandler: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -56,7 +68,7 @@ const listLocationsHandler: RequestHandler = async (_req, res) => {
   }
 };
 
-// Custom update handler with cycle detection
+// Wraps update with cycle detection to prevent circular parent chains
 const updateWithCycleCheck: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -93,7 +105,7 @@ const updateWithCycleCheck: RequestHandler = async (req, res) => {
   }
 };
 
-// Custom create handler with cycle detection (for when parent is set on creation)
+// Validates that the parent exists when creating a location with a parent set
 const createWithCycleCheck: RequestHandler = async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -123,7 +135,9 @@ const createWithCycleCheck: RequestHandler = async (req, res) => {
   }
 };
 
-// Helper to read map config from _map-config.md
+// ── Map Configuration ──────────────────────────────────────────────────
+
+/** Read the optional _map-config.md file, falling back to defaults */
 async function readMapConfig(campaignId: string): Promise<MapConfig> {
   try {
     const configFile = await fileStore.get(campaignId, 'locations', '_map-config');
@@ -141,7 +155,9 @@ async function readMapConfig(campaignId: string): Promise<MapConfig> {
   return DEFAULT_MAP_CONFIG;
 }
 
-// Map generation handler
+// ── Map Generation & Retrieval ─────────────────────────────────────────
+
+/** Trigger star-system map generation from current location data */
 const generateMapHandler: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -178,7 +194,7 @@ const generateMapHandler: RequestHandler = async (_req, res) => {
   }
 };
 
-// Get generated map HTML
+/** Serve the previously generated map HTML file */
 const getMapHandler: RequestHandler = async (_req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -203,7 +219,8 @@ const getMapHandler: RequestHandler = async (_req, res) => {
   }
 };
 
-// Get base routes and replace handlers with our custom ones
+// ── Route Assembly ─────────────────────────────────────────────────────
+// Start with base CRUD routes, then swap in custom handlers where needed
 const baseRoutes = createBaseRoutes('locations');
 const customRoutes: ModuleRoute[] = baseRoutes.map((route) => {
   if (route.method === 'GET' && route.path === '/') {
@@ -223,6 +240,8 @@ customRoutes.push(
   { method: 'POST', path: '/map/generate', handler: generateMapHandler },
   { method: 'GET', path: '/map', handler: getMapHandler }
 );
+
+// ── Module Definition ──────────────────────────────────────────────────
 
 export const locationsModule: ModuleDefinition = {
   id: 'locations',

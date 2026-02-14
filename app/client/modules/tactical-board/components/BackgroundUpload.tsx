@@ -1,3 +1,8 @@
+/**
+ * BackgroundUpload -- image picker with drag-to-reposition and zoom controls
+ * for setting a tactical board's background map image. Handles file selection,
+ * local preview, position/scale adjustment, and upload to the server.
+ */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Image, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -127,6 +132,7 @@ export function BackgroundUpload({
     }));
   };
 
+  // Upload the selected file to the server and notify the parent with the stored path
   const handleUpload = async () => {
     if (!selectedFile || !campaign) return;
 
@@ -160,6 +166,7 @@ export function BackgroundUpload({
     }
   };
 
+  // Discard the pending selection without uploading
   const handleClear = () => {
     setSelectedFile(null);
     if (previewUrl) {

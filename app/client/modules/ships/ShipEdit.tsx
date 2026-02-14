@@ -1,3 +1,9 @@
+/**
+ * ShipEdit -- create/edit form for ships and vehicles.
+ * Covers basic info, description, characteristics, DM-only secrets,
+ * image upload with crop positioning, and extended markdown content.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Users, Rocket } from 'lucide-react';
@@ -13,7 +19,7 @@ export function ShipEdit() {
   const isNew = fileId === 'new';
   const { data: existingShip, isLoading } = get(isNew ? '' : fileId || '');
 
-  // Form state
+  // -- Form state (individual fields instead of a single object for simplicity)
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [shipClass, setShipClass] = useState('');
@@ -31,6 +37,7 @@ export function ShipEdit() {
   const [imagePosition, setImagePosition] = useState<{ x: number; y: number; scale: number } | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate all form fields when editing an existing ship
   useEffect(() => {
     if (existingShip && !isNew) {
       const fm = existingShip.frontmatter as unknown as ShipFrontmatter;
@@ -53,11 +60,13 @@ export function ShipEdit() {
     }
   }, [existingShip, isNew]);
 
+  // -- Save handler -----------------------------------------------------------
   const handleSave = async () => {
     if (!name.trim()) return;
 
     setIsSaving(true);
     try {
+      // Convert comma-separated strings into arrays for storage
       const tagsArray = tags
         .split(',')
         .map((t) => t.trim())
@@ -108,6 +117,7 @@ export function ShipEdit() {
     }
   };
 
+  // Store the uploaded image path and its crop position for later saving
   const handleImageUpload = (path: string, position: { x: number; y: number; scale: number }) => {
     setImage(path);
     setImagePosition(position);

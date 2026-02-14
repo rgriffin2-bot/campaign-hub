@@ -1,3 +1,9 @@
+/**
+ * ShipList -- grid view of all ships and vehicles in the campaign.
+ * Supports text search (name, type, class, characteristics, tags) and
+ * a toggle filter for crew-owned ships. Crew ships are always sorted first.
+ */
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Rocket, Users } from 'lucide-react';
@@ -11,8 +17,8 @@ export function ShipList() {
 
   const ships = list.data || [];
 
+  // Apply crew-ship toggle and text search across multiple fields
   const filteredShips = ships.filter((ship) => {
-    // Filter by crew ships toggle
     if (filterCrewShips && !ship.isCrewShip) return false;
 
     if (search === '') return true;
@@ -32,7 +38,7 @@ export function ShipList() {
     );
   });
 
-  // Sort crew ships first
+  // Crew ships always appear first, then alphabetical within each group
   const sortedShips = [...filteredShips].sort((a, b) => {
     if (a.isCrewShip && !b.isCrewShip) return -1;
     if (!a.isCrewShip && b.isCrewShip) return 1;

@@ -1,3 +1,7 @@
+/**
+ * LoreEdit -- Create/edit form for lore entries.
+ * Supports name, type selector, tags, header image upload, and markdown content.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -24,6 +28,7 @@ export function LoreEdit() {
   const isNew = fileId === 'new';
   const { data: existingLore, isLoading } = get(isNew ? '' : fileId || '');
 
+  // --- Form state ---
   const [name, setName] = useState('');
   const [type, setType] = useState<LoreType>('life-in-haven');
   const [tags, setTags] = useState('');
@@ -31,6 +36,7 @@ export function LoreEdit() {
   const [image, setImage] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate form when editing an existing entry
   useEffect(() => {
     if (existingLore && !isNew) {
       const fm = existingLore.frontmatter as unknown as LoreFrontmatter;
@@ -42,6 +48,7 @@ export function LoreEdit() {
     }
   }, [existingLore, isNew]);
 
+  /** Validate, build frontmatter, then create or update the lore file */
   const handleSave = async () => {
     if (!name.trim()) return;
 

@@ -1,3 +1,7 @@
+/**
+ * SessionNotesEdit -- Create/edit form for session notes.
+ * Supports title, session date, author, tags, and markdown content.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, StickyNote } from 'lucide-react';
@@ -12,6 +16,7 @@ export function SessionNotesEdit() {
   const isNew = fileId === 'new';
   const { data: existingNotes, isLoading } = get(isNew ? '' : fileId || '');
 
+  // --- Form state ---
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [author, setAuthor] = useState('');
@@ -19,6 +24,7 @@ export function SessionNotesEdit() {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Populate form when editing an existing entry
   useEffect(() => {
     if (existingNotes && !isNew) {
       const fm = existingNotes.frontmatter as unknown as SessionNotesFrontmatter;
@@ -30,6 +36,7 @@ export function SessionNotesEdit() {
     }
   }, [existingNotes, isNew]);
 
+  /** Validate and persist the session notes (create or update) */
   const handleSave = async () => {
     if (!name.trim()) return;
 

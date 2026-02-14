@@ -1,4 +1,12 @@
+/**
+ * Player Character schema.
+ * Validates frontmatter for PC markdown files stored in the player-characters/ folder.
+ * Covers stats, harm, pressure, gear, playbook moves, and resource tracking.
+ */
+
 import { z } from 'zod';
+
+// ── Resource Levels ─────────────────────────────────────────────────────────
 
 export const resourceLevels = [
   'screwed',
@@ -20,6 +28,8 @@ export const resourceLevelLabels: Record<ResourceLevel, string> = {
   'swimming': 'Swimming in it',
 };
 
+// ── Character Stats ─────────────────────────────────────────────────────────
+
 export const statNames = ['poise', 'insight', 'grit', 'presence', 'resonance'] as const;
 export type StatName = (typeof statNames)[number];
 
@@ -31,6 +41,8 @@ export const statLabels: Record<StatName, string> = {
   'resonance': 'Resonance',
 };
 
+// ── Gear & Harm ─────────────────────────────────────────────────────────────
+
 export const gearItemSchema = z.object({
   item: z.string(),
   tags: z.array(z.string()).optional().default([]),
@@ -39,6 +51,7 @@ export const gearItemSchema = z.object({
 
 export type GearItem = z.infer<typeof gearItemSchema>;
 
+/** Harm tracks injury severity levels from old wounds through severe */
 export const harmSchema = z.object({
   oldWounds: z.string().optional(),
   mild: z.string().optional(),
@@ -48,6 +61,7 @@ export const harmSchema = z.object({
 
 export type HarmState = z.infer<typeof harmSchema>;
 
+/** Character stats, each ranging from 0-4 */
 export const statsSchema = z.object({
   poise: z.number().min(0).max(4).default(0),
   insight: z.number().min(0).max(4).default(0),
@@ -57,6 +71,8 @@ export const statsSchema = z.object({
 });
 
 export type Stats = z.infer<typeof statsSchema>;
+
+// ── Main Player Character Schema ────────────────────────────────────────────
 
 export const playerCharacterSchema = z.object({
   id: z.string(),
@@ -103,6 +119,7 @@ export const playerCharacterSchema = z.object({
 
 export type PlayerCharacterFrontmatter = z.infer<typeof playerCharacterSchema>;
 
+/** A fully parsed player character file (frontmatter + markdown body + path) */
 export interface PlayerCharacterFile {
   frontmatter: PlayerCharacterFrontmatter;
   content: string;

@@ -1,3 +1,8 @@
+/**
+ * Dashboard -- the landing page shown when a campaign is selected.
+ * Displays the campaign name, a quick-access grid of enabled modules,
+ * and a stats section with creation date, module count, and sync status.
+ */
 import { Link } from 'react-router-dom';
 import { useCampaign } from './providers/CampaignProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';

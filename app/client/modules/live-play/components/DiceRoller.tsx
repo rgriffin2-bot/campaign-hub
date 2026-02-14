@@ -1,3 +1,9 @@
+/**
+ * DiceRoller -- shared dice widget for the live-play view.
+ * Both DM and players can roll standard dice (d4-d100). Roll history is
+ * polled from the server every few seconds so all participants stay in sync.
+ * The DM can toggle visibility (hide rolls from players) and clear history.
+ */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dices, Eye, EyeOff, Trash2 } from 'lucide-react';
@@ -5,7 +11,8 @@ import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { DiceRollState, DiceType, DiceRoll } from '@shared/types/scene';
 import type { ApiResponse } from '@shared/types/api';
 
-const POLL_INTERVAL = 3000;
+// How often to refetch roll state to keep all clients in sync
+const POLL_INTERVAL = 1000;
 
 const diceTypes: DiceType[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd100'];
 
@@ -18,7 +25,7 @@ export function DiceRoller({ isDM = false }: DiceRollerProps) {
   const queryClient = useQueryClient();
   const [isRolling, setIsRolling] = useState(false);
 
-  // Use the appropriate API endpoint based on role
+  // DM and player use separate API routes with different permissions
   const apiBase = isDM ? '/api/modules/live-play' : '/api/player';
 
   // Fetch dice roll state
@@ -112,7 +119,7 @@ export function DiceRoller({ isDM = false }: DiceRollerProps) {
     clearMutation.mutate();
   };
 
-  // For players, don't show if hidden
+  // Players should not see the dice roller at all when DM has hidden it
   if (!isDM && rollState && !rollState.visibleToPlayers) {
     return null;
   }

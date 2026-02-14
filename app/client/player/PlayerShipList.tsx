@@ -1,3 +1,10 @@
+/**
+ * PlayerShipList.tsx
+ *
+ * Player (read-only) view for browsing ships and vehicles.
+ * Cards show image, type/class, characteristics, and visual badges
+ * for crew ships (ring highlight) and damaged ships (warning icon).
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Rocket, Users, AlertTriangle } from 'lucide-react';
@@ -5,6 +12,7 @@ import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import type { ShipFrontmatter } from '@shared/schemas/ship';
 
+/** Searchable ship/vehicle grid for the player view. */
 export function PlayerShipList() {
   const { campaign } = useCampaign();
   const { list } = usePlayerFiles('ships');
@@ -75,6 +83,7 @@ export function PlayerShipList() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredShips.map((ship) => {
             const fm = ship as unknown as ShipFrontmatter;
+            // Check whether any subsystem has minor or major damage
             const damage = fm.damage as Record<string, { minor?: string; major?: string }> | undefined;
             const hasDamage = damage && Object.values(damage).some(
               subsystem => subsystem?.minor || subsystem?.major

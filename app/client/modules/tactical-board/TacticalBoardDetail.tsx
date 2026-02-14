@@ -1,3 +1,9 @@
+/**
+ * TacticalBoardDetail -- the main interactive board view.
+ * Composes the canvas, toolbar, token palette sidebar, and initiative panel.
+ * All board mutations (add/update/delete tokens, connections, fog, etc.) are
+ * handled here and persisted via the useFiles hook.
+ */
 import { useState, useCallback, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
@@ -57,7 +63,7 @@ export function TacticalBoardDetail() {
     [board, fileId, tokens, update]
   );
 
-  // Handle adding a token
+  // Handle adding a token at a specific canvas position
   const handleAddToken = useCallback(
     async (
       sourceType: TokenSourceType,
@@ -69,6 +75,7 @@ export function TacticalBoardDetail() {
     ) => {
       if (!board || !fileId) return;
 
+      // Generate a unique ID using timestamp + random suffix
       const newToken: BoardToken = {
         id: `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         sourceType,
@@ -125,12 +132,12 @@ export function TacticalBoardDetail() {
     [handleAddToken]
   );
 
-  // Handle uploading an image to the board
+  // Upload an image file, then place it as a token on the canvas
   const handleAddImage = useCallback(
     async (file: File) => {
       if (!campaign || !board || !fileId) return;
 
-      // Get current viewport center
+      // Place the new image token at the center of the current viewport
       const viewportCenter = canvasRef.current?.getViewportCenter();
       const x = viewportCenter?.x ?? (board.canvasWidth || 2000) / 2;
       const y = viewportCenter?.y ?? (board.canvasHeight || 2000) / 2;
@@ -212,14 +219,14 @@ export function TacticalBoardDetail() {
     setSelectedTokenId(null);
   }, [board, fileId, selectedTokenId, tokens, update]);
 
-  // Handle adding a connection between tokens
+  // Add a visual line between two tokens (bidirectional duplicate check)
   const handleAddConnection = useCallback(
     async (fromTokenId: string, toTokenId: string) => {
       if (!board || !fileId) return;
 
       const connections = board.connections || [];
 
-      // Check if connection already exists (in either direction)
+      // Prevent duplicate connections in either direction
       const exists = connections.some(
         (c) =>
           (c.fromTokenId === fromTokenId && c.toTokenId === toTokenId) ||

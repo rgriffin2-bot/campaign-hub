@@ -1,3 +1,8 @@
+/**
+ * LocationDetail -- Read-only detail view for a single location.
+ * Displays hero image, breadcrumb hierarchy, child locations,
+ * DM-only secrets, and markdown content.
+ */
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -16,6 +21,7 @@ export function LocationDetail() {
   const { data: location, isLoading } = get(fileId || '');
   const allLocations = list.data || [];
 
+  /** Delete location after confirmation, then redirect to list */
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this location?')) return;
@@ -24,6 +30,7 @@ export function LocationDetail() {
     navigate('/modules/locations');
   };
 
+  // --- Loading state ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -49,12 +56,13 @@ export function LocationDetail() {
     );
   }
 
+  // --- Extract frontmatter fields ---
   const { content } = location;
   const frontmatter = location.frontmatter as unknown as LocationFrontmatter;
   const dmOnly = frontmatter.dmOnly;
   const isHidden = frontmatter.hidden === true;
 
-  // Get child locations
+  // Find locations whose parent matches this one (direct children)
   const childLocations = allLocations.filter(
     (loc) => loc.parent === frontmatter.id
   );

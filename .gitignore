@@ -40,6 +40,10 @@ campaigns/*
 player-sites/*
 !player-sites/.gitkeep
 
+# Tunnel URL (written by launcher, changes every session)
+.tunnel-url
+.ngrok-url
+
 # Temp files
 *.tmp
 .cache/

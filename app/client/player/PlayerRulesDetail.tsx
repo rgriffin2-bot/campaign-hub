@@ -1,8 +1,17 @@
+/**
+ * PlayerRulesDetail.tsx
+ *
+ * Player (read-only) detail page for a single game rule.
+ * Displays category badge, subcategory, tags, source attribution,
+ * rendered markdown content, and related rules (same category or shared tags).
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Cog, Zap, Users, Sword, Clock, Heart, Package, Rocket, BookMarked } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { MarkdownContent } from '../components/MarkdownContent';
 import type { RuleCategory, RuleFrontmatter } from '@shared/schemas/rules';
+
+// --- Category display mappings ---
 
 const categoryIcons: Record<RuleCategory, React.ReactNode> = {
   'core-mechanic': <Cog className="h-5 w-5" />,
@@ -28,6 +37,7 @@ const categoryLabels: Record<RuleCategory, string> = {
   'gm-reference': 'GM Reference',
 };
 
+/** Rule detail page with related-rules sidebar for the player view. */
 export function PlayerRulesDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { get, list } = usePlayerFiles('rules');
@@ -64,14 +74,12 @@ export function PlayerRulesDetail() {
   const frontmatter = rule.frontmatter as unknown as RuleFrontmatter;
   const category = frontmatter.category;
 
-  // Find related rules (same category or shared tags)
+  // Build a list of related rules: same category OR overlapping tags, capped at 6.
   const relatedRules = allRules?.filter((r) => {
     if (r.id === fileId) return false;
 
-    // Same category
     if (r.category === category) return true;
 
-    // Shared tags
     const ruleTags = frontmatter.tags || [];
     const otherTags = (r.tags as string[]) || [];
     return ruleTags.some((tag) => otherTags.includes(tag));

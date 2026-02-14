@@ -1,3 +1,9 @@
+/**
+ * AuthProvider -- manages authentication state (session check, login, logout).
+ * On mount, checks the server for an existing session. When auth is disabled
+ * server-side, `authEnabled` is false and the user is treated as authenticated.
+ * Exposes role ('dm' | 'player') and auth actions via React context.
+ */
 import {
   createContext,
   useContext,
@@ -36,6 +42,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading: true,
   });
 
+  // Verify if a valid session cookie exists on the server
   const checkSession = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/session', {
@@ -59,6 +66,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // Authenticate with a password; sets role on success
   const login = useCallback(async (password: string) => {
     try {
       const response = await fetch('/api/auth/login', {
@@ -86,6 +94,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // End the session on the server and reset local auth state
   const logout = useCallback(async () => {
     try {
       await fetch('/api/auth/logout', {

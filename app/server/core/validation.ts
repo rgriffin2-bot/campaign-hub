@@ -1,15 +1,20 @@
+/**
+ * Validation
+ *
+ * Zod schemas for every API input surface (body, params, query) and an
+ * Express middleware factory that wires them together. If validation fails,
+ * the middleware short-circuits the request with a 400 response containing
+ * human-readable error messages. Schemas are also used by parseJsonField()
+ * to safely extract typed values from multipart form data strings.
+ */
+
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 
-/**
- * API input validation schemas and middleware
- */
-
 // =============================================================================
-// Common Schemas
+// Common Schemas — Reusable building blocks
 // =============================================================================
 
-// Campaign ID parameter
 export const campaignIdSchema = z.string().min(1, 'Campaign ID is required');
 
 // File ID parameter
@@ -25,17 +30,16 @@ export const paginationSchema = z.object({
 });
 
 // =============================================================================
-// File Operation Schemas
+// File Operation Schemas — Used by the generic CRUD file endpoints
 // =============================================================================
 
-// Create file input
 export const createFileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
   content: z.string().optional().default(''),
   frontmatter: z.record(z.unknown()).optional().default({}),
 });
 
-// Update file input
+// All fields optional on update — only provided fields are merged
 export const updateFileSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   content: z.string().optional(),
@@ -67,7 +71,9 @@ export const updateCampaignSchema = z.object({
 });
 
 // =============================================================================
-// Live Play Schemas
+// Live Play Schemas — Scene NPC and Ship validation.
+// Both "stats" and "antagonistStats" are accepted for backwards compatibility
+// after a field rename.
 // =============================================================================
 
 export const sceneNPCSchema = z.object({
@@ -126,6 +132,7 @@ export const updateSceneNPCSchema = z.object({
   }).optional(),
 });
 
+// Ship damage tracks six subsystems, each with optional minor/major descriptions
 export const sceneShipSchema = z.object({
   id: z.string().min(1, 'Ship ID is required'),
   name: z.string().min(1, 'Ship name is required'),
@@ -146,6 +153,7 @@ export const sceneShipSchema = z.object({
   visibleToPlayers: z.boolean().optional(),
 });
 
+// Update schema: all fields optional, id excluded (comes from URL param)
 export const updateSceneShipSchema = sceneShipSchema.partial().omit({ id: true });
 
 // =============================================================================
@@ -175,7 +183,7 @@ export const npcGenerateSchema = z.object({
 // Portrait/Image Upload Schemas
 // =============================================================================
 
-// Crop position matches upload-handler.ts CropPosition interface
+// Sent as a JSON string inside multipart form data, parsed by parseJsonField()
 export const cropPositionSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -193,7 +201,9 @@ interface ValidationOptions {
 }
 
 /**
- * Creates Express middleware that validates request parts against Zod schemas
+ * Creates Express middleware that validates request body, params, and/or query
+ * against the provided Zod schemas. On success, req.body/params/query are
+ * replaced with the parsed (and possibly transformed/defaulted) values.
  */
 export function validate(schemas: ValidationOptions) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -224,7 +234,9 @@ export function validate(schemas: ValidationOptions) {
 }
 
 /**
- * Parse and validate JSON from a string (e.g., form data)
+ * Parse and validate a JSON string from multipart form data.
+ * Returns undefined (rather than throwing) for missing/invalid values,
+ * since crop positions and similar fields are optional.
  */
 export function parseJsonField<T>(
   value: unknown,

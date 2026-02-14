@@ -1,3 +1,10 @@
+/**
+ * PlayerNPCDetail.tsx
+ *
+ * Player (read-only) detail page for a single NPC.
+ * Shows portrait, occupation, location, tags, related characters,
+ * personality/goals/appearance cards, and markdown notes.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, User, MapPin } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -6,6 +13,7 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { PlayerRelatedNPCs } from './components/PlayerRelatedNPCs';
 import type { NPCFrontmatter } from '@shared/schemas/npc';
 
+/** NPC detail page for the player view. */
 export function PlayerNPCDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();

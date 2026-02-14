@@ -1,3 +1,14 @@
+/**
+ * Live Play Module
+ *
+ * Manages real-time session state for tabletop RPG play. Provides CRUD
+ * endpoints for four subsystems: Scene NPCs, Scene Ships, Dice Rolls,
+ * and Initiative Tracking. Each subsystem persists state to a JSON file
+ * inside the active campaign directory and uses file locking to prevent
+ * concurrent-write corruption (important because the player site polls
+ * these endpoints every few seconds).
+ */
+
 import type { RequestHandler } from 'express';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -20,6 +31,10 @@ import {
 
 // Placeholder views - will be replaced by actual React components
 const PlaceholderView = () => null;
+
+// ============================================================================
+// Scene NPCs — NPCs temporarily placed into the active scene
+// ============================================================================
 
 // Helper to get the scene file path for a campaign
 function getSceneFilePath(campaignId: string): string {
@@ -116,7 +131,8 @@ const updateSceneNPC: RequestHandler = async (req, res) => {
       return;
     }
 
-    // Merge updates into existing NPC
+        // Shallow merge top-level fields, but deep merge nested stat objects
+    // so partial stat updates (e.g., just damage) don't wipe other stat fields.
     npcs[index] = {
       ...npcs[index],
       ...updates,
@@ -181,7 +197,9 @@ const clearSceneNPCs: RequestHandler = async (_req, res) => {
 };
 
 // ============================================================================
-// Scene Ships (uses shared SceneShip type from ../../../shared/types/scene.js)
+// Scene Ships — Ships temporarily placed into the active scene.
+// Ship pressure/damage is bidirectionally synced with the canonical ship
+// markdown files so edits in either place stay consistent.
 // ============================================================================
 
 function getSceneShipsFilePath(campaignId: string): string {
@@ -217,7 +235,9 @@ const getSceneShips: RequestHandler = async (_req, res) => {
 
     const ships = await readSceneShips(campaign.id);
 
-    // Sync pressure and damage from actual ship files to scene copies
+    // On read, pull the latest pressure/damage from the authoritative ship
+    // markdown files into the scene snapshot. This ensures changes made in
+    // the ship editor are reflected in the live scene without a manual refresh.
     let hasChanges = false;
     for (let i = 0; i < ships.length; i++) {
       try {
@@ -322,7 +342,8 @@ const updateSceneShip: RequestHandler = async (req, res) => {
 
     await writeSceneShips(campaign.id, ships);
 
-    // Sync pressure and damage back to the actual ship file
+    // Write pressure/damage changes back to the authoritative ship file
+    // so they persist beyond the scene and show up in the ship editor too.
     if ('pressure' in updates || 'damage' in updates) {
       try {
         const shipFile = await fileStore.get(campaign.id, 'ships', shipId);
@@ -393,9 +414,12 @@ const clearSceneShips: RequestHandler = async (_req, res) => {
 };
 
 // ============================================================================
-// Dice Rolls
+// Dice Rolls — Server-side random number generation shared between DM & players.
+// A short rolling history is kept so late-arriving poll responses still show
+// recent results.
 // ============================================================================
 
+// Only the most recent N rolls are retained in state
 const MAX_ROLL_HISTORY = 5;
 
 function getDiceRollFilePath(campaignId: string): string {
@@ -454,7 +478,7 @@ const rollDice: RequestHandler = async (req, res) => {
       return;
     }
 
-    // Generate random result based on dice type
+    // Derive max value from dice name (e.g., "d12" -> 12, "d100" -> 100)
     const maxValue = diceType === 'd100' ? 100 : parseInt(diceType.substring(1));
     const result = Math.floor(Math.random() * maxValue) + 1;
 
@@ -524,7 +548,10 @@ const clearDiceRolls: RequestHandler = async (_req, res) => {
 };
 
 // ============================================================================
-// Initiative Tracker
+// Initiative Tracker — Ordered turn list for combat encounters.
+// Entries can originate from PCs, NPCs, ships, or be custom names.
+// The "active" flag marks whose turn it is; next/prev-turn endpoints
+// cycle through the list, incrementing the round counter on wrap-around.
 // ============================================================================
 
 function getInitiativeFilePath(campaignId: string): string {
@@ -622,7 +649,8 @@ const addInitiativeEntriesBatch: RequestHandler = async (req, res) => {
 
     const state = await readInitiativeState(campaign.id);
 
-    // Build sets of existing sourceIds and name+type combinations for duplicate checking
+    // Use two duplicate-detection strategies: by sourceId (entity identity)
+    // and by name+type combo (catches manually-added duplicates)
     const existingSourceIds = new Set(
       state.entries.filter((e) => e.sourceId).map((e) => e.sourceId)
     );
@@ -795,11 +823,11 @@ const nextTurn: RequestHandler = async (_req, res) => {
       state.entries[activeIndex].isActive = false;
     }
 
-    // Calculate next index
+    // Wrap around to the top of the order and bump the round counter
     let nextIndex = currentIndex + 1;
     if (nextIndex >= state.entries.length) {
       nextIndex = 0;
-      state.currentRound += 1; // Increment round when wrapping
+      state.currentRound += 1;
     }
 
     // Activate next
@@ -839,11 +867,11 @@ const prevTurn: RequestHandler = async (_req, res) => {
       state.entries[activeIndex].isActive = false;
     }
 
-    // Calculate previous index
+    // Wrap backward to the bottom of the order; never go below round 1
     let prevIndex = currentIndex - 1;
     if (prevIndex < 0) {
       prevIndex = state.entries.length - 1;
-      state.currentRound = Math.max(1, state.currentRound - 1); // Decrement round when wrapping back
+      state.currentRound = Math.max(1, state.currentRound - 1);
     }
 
     // Activate previous
@@ -938,7 +966,10 @@ const updateInitiativeState: RequestHandler = async (req, res) => {
   }
 };
 
-// Live Play module
+// ============================================================================
+// Module Registration — Declares routes and metadata for the Live Play module
+// ============================================================================
+
 export const livePlayModule: ModuleDefinition = {
   id: 'live-play',
   name: 'Live Play',

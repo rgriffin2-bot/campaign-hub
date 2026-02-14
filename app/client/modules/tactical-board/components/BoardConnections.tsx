@@ -1,3 +1,8 @@
+/**
+ * BoardConnections -- renders SVG lines between connected tokens.
+ * Each connection can have a glow, animated dash/pulse effects, labels,
+ * and a selection highlight. Animations can be globally toggled off for perf.
+ */
 import { useMemo, memo } from 'react';
 import type { BoardToken, BoardConnection } from '@shared/schemas/tactical-board';
 
@@ -64,16 +69,16 @@ export const BoardConnections = memo(function BoardConnections({
         // Only animate if both board-level and connection-level settings allow it
         const shouldAnimate = animationsEnabled && connection.animated;
 
-        // Calculate midpoint for label
+        // Midpoint is used to position the optional label
         const midX = (fromPos.x + toPos.x) / 2;
         const midY = (fromPos.y + toPos.y) / 2;
 
-        // Calculate line length for animation timing
+        // Length drives animation duration so pulses scale with distance
         const dx = toPos.x - fromPos.x;
         const dy = toPos.y - fromPos.y;
         const length = Math.sqrt(dx * dx + dy * dy);
 
-        // Dash array based on style
+        // Map connection style to an SVG dash pattern
         let strokeDasharray: string | undefined;
         if (connection.style === 'dashed') {
           strokeDasharray = '12 6';

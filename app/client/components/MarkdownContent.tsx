@@ -1,3 +1,15 @@
+/**
+ * MarkdownContent.tsx
+ *
+ * Custom markdown-to-JSX renderer with support for:
+ *   - Standard markdown (headings, lists, code blocks, tables, blockquotes)
+ *   - Inline formatting (bold, italic, inline code, line breaks)
+ *   - [[module:id]] inter-module links with live validation
+ *
+ * Why a custom renderer instead of a library: the app needs [[module:id]] link
+ * syntax, validated against live data, with React Router navigation. A generic
+ * library would need heavy plugin work to achieve the same result.
+ */
 import { Link } from 'react-router-dom';
 import { useMemo, createContext, useContext } from 'react';
 import { useFiles } from '../hooks/useFiles';
@@ -9,9 +21,12 @@ interface MarkdownContentProps {
   linkBasePath?: string;
 }
 
-// Context to hold valid IDs for each module
+// ─── Link Validation Context ──────────────────────────────────────
+// Provides a lookup of valid IDs per module so [[module:id]] links
+// can show a "deleted" treatment when the target no longer exists.
+
 interface LinkValidationContextValue {
-  validIds: Map<string, Set<string>>; // module -> set of valid IDs
+  validIds: Map<string, Set<string>>;
   isLoading: boolean;
 }
 
@@ -20,7 +35,7 @@ const LinkValidationContext = createContext<LinkValidationContextValue>({
   isLoading: true,
 });
 
-// Provider that loads all module data for link validation
+/** Loads NPC and lore file lists so links can be validated at render time */
 function LinkValidationProvider({ children }: { children: React.ReactNode }) {
   const { list: npcList } = useFiles('npcs');
   const { list: loreList } = useFiles('lore');
@@ -49,7 +64,7 @@ function LinkValidationProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Hook to check if a link target exists
+/** Returns true/false/null (still loading) for whether a [[module:id]] target exists */
 function useLinkExists(module: string, id: string): boolean | null {
   const { validIds, isLoading } = useContext(LinkValidationContext);
 
@@ -61,7 +76,9 @@ function useLinkExists(module: string, id: string): boolean | null {
   return moduleIds.has(id);
 }
 
-// Validated link component
+// ─── Validated Link ───────────────────────────────────────────────
+// Renders a React Router link when the target exists, or a strikethrough
+// span with a tooltip when the target has been deleted.
 function ValidatedLink({
   module,
   id,
@@ -101,13 +118,16 @@ function ValidatedLink({
   );
 }
 
-// Apply inline formatting (bold, italic, inline code, line breaks) to text
+// ─── Inline Formatting ────────────────────────────────────────────
+
+/**
+ * Converts inline markdown (bold, italic, code, <br>) within a single
+ * line of text into JSX elements. The regex tests longer patterns first
+ * (***bold italic*** before **bold** before *italic*) to avoid ambiguity.
+ */
 function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.Element)[] {
   const parts: (string | JSX.Element)[] = [];
 
-  // Combined regex for inline formatting
-  // Order matters: check bold (**) before italic (*), and bold italic (***) first
-  // Also handles <br>, <br/>, and <br /> for line breaks
   const inlineRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|<br\s*\/?>)/g;
 
   let lastIndex = 0;
@@ -160,7 +180,10 @@ function applyInlineFormatting(text: string, keyPrefix: string): (string | JSX.E
   return parts.length > 0 ? parts : [text];
 }
 
-// Parsed link info for deferred rendering
+// ─── Link Parsing ─────────────────────────────────────────────────
+// Intermediate types for a two-pass approach: first parse the text into
+// a mix of plain content and link descriptors, then render with validation.
+
 interface ParsedLink {
   type: 'link';
   module: string;
@@ -176,8 +199,10 @@ interface ParsedText {
 
 type ParsedContent = ParsedLink | ParsedText;
 
-// Parse [[module:id]] links and apply inline formatting
-// Returns parsed content that can be rendered with validation
+/**
+ * Splits text into alternating plain-text segments and [[module:id]] link
+ * descriptors. Inline formatting is applied to the plain-text segments.
+ */
 function parseLinksToContent(text: string, keyPrefix: string = 'link'): ParsedContent[] {
   const linkRegex = /\[\[(\w+):([^\]]+)\]\]/g;
   const parts: ParsedContent[] = [];
@@ -230,7 +255,7 @@ function parseLinksToContent(text: string, keyPrefix: string = 'link'): ParsedCo
   return parts;
 }
 
-// Render parsed content with validated links
+/** Renders a ParsedContent array, using ValidatedLink for link segments */
 function RenderParsedContent({
   content,
   linkBasePath
@@ -259,7 +284,10 @@ function RenderParsedContent({
   );
 }
 
-// Simple markdown-to-JSX converter
+// ─── Block-level Markdown Renderer ────────────────────────────────
+// Processes content line-by-line, accumulating list items and table rows
+// until a different block type is encountered (then "flushing" them).
+
 function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBasePath: string }) {
   const lines = content.split('\n');
   const elements: JSX.Element[] = [];
@@ -270,6 +298,7 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
   let tableRows: string[][] = [];
   let tableHasHeader = false;
 
+  // Emit any accumulated list items as a <ul> or <ol>
   const flushList = () => {
     if (listItems.length > 0 && listType) {
       const ListTag = listType;
@@ -291,13 +320,14 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
     }
   };
 
+  // Emit any accumulated table rows as a full <table>
   const flushTable = () => {
     if (tableRows.length > 0) {
       const tableKey = elements.length;
       const headerRow = tableHasHeader ? tableRows[0] : null;
       const bodyRows = tableHasHeader ? tableRows.slice(1) : tableRows;
 
-      // Calculate equal column width based on number of columns
+      // Equal-width columns via table-fixed + percentage widths
       const numCols = headerRow?.length || bodyRows[0]?.length || 1;
       const colWidth = `${100 / numCols}%`;
 
@@ -348,7 +378,7 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
     }
   };
 
-  // Check if a line is a table separator (e.g., | --- | --- |)
+  // Table detection helpers
   const isTableSeparator = (line: string): boolean => {
     return /^\|[\s\-:|]+\|$/.test(line.trim());
   };
@@ -368,10 +398,11 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
     return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.includes('|');
   };
 
+  // ── Main line-by-line parse loop ──
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Code blocks
+    // Code blocks (``` fenced)
     if (line.startsWith('```')) {
       if (inCodeBlock) {
         elements.push(
@@ -527,12 +558,15 @@ function MarkdownRenderer({ content, linkBasePath }: { content: string; linkBase
     );
   }
 
+  // Flush any trailing list or table that wasn't terminated by a blank line
   flushList();
   flushTable();
 
   return <>{elements}</>;
 }
 
+// ─── Public Component ─────────────────────────────────────────────
+/** Renders a markdown string as styled JSX with [[module:id]] link support */
 export function MarkdownContent({ content, className = '', linkBasePath = '/modules' }: MarkdownContentProps) {
   return (
     <LinkValidationProvider>

@@ -1,3 +1,8 @@
+/**
+ * LinkAutocomplete -- text input with a dropdown of matching entities from
+ * a given module (NPCs, lore, or locations). Supports keyboard navigation
+ * (ArrowUp/Down, Enter, Escape) and click-outside dismissal.
+ */
 import { useState, useRef, useEffect } from 'react';
 import { useFiles } from '../hooks/useFiles';
 import type { FileMetadata } from '@shared/types/file';

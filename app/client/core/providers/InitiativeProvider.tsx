@@ -1,3 +1,12 @@
+/**
+ * InitiativeProvider -- Context provider for the combat initiative tracker.
+ *
+ * State is server-authoritative: every mutation PATCHes/POSTs to the API and
+ * the response immediately replaces the local cache. Between mutations the
+ * state is polled every 3 seconds so players stay in sync with the DM.
+ *
+ * All write operations are gated on `isDm` -- player clients silently no-op.
+ */
 import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -12,9 +21,10 @@ import type {
 // Re-export types for consumers
 export type { InitiativeEntry, InitiativeState, InitiativeSourceType };
 
-// Polling interval for live updates (3 seconds)
-const POLL_INTERVAL = 3000;
+// Polling interval for live updates (1 second)
+const POLL_INTERVAL = 1000;
 
+/** Shape of the context exposed to consumers via useInitiative(). */
 interface InitiativeContextValue {
   // State
   initiative: InitiativeState;
@@ -61,13 +71,12 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const location = useLocation();
 
-  // Determine if we're in player mode based on route
+  // ── Role detection ─────────────────────────────────────────────────
+  // Player routes always get the player endpoint, even if the user has DM creds
   const isPlayerRoute = location.pathname.startsWith('/player');
-
-  // Determine if user should see DM data
   const isDm = !isPlayerRoute && (!authEnabled || role === 'dm');
 
-  // Use different endpoints for DM vs player
+  // DM and player endpoints differ: the player one filters hidden entries
   const endpoint = isDm
     ? '/api/modules/live-play/initiative'
     : '/api/player/initiative';
@@ -87,7 +96,11 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     refetchIntervalInBackground: true,
   });
 
-  // Mutation for adding an entry (DM only)
+  // ── Mutations ───────────────────────────────────────────────────────
+  // Each mutation writes to the server and immediately updates the React Query
+  // cache with the server's response (optimistic-ish: we trust the server reply).
+
+  // Add a single entry
   const addMutation = useMutation({
     mutationFn: async (entry: Omit<InitiativeEntry, 'id'>) => {
       const res = await fetch('/api/modules/live-play/initiative', {
@@ -225,7 +238,9 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Callbacks
+  // ── Callback wrappers ───────────────────────────────────────────────
+  // Each callback guards with `if (!isDm) return` so player clients never fire writes.
+
   const addEntry = useCallback(
     (entry: Omit<InitiativeEntry, 'id'>) => {
       if (!isDm) return;
@@ -273,10 +288,10 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     turnMutation.mutate('prev');
   }, [turnMutation, isDm]);
 
+  /** Jump to a specific entry, deactivating all others. */
   const setActiveEntry = useCallback(
     (entryId: string) => {
       if (!isDm) return;
-      // Deactivate all, then activate the selected one
       const entries = initiative.entries.map((e: InitiativeEntry) => ({
         ...e,
         isActive: e.id === entryId,
@@ -351,6 +366,7 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Hook to consume initiative state. Must be inside an InitiativeProvider. */
 export function useInitiative() {
   const context = useContext(InitiativeContext);
   if (!context) {

@@ -1,4 +1,12 @@
+/**
+ * Rules schema.
+ * Validates frontmatter for game rules/moves stored in the rules/ folder.
+ * Categories map to the game system's rule types (core mechanics, moves, etc.).
+ */
+
 import { z } from 'zod';
+
+// ── Rule Categories ─────────────────────────────────────────────────────────
 
 export const ruleCategories = [
   'core-mechanic',
@@ -26,6 +34,8 @@ export const ruleCategoryLabels: Record<RuleCategory, string> = {
   'gm-reference': 'GM Reference',
 };
 
+// ── Main Rule Schema ────────────────────────────────────────────────────────
+
 export const ruleSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
@@ -38,6 +48,7 @@ export const ruleSchema = z.object({
 
 export type RuleFrontmatter = z.infer<typeof ruleSchema>;
 
+/** A fully parsed rule file (frontmatter + markdown body + path) */
 export interface RuleFile {
   frontmatter: RuleFrontmatter;
   content: string;

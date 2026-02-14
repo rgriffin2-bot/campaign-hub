@@ -1,3 +1,11 @@
+/**
+ * CelestialFields.tsx
+ *
+ * Collapsible form section for editing a location's celestial body
+ * properties (body type, radius, color, orbit parameters, map image).
+ * The entire section can be toggled on/off; disabling it clears the
+ * celestial data from the parent location.
+ */
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Globe, X, Image } from 'lucide-react';
 import {
@@ -7,10 +15,14 @@ import {
 } from '@shared/schemas/location';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 
+// ─── Types & Constants ────────────────────────────────────────────
+
 interface CelestialFieldsProps {
   value: CelestialData | undefined;
   onChange: (value: CelestialData | undefined) => void;
+  /** Whether this location has a parent (determines if orbit fields appear) */
   hasParent: boolean;
+  /** Required for image uploads; must save the location first */
   locationId?: string;
 }
 
@@ -38,6 +50,8 @@ const DEFAULT_RADII: Record<CelestialBodyType, number> = {
   asteroid_ring: 4,
 };
 
+// ─── Component ────────────────────────────────────────────────────
+
 export function CelestialFields({ value, onChange, hasParent, locationId }: CelestialFieldsProps) {
   const { campaign } = useCampaign();
   const [isExpanded, setIsExpanded] = useState(!!value);
@@ -45,7 +59,7 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync enabled state with value prop when it changes (e.g., when loading a location)
+  // Keep local toggle in sync when the parent loads or resets the value
   useEffect(() => {
     setEnabled(!!value);
     if (value) {
@@ -53,13 +67,13 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
     }
   }, [value]);
 
+  // Toggle celestial data on/off. Enabling creates sensible defaults;
+  // disabling clears all celestial data from the location.
   const handleToggle = () => {
     if (enabled) {
-      // Disable celestial data
       setEnabled(false);
       onChange(undefined);
     } else {
-      // Enable with defaults
       setEnabled(true);
       setIsExpanded(true);
       onChange({
@@ -77,6 +91,7 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
     }
   };
 
+  // Generic field updater - spreads the existing value and patches one key
   const updateField = <K extends keyof CelestialData>(
     field: K,
     fieldValue: CelestialData[K]
@@ -85,6 +100,7 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
     onChange({ ...value, [field]: fieldValue });
   };
 
+  // Switching body type also resets radius and color to that type's defaults
   const handleBodyTypeChange = (bodyType: CelestialBodyType) => {
     onChange({
       ...value!,
@@ -94,6 +110,7 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
     });
   };
 
+  // Upload a custom map image for this celestial body via multipart form POST
   const handleMapImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !campaign || !locationId || !value) return;
@@ -130,14 +147,16 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
     updateField('mapImage', undefined);
   };
 
+  // Build a displayable URL for the current map image, if one exists
   const mapImageUrl =
     value?.mapImage && campaign
       ? `/api/campaigns/${campaign.id}/assets/${value.mapImage.replace('assets/', '')}`
       : null;
 
+  // ── Render ──
   return (
     <div className="space-y-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
-      {/* Header with toggle */}
+      {/* Header with enable/disable toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-blue-500" />

@@ -1,3 +1,13 @@
+/**
+ * BoardToken.tsx
+ *
+ * Renders and manages interaction for a single token on the tactical board.
+ * Supports two rendering paths: regular tokens (circle/square with image or
+ * icon) and text-box tokens (resizable rectangle with editable text).
+ *
+ * Dragging and resizing use local state for smooth 60fps updates; the final
+ * position/size is synced to the server only on mouse-up.
+ */
 import { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { User, Ship, MapPin, Skull, Circle, Type, Lock } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -15,7 +25,7 @@ interface BoardTokenProps {
   onUpdateLabel?: (label: string) => void;
 }
 
-// Get the appropriate icon for a token's source type
+// Map source types to Lucide icons used as fallback when no image is set
 function getSourceIcon(sourceType: TokenSourceType) {
   switch (sourceType) {
     case 'pc':
@@ -48,15 +58,20 @@ export const BoardToken = memo(function BoardToken({
   const { campaign } = useCampaign();
   const tokenRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Interaction state ──
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(token.label);
-  // Local position during drag - prevents server calls on every mouse move
+
+  // Local position/size during drag/resize for smooth rendering.
+  // Only the final value is flushed to the server on mouse-up.
   const [localPosition, setLocalPosition] = useState<{ x: number; y: number } | null>(null);
   const [localSize, setLocalSize] = useState<number | null>(null);
-  // Local dimensions for text box resizing
   const [localDimensions, setLocalDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  // Refs capture the initial mouse and token state at the start of a gesture
   const dragStartRef = useRef<{ x: number; y: number; tokenX: number; tokenY: number } | null>(null);
   const resizeStartRef = useRef<{ mouseX: number; size: number } | null>(null);
   const dimensionResizeStartRef = useRef<{ mouseX: number; mouseY: number; width: number; height: number } | null>(null);
@@ -71,7 +86,8 @@ export const BoardToken = memo(function BoardToken({
   // Check if token can be moved (editable and not locked)
   const canMove = isEditable && !token.locked;
 
-  // Handle drag start
+  // ── Drag handlers ──
+  // Mouse-down selects the token and starts a drag (unless locked)
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (!isEditable) return;
@@ -95,13 +111,13 @@ export const BoardToken = memo(function BoardToken({
     [isEditable, onSelect, token.x, token.y, token.locked]
   );
 
-  // Handle drag move - use local state during drag for smooth performance
+  // Mouse-move updates local state only (no network call) for smooth 60fps.
+  // The scale divisor converts screen pixels to canvas units.
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (isDragging && dragStartRef.current) {
         const dx = (e.clientX - dragStartRef.current.x) / scale;
         const dy = (e.clientY - dragStartRef.current.y) / scale;
-        // Update local position only (no server call)
         setLocalPosition({
           x: Math.round(dragStartRef.current.tokenX + dx),
           y: Math.round(dragStartRef.current.tokenY + dy),
@@ -128,9 +144,9 @@ export const BoardToken = memo(function BoardToken({
     [isDragging, isResizing, scale]
   );
 
-  // Handle drag end - sync to server only on drop
+  // ── Mouse-up: flush to server ──
+  // Syncs the final drag/resize result to the server in one call
   const handleMouseUp = useCallback(() => {
-    // Sync final position/size to server
     if (isDragging && localPosition) {
       onMove(localPosition.x, localPosition.y);
     }
@@ -164,7 +180,8 @@ export const BoardToken = memo(function BoardToken({
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
-  // Handle resize start
+  // ── Resize handlers ──
+  // Uniform resize (circle/square tokens) - dragging the handle scales the size
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
       if (!isEditable || token.locked) return;
@@ -179,7 +196,8 @@ export const BoardToken = memo(function BoardToken({
     [isEditable, token.size, token.locked]
   );
 
-  // Handle double-click to edit text (for text box tokens)
+  // ── Inline text editing (text-box tokens only) ──
+  // Double-click enters edit mode; Enter saves, Escape cancels
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       if (!isEditable || token.locked || token.sourceType !== 'text') return;
@@ -201,16 +219,14 @@ export const BoardToken = memo(function BoardToken({
     setIsEditing(false);
   }, [editText, token.label, onUpdateLabel]);
 
-  // Handle key down in edit mode
+  // Enter saves, Shift+Enter inserts newline, Escape cancels
   const handleEditKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        // Enter without shift saves the text
         e.preventDefault();
         handleSaveEdit();
       } else if (e.key === 'Enter' && e.shiftKey) {
-        // Shift+Enter adds a new line (default behavior for textarea)
-        // Don't prevent default - let it add the newline
+        // Let the default textarea behavior insert a newline
       } else if (e.key === 'Escape') {
         e.preventDefault();
         setEditText(token.label);
@@ -220,7 +236,7 @@ export const BoardToken = memo(function BoardToken({
     [handleSaveEdit, token.label]
   );
 
-  // Handle dimension resize start (for text boxes)
+  // Independent width/height resize for text boxes (vs uniform size for regular tokens)
   const handleDimensionResizeStart = useCallback(
     (e: React.MouseEvent) => {
       if (!isEditable || token.locked) return;
@@ -240,15 +256,15 @@ export const BoardToken = memo(function BoardToken({
     [isEditable, token.width, token.height, token.locked]
   );
 
-  // Calculate image position
+  // ── Display values ──
+  // Prefer local (in-flight) values during drag/resize for responsiveness
   const imagePosition = token.imagePosition || { x: 0, y: 0, scale: 1 };
-
-  // Use local position during drag, otherwise use token position
   const displayX = localPosition?.x ?? token.x;
   const displayY = localPosition?.y ?? token.y;
   const displaySize = localSize ?? token.size;
 
-  // Text box tokens render differently - use explicit width/height for independent sizing
+  // ── Text-box rendering path ──
+  // Text boxes have independent width/height and support inline editing
   if (token.sourceType === 'text') {
     const baseFontSize = token.fontSize || 14;
     // Use local dimensions during resize, otherwise use token dimensions with defaults
@@ -338,7 +354,7 @@ export const BoardToken = memo(function BoardToken({
     );
   }
 
-  // Regular token rendering
+  // ── Regular token rendering (circle or square shape) ──
   return (
     <div
       ref={tokenRef}

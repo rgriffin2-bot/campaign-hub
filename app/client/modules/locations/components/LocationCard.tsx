@@ -1,3 +1,8 @@
+/**
+ * LocationCard -- Card for the location grid view.
+ * Displays a landscape image (or placeholder), name, type badge,
+ * description, and a visibility toggle button.
+ */
 import { Link } from 'react-router-dom';
 import { MapPin, Eye, EyeOff } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -14,7 +19,7 @@ export function LocationCard({ location }: LocationCardProps) {
 
   const isHidden = location.hidden === true;
 
-  // Get image URL if available
+  // Build the asset URL for the location's image
   const image = location.image as string | undefined;
   const imageUrl =
     image && campaign

@@ -1,3 +1,9 @@
+/**
+ * StoryArtefactDetail -- read-only detail view for a single story artefact.
+ * Displays an image gallery, markdown content, and DM-only secrets/notes.
+ * Deletion warns that all associated images will also be removed.
+ */
+
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Scroll, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -15,6 +21,7 @@ export function StoryArtefactDetail() {
 
   const { data: artefact, isLoading } = get(fileId || '');
 
+  // -- Delete handler (also removes all server-side images) ------------------
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete this artefact? This will also delete all associated images.')) return;
@@ -48,6 +55,7 @@ export function StoryArtefactDetail() {
     );
   }
 
+  // -- Render -----------------------------------------------------------------
   const { content } = artefact;
   const frontmatter = artefact.frontmatter as unknown as StoryArtefactFrontmatter;
   const isHidden = frontmatter.hidden === true;

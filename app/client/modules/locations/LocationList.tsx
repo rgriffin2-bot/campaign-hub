@@ -1,3 +1,7 @@
+/**
+ * LocationList -- Main listing page for campaign locations.
+ * Supports three view modes: hierarchical tree, card grid, and full-screen map.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, MapPin, LayoutGrid, List, Globe } from 'lucide-react';
@@ -15,6 +19,7 @@ export function LocationList() {
 
   const locations = list.data || [];
 
+  // Search filter matches name, type, description, and tags
   const filteredLocations = locations.filter((location) => {
     if (search === '') return true;
 
@@ -33,6 +38,7 @@ export function LocationList() {
     );
   });
 
+  // --- Loading state ---
   if (list.isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -111,7 +117,7 @@ export function LocationList() {
         />
       </div>
 
-      {/* Location List/Grid/Map */}
+      {/* Location content: empty state -> map -> tree -> card grid (fallthrough) */}
       {locations.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
           <MapPin className="h-12 w-12 text-muted-foreground" />

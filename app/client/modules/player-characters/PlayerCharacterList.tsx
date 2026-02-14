@@ -1,3 +1,9 @@
+/**
+ * PlayerCharacterList -- grid view of all player characters with search.
+ * Each card shows a portrait thumbnail alongside key status indicators
+ * (pressure pips, resource dot, and harm severity).
+ */
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Users, Heart, Coins, Sparkles } from 'lucide-react';
@@ -6,6 +12,7 @@ import { useCampaign } from '../../core/providers/CampaignProvider';
 import type { FileMetadata } from '@shared/types/file';
 import type { ResourceLevel, HarmState } from '@shared/schemas/player-character';
 
+// Maps each resource level to a Tailwind background color for the indicator dot
 const resourceColors: Record<ResourceLevel, string> = {
   screwed: 'bg-red-500',
   dry: 'bg-orange-500',
@@ -15,6 +22,7 @@ const resourceColors: Record<ResourceLevel, string> = {
   swimming: 'bg-purple-500',
 };
 
+/** Renders 5 small circles; filled pips represent current pressure level. */
 function PressurePips({ value }: { value: number }) {
   return (
     <div className="flex gap-1">
@@ -30,12 +38,14 @@ function PressurePips({ value }: { value: number }) {
   );
 }
 
+/** Shows the worst active harm level with a color-coded heart icon. */
 function HarmIndicator({ harm }: { harm?: HarmState }) {
   if (!harm) return null;
 
   const hasHarm = harm.oldWounds || harm.mild || harm.moderate || harm.severe;
   if (!hasHarm) return null;
 
+  // Display only the most severe active harm tier
   const severity = harm.severe ? 'Severe' : harm.moderate ? 'Moderate' : harm.mild ? 'Mild' : 'Old Wounds';
   const color = harm.severe ? 'text-red-500' : harm.moderate ? 'text-orange-500' : harm.mild ? 'text-yellow-500' : 'text-muted-foreground';
 
@@ -47,8 +57,10 @@ function HarmIndicator({ harm }: { harm?: HarmState }) {
   );
 }
 
+/** Card linking to a single PC's detail view, showing portrait + status at a glance. */
 function PlayerCharacterCard({ item }: { item: FileMetadata }) {
   const { campaign } = useCampaign();
+  // Extract typed metadata from the generic FileMetadata record
   const portrait = item.portrait as string | undefined;
   const playbook = item.playbook as string | undefined;
   const player = item.player as string | undefined;
@@ -109,12 +121,14 @@ function PlayerCharacterCard({ item }: { item: FileMetadata }) {
   );
 }
 
+/** Top-level list page: fetches all PCs, provides search, and renders a responsive grid. */
 export function PlayerCharacterList() {
   const { list } = useFiles('player-characters');
   const [search, setSearch] = useState('');
 
   const characters = list.data || [];
 
+  // Filter by name, player, or playbook
   const filteredItems = characters.filter((item) => {
     if (!search) return true;
     const searchLower = search.toLowerCase();

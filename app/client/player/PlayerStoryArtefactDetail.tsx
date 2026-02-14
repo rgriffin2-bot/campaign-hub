@@ -1,3 +1,9 @@
+/**
+ * PlayerStoryArtefactDetail.tsx
+ *
+ * Player (read-only) detail page for a single story artefact.
+ * Shows tags, an image gallery, and rendered markdown content.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Scroll } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -6,6 +12,7 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { ImageGallery } from '../modules/story-artefacts/components/ImageGallery';
 import type { StoryArtefactFrontmatter, ArtefactImage } from '@shared/schemas/story-artefact';
 
+/** Story artefact detail page for the player view. */
 export function PlayerStoryArtefactDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { campaign } = useCampaign();

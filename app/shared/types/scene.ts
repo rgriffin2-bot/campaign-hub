@@ -13,9 +13,12 @@ export type { Disposition };
  * NPC stats for combat/encounter tracking
  */
 export interface NPCStats {
+  /** Current damage taken */
   damage?: number;
+  /** Damage threshold before being taken out */
   maxDamage?: number;
   armor?: number;
+  /** Enemy moves/abilities (markdown) */
   moves?: string;
 }
 
@@ -27,13 +30,17 @@ export interface SceneNPC {
   name: string;
   occupation?: string;
   portrait?: string;
+  /** Crop position and zoom for circular portrait display */
   portraitPosition?: { x: number; y: number; scale: number };
+  /** Whether this NPC has a combat stat block */
   hasStats?: boolean;
   disposition?: Disposition;
   stats?: NPCStats;
   visibleToPlayers?: boolean;
   // Backwards compatibility
+  /** @deprecated Use hasStats instead */
   isAntagonist?: boolean;
+  /** @deprecated Use stats instead */
   antagonistStats?: NPCStats;
 }
 
@@ -43,13 +50,19 @@ export interface SceneNPC {
 export interface SceneShip {
   id: string;
   name: string;
+  /** Vehicle category (e.g. starship, mech, drone) */
   type?: string;
+  /** Ship class (e.g. freighter, interceptor) */
   class?: string;
   image?: string;
+  /** Crop position and zoom for ship image display */
   imagePosition?: { x: number; y: number; scale: number };
+  /** True if this ship is controlled by the player crew */
   isCrewShip?: boolean;
   disposition?: Disposition;
+  /** Pressure tracker (0-5) */
   pressure?: number;
+  /** Subsystem damage state */
   damage?: ShipDamage;
   visibleToPlayers?: boolean;
 }

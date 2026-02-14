@@ -1,3 +1,10 @@
+/**
+ * PCPanel -- displays a single player character's trackers during live play.
+ * Has two layout modes:
+ *   - compact: portrait + vertically stacked trackers (for side-by-side multi-PC views)
+ *   - standard: horizontal header with inline trackers
+ * All tracker values are editable when `editable` is true and propagated via onUpdate.
+ */
 import { Link } from 'react-router-dom';
 import { Users, ExternalLink, Clover } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -29,6 +36,8 @@ interface PCPanelProps {
 export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPanelProps) {
   const { campaign } = useCampaign();
   const fm = pc.frontmatter;
+
+  // --- Tracker change handlers (each propagates a partial frontmatter update) ---
 
   const handlePressureChange = (pressure: number) => {
     onUpdate?.({ pressure });

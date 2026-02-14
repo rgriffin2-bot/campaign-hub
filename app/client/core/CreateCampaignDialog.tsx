@@ -1,3 +1,8 @@
+/**
+ * CreateCampaignDialog -- modal for creating a new campaign.
+ * Collects a name, optional description, and a checkbox list of modules
+ * to enable. Submitted via the CampaignProvider's createCampaign method.
+ */
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useCampaign } from './providers/CampaignProvider';
@@ -19,6 +24,7 @@ export function CreateCampaignDialog({
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Toggle a module ID in/out of the selected set
   const toggleModule = (moduleId: string) => {
     setSelectedModules((prev) =>
       prev.includes(moduleId)

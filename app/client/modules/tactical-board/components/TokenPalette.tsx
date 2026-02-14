@@ -1,3 +1,9 @@
+/**
+ * TokenPalette -- sidebar panel for adding tokens to the board.
+ * Lists campaign entities grouped by category (PCs, NPCs, ships, locations),
+ * each collapsible and searchable. Also provides an image upload button
+ * for placing arbitrary image tokens on the canvas.
+ */
 import { useState, useRef } from 'react';
 import { User, Skull, Ship, MapPin, Circle, Plus, Search, ChevronDown, ChevronRight, ImagePlus, Loader2 } from 'lucide-react';
 import { useFiles } from '../../../hooks/useFiles';
@@ -14,6 +20,7 @@ interface TokenPaletteProps {
   onAddImage?: (file: File) => Promise<void>;
 }
 
+/** Maps a token source type to its display label, icon, and backing module */
 interface SourceCategory {
   id: TokenSourceType;
   label: string;
@@ -34,6 +41,7 @@ interface EntityItemProps {
   onAdd: () => void;
 }
 
+/** Single row in a category section -- thumbnail, name, and an add button */
 function EntityItem({ entity, sourceType, onAdd }: EntityItemProps) {
   const { campaign } = useCampaign();
   const imagePath = entity.portrait || entity.image;
@@ -73,8 +81,9 @@ interface CategorySectionProps {
   onAddToken: TokenPaletteProps['onAddToken'];
 }
 
+/** Collapsible section listing entities from a single module (e.g. NPCs) */
 function CategorySection({ category, search, onAddToken }: CategorySectionProps) {
-  // Default to collapsed unless user has expanded or is searching
+  // Default to collapsed; user can toggle open
   const [isExpanded, setIsExpanded] = useState(false);
   const { list } = useFiles(category.moduleId);
 

@@ -1,3 +1,10 @@
+/**
+ * PlayerCharacterEdit -- Player-facing form for editing their own character.
+ *
+ * Sections: portrait, basic info, stats, trackers (pressure / resources /
+ * experience / luck / harm), gear, playbook moves, and freeform notes.
+ * Submits via the player API endpoint, which enforces ownership checks.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Users, X } from 'lucide-react';
@@ -12,6 +19,8 @@ import type {
 } from '@shared/schemas/player-character';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
+// ── Resource level constants ─────────────────────────────────────────
+// Ordered from worst to best; used for the resources dropdown
 const resourceLevels: ResourceLevel[] = ['screwed', 'dry', 'light', 'covered', 'flush', 'swimming'];
 
 const resourceLabels: Record<ResourceLevel, string> = {
@@ -30,9 +39,10 @@ export function PlayerCharacterEdit() {
   const queryClient = useQueryClient();
   const { get } = usePlayerFiles('player-characters');
 
+  // ── Data fetching ──────────────────────────────────────────────────
   const { data: existingPC, isLoading } = get(fileId || '');
 
-  // Fetch available playbook moves
+  // Fetch available playbook moves from the rules module
   const { data: availableMoves } = useQuery({
     queryKey: ['player-available-moves', campaign?.id],
     queryFn: async () => {
@@ -48,6 +58,7 @@ export function PlayerCharacterEdit() {
     enabled: !!campaign,
   });
 
+  // ── Local form state ────────────────────────────────────────────────
   const [form, setForm] = useState<Partial<PlayerCharacterFrontmatter>>({
     name: '',
     player: '',
@@ -71,6 +82,7 @@ export function PlayerCharacterEdit() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Populate form from server data once loaded
   useEffect(() => {
     if (existingPC) {
       const fm = existingPC.frontmatter as unknown as PlayerCharacterFrontmatter;
@@ -97,7 +109,7 @@ export function PlayerCharacterEdit() {
     }
   }, [existingPC]);
 
-  // Mutation for updating the character via player API
+  // ── Save mutation ───────────────────────────────────────────────────
   const updateMutation = useMutation({
     mutationFn: async (data: { frontmatter: Partial<PlayerCharacterFrontmatter>; content: string }) => {
       if (!campaign || !fileId) throw new Error('Missing campaign or file ID');
@@ -127,6 +139,7 @@ export function PlayerCharacterEdit() {
     },
   });
 
+  // ── Event handlers ─────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.player) return;
@@ -143,6 +156,7 @@ export function PlayerCharacterEdit() {
     updateMutation.mutate({ frontmatter, content });
   };
 
+  /** Append a playbook move to the character's selected moves. */
   const handleAddMove = (moveId: string) => {
     if (!form.playbookMoves?.includes(moveId)) {
       setForm((prev) => ({
@@ -159,6 +173,7 @@ export function PlayerCharacterEdit() {
     }));
   };
 
+  // ── Loading / not-found states ──────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -184,6 +199,7 @@ export function PlayerCharacterEdit() {
     );
   }
 
+  // ── Main form render ────────────────────────────────────────────────
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Back link */}

@@ -1,8 +1,18 @@
+/**
+ * LocationMap.tsx
+ *
+ * SVG-based interactive star system map. Renders celestial bodies
+ * (stars, planets, moons, stations, asteroid rings) with orbit paths,
+ * and supports pan/zoom navigation via mouse drag and scroll wheel.
+ * Positions are computed from parent-child orbit relationships.
+ */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { FileMetadata } from '@shared/types/file';
 import type { CelestialData } from '@shared/schemas/location';
+
+// ─── Types ────────────────────────────────────────────────────────
 
 interface LocationMapProps {
   locations: FileMetadata[];
@@ -10,6 +20,7 @@ interface LocationMapProps {
   selectedLocationId?: string;
 }
 
+/** A location with guaranteed celestial data attached */
 interface CelestialLocation extends FileMetadata {
   celestial: CelestialData;
   parent?: string;
@@ -20,11 +31,13 @@ interface Position {
   y: number;
 }
 
-// Map dimensions
+// ─── Constants ────────────────────────────────────────────────────
+
+// SVG coordinate space dimensions (not pixels)
 const MAP_SIZE = 2400;
 const CENTER = MAP_SIZE / 2;
 
-// Default colors for celestial bodies
+// Fallback visual properties per body type
 const DEFAULT_COLORS: Record<string, string> = {
   star: '#FDB813',
   planet: '#4A90D9',
@@ -51,7 +64,9 @@ export function LocationMap({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Pan and zoom state
+  // ── Pan and zoom state ──
+  // We manipulate the SVG viewBox rather than CSS transforms so the SVG
+  // stays resolution-independent at all zoom levels.
   const [viewBox, setViewBox] = useState({
     x: 0,
     y: 0,
@@ -62,23 +77,25 @@ export function LocationMap({
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
   const [viewBoxStart, setViewBoxStart] = useState({ x: 0, y: 0 });
 
-  // Filter locations with celestial data
+  // ── Position computation ──
+  // Only locations with celestial data appear on the map
   const celestialLocations = locations.filter(
     (loc): loc is CelestialLocation =>
       loc.celestial !== undefined && loc.celestial !== null
   );
 
-  // Build position map based on parent-child relationships
+  // Maps each location ID to its computed SVG position
   const positionMap = new Map<string, Position>();
 
-  // Find root celestial bodies (stars with no parent, or parent without celestial data)
+  // Root bodies have no parent or their parent lacks celestial data (i.e. top-level stars)
   const rootBodies = celestialLocations.filter((loc) => {
     if (!loc.parent) return true;
     const parent = celestialLocations.find((p) => p.id === loc.parent);
     return !parent;
   });
 
-  // Calculate positions recursively
+  // Compute a child body's position relative to its parent using orbital parameters.
+  // Supports both circular and elliptical (eccentricity > 0) orbits.
   function calculatePosition(
     loc: CelestialLocation,
     parentPos: Position
@@ -87,17 +104,16 @@ export function LocationMap({
     const orbitDistance = celestial.orbitDistance || 100;
     const startAngle = ((celestial.startPosition || 0) * Math.PI) / 180;
 
-    // For elliptical orbits
+    // Elliptical orbit geometry: semi-minor axis shrinks as eccentricity increases
     const eccentricity = celestial.orbitEccentricity || 0;
     const semiMajorAxis = orbitDistance;
     const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity);
 
-    // Calculate position on orbit
     const orbitRotation = ((celestial.orbitRotation || 0) * Math.PI) / 180;
 
     let x: number, y: number;
     if (celestial.orbitShape === 'ellipse' && eccentricity > 0) {
-      // Elliptical orbit
+      // Rotate the ellipse point by orbitRotation around the parent
       const cosRotation = Math.cos(orbitRotation);
       const sinRotation = Math.sin(orbitRotation);
       const xEllipse = semiMajorAxis * Math.cos(startAngle);
@@ -105,7 +121,6 @@ export function LocationMap({
       x = parentPos.x + xEllipse * cosRotation - yEllipse * sinRotation;
       y = parentPos.y + xEllipse * sinRotation + yEllipse * cosRotation;
     } else {
-      // Circular orbit
       x = parentPos.x + orbitDistance * Math.cos(startAngle);
       y = parentPos.y + orbitDistance * Math.sin(startAngle);
     }
@@ -113,9 +128,8 @@ export function LocationMap({
     return { x, y };
   }
 
-  // Build positions for all celestial bodies
+  // Place all celestial bodies: roots at center (or evenly spaced), children recursively.
   function buildPositions() {
-    // Place root bodies
     if (rootBodies.length === 1) {
       // Single root (star) at center
       positionMap.set(rootBodies[0].id, { x: CENTER, y: CENTER });
@@ -149,7 +163,10 @@ export function LocationMap({
 
   buildPositions();
 
-  // Handle mouse wheel zoom
+  // ── Zoom / Pan event handlers ──
+
+  // Zoom toward the mouse pointer by scaling the viewBox dimensions while
+  // adjusting the origin so the point under the cursor stays fixed.
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
@@ -157,8 +174,6 @@ export function LocationMap({
     setViewBox((prev) => {
       const newWidth = Math.min(MAP_SIZE * 2, Math.max(200, prev.width * zoomFactor));
       const newHeight = Math.min(MAP_SIZE * 2, Math.max(200, prev.height * zoomFactor));
-
-      // Zoom toward mouse position
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         const mouseX = e.clientX - rect.left;
@@ -189,7 +204,7 @@ export function LocationMap({
     }
   }, [handleWheel]);
 
-  // Handle mouse drag for panning
+  // Pan by dragging - translates screen-space pixel deltas into viewBox offsets
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
     setIsDragging(true);
@@ -249,7 +264,8 @@ export function LocationMap({
     onSelectLocation(null);
   };
 
-  // Generate starfield background
+  // ── Decorative starfield ──
+  // Generated once and stored in a ref so the random positions persist across renders
   const stars = useRef<Array<{ cx: number; cy: number; r: number; opacity: number }>>([]);
   if (stars.current.length === 0) {
     for (let i = 0; i < 200; i++) {
@@ -262,7 +278,9 @@ export function LocationMap({
     }
   }
 
-  // Render orbit path
+  // ── SVG rendering helpers ──
+
+  // Draw a circular or elliptical orbit path centered on the parent body
   function renderOrbit(loc: CelestialLocation) {
     if (!loc.parent) return null;
     const parentPos = positionMap.get(loc.parent);
@@ -316,7 +334,8 @@ export function LocationMap({
     );
   }
 
-  // Render celestial body
+  // Render a celestial body: either an image-clipped circle, colored circle,
+  // or (for asteroid rings) a thick dashed ring around the parent.
   function renderBody(loc: CelestialLocation) {
     const pos = positionMap.get(loc.id);
     if (!pos) return null;
@@ -334,7 +353,8 @@ export function LocationMap({
         ? `/api/campaigns/${campaign.id}/assets/${image.replace('assets/', '')}`
         : null;
 
-    // Special rendering for asteroid rings
+    // Asteroid rings are drawn as a dashed circle at the orbit distance
+    // rather than as a point body
     if (bodyType === 'asteroid_ring') {
       if (!loc.parent) return null;
       const parentPos = positionMap.get(loc.parent);

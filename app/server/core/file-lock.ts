@@ -1,14 +1,20 @@
 /**
- * Simple file-based locking mechanism to prevent concurrent writes
- * Uses in-memory locks with async mutex pattern
+ * In-memory async mutex to prevent concurrent writes to the same file.
+ *
+ * Uses a per-path Promise chain so that callers queue up automatically.
+ * This is sufficient for a single-process server; if CampaignHub ever
+ * runs multi-process, this would need to be replaced with an OS-level
+ * advisory lock.
  */
 
-// Map of file paths to their lock state
+// Map of file paths to their pending lock promise
 const locks = new Map<string, Promise<void>>();
 
+// ── Public API ─────────────────────────────────────────────────────────
+
 /**
- * Acquires a lock for the given file path and executes the callback
- * Ensures only one write operation per file at a time
+ * Acquire an exclusive lock for `filePath`, run `callback`, then release.
+ * If another operation already holds the lock, this will wait for it first.
  */
 export async function withFileLock<T>(
   filePath: string,
@@ -20,7 +26,7 @@ export async function withFileLock<T>(
     await existingLock;
   }
 
-  // Create a new lock
+  // Create a new promise whose resolve function acts as the release trigger
   let releaseLock: () => void;
   const lockPromise = new Promise<void>((resolve) => {
     releaseLock = resolve;
@@ -28,21 +34,17 @@ export async function withFileLock<T>(
   locks.set(filePath, lockPromise);
 
   try {
-    // Execute the callback while holding the lock
     return await callback();
   } finally {
-    // Release the lock
     releaseLock!();
-    // Clean up if this is still our lock
+    // Only delete if no one else has replaced our lock in the meantime
     if (locks.get(filePath) === lockPromise) {
       locks.delete(filePath);
     }
   }
 }
 
-/**
- * Checks if a file is currently locked
- */
+/** Check whether a file currently has a pending write lock */
 export function isLocked(filePath: string): boolean {
   return locks.has(filePath);
 }

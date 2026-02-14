@@ -1,8 +1,16 @@
+/**
+ * SceneNPCPanel -- Renders a single NPC card during live play.
+ *
+ * Supports two layouts: compact (grid tile with portrait) and full (larger card).
+ * The DM sees stat controls (health, armor, disposition); players see a read-only view.
+ * Disposition (hostile/neutral/friendly) tints the card border and background.
+ */
 import { Link } from 'react-router-dom';
 import { User, X, Shield, Heart, Minus, Plus, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { SceneNPC, Disposition } from '../../../core/providers/SceneNPCsProvider';
 
+/** Props for SceneNPCPanel. Callbacks are optional -- omit them for read-only mode. */
 interface SceneNPCPanelProps {
   npc: SceneNPC;
   onRemove?: () => void;
@@ -52,11 +60,12 @@ export function SceneNPCPanel({
 }: SceneNPCPanelProps) {
   const { campaign } = useCampaign();
 
+  // ── Derived state ──────────────────────────────────────────────────
   const portraitUrl = npc.portrait && campaign
     ? `/api/campaigns/${campaign.id}/assets/${npc.portrait.replace('assets/', '')}`
     : null;
 
-  // Support both old and new field names
+  // Support both old (`isAntagonist` / `antagonistStats`) and new field names
   const hasStats = npc.hasStats ?? npc.isAntagonist ?? false;
   const stats = npc.stats ?? npc.antagonistStats ?? {};
   const damage = stats.damage || 0;
@@ -66,6 +75,8 @@ export function SceneNPCPanel({
   const isHiddenFromPlayers = npc.visibleToPlayers === false;
   const disposition = npc.disposition || 'neutral';
 
+  // ── Event handlers ─────────────────────────────────────────────────
+  /** Increment or decrement damage, clamped to >= 0 */
   const handleDamageChange = (delta: number) => {
     if (onUpdateStats) {
       const newDamage = Math.max(0, damage + delta);
@@ -76,6 +87,8 @@ export function SceneNPCPanel({
   const borderClass = getDispositionBorderClass(disposition, isHiddenFromPlayers);
   const bgClass = getDispositionBgClass(disposition, isHiddenFromPlayers);
 
+  // ── Render ──────────────────────────────────────────────────────────
+  // Compact layout: smaller tile used in grid views
   if (compact) {
     return (
       <div className={`relative rounded-lg border-2 overflow-hidden ${borderClass} ${bgClass}`}>

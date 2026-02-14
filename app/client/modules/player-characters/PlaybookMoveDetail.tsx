@@ -1,3 +1,9 @@
+/**
+ * PlaybookMoveDetail - Full-page view for a single playbook move.
+ * Fetches the move's rule content from the rules module and renders
+ * it as markdown, with a back-link to the owning character.
+ */
+
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { useCampaign } from '../../core/providers/CampaignProvider';

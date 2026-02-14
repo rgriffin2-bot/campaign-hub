@@ -1,3 +1,10 @@
+/**
+ * ProjectDetail -- read-only detail for a downtime project.
+ * Features a large interactive progress clock and +/- buttons that persist
+ * changes immediately, so the DM can tick progress during play.
+ * Shows phase info for multi-phase projects, tags, and markdown notes.
+ */
+
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Clock, Eye, EyeOff, Minus, Plus, Check } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +24,7 @@ export function ProjectDetail() {
 
   const { data: project, isLoading } = get(fileId || '');
 
-  // Mutation for updating progress
+  // Direct API mutation for updating progress (bypasses full form save)
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<ProjectFrontmatter>) => {
       if (!campaign || !fileId) throw new Error('Missing campaign or file ID');
@@ -85,6 +92,7 @@ export function ProjectDetail() {
   const frontmatter = project.frontmatter as unknown as ProjectFrontmatter;
   const isHidden = frontmatter.hidden === true;
 
+  // Derive clock state -- a project is complete when all segments are filled
   const clockSize = parseInt(frontmatter.clockSize || '6');
   const progress = frontmatter.progress ?? 0;
   const isComplete = progress >= clockSize;
@@ -94,6 +102,7 @@ export function ProjectDetail() {
     toggleVisibility.mutate({ fileId, hidden: !isHidden });
   };
 
+  // Clamp progress between 0 and clockSize before persisting
   const handleProgressChange = (delta: number) => {
     const newProgress = Math.max(0, Math.min(clockSize, progress + delta));
     if (newProgress !== progress) {

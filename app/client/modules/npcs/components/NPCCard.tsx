@@ -1,3 +1,8 @@
+/**
+ * NPCCard -- Compact card for the NPC grid list.
+ * Shows portrait, name, occupation, location, and quick-action buttons
+ * for toggling scene membership and player visibility.
+ */
 import { Link } from 'react-router-dom';
 import { User, Eye, EyeOff, MapPin, UserPlus, UserMinus, Swords } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
@@ -14,11 +19,12 @@ export function NPCCard({ npc }: NPCCardProps) {
   const { toggleVisibility } = useFiles('npcs');
   const { addToScene, removeFromScene, isInScene } = useSceneNPCs();
 
+  // --- Derived status flags ---
   const isHidden = npc.hidden === true;
   const inScene = isInScene(npc.id);
   const isAntagonist = npc.isAntagonist === true;
 
-  // Get portrait URL if available
+  // Build portrait asset URL from the stored relative path
   const portrait = npc.portrait as string | undefined;
   const portraitPosition = npc.portraitPosition as { x: number; y: number; scale: number } | undefined;
   const portraitUrl = portrait && campaign
@@ -27,12 +33,14 @@ export function NPCCard({ npc }: NPCCardProps) {
 
   const location = npc.location as string | undefined;
 
+  // stopPropagation prevents the click from navigating via the parent Link
   const handleToggleVisibility = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     toggleVisibility.mutate({ fileId: npc.id, hidden: !isHidden });
   };
 
+  /** Add or remove this NPC from the active live-play scene */
   const handleToggleScene = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();

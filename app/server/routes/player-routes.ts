@@ -1,3 +1,16 @@
+/**
+ * Player Routes
+ *
+ * Read-only (mostly) API endpoints served to players via the player site.
+ * Every response is filtered to strip DM-only content, hidden items, and
+ * sensitive NPC/ship stats before being sent to the client. Players get
+ * limited write access for: their own character trackers, session notes,
+ * crew ship updates, and dice rolls.
+ *
+ * All routes are mounted under /api/player and require at least player-level
+ * authentication (see server/index.ts).
+ */
+
 import { Router } from 'express';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -13,7 +26,8 @@ import { withFileLock } from '../core/file-lock.js';
 
 const router = Router();
 
-// Helper to filter out system files (IDs starting with _)
+// System files (IDs prefixed with _) are internal config files like _map-config
+// that should never be exposed to players.
 function filterSystemFiles<T extends { id: string }>(files: T[]): T[] {
   return files.filter((f) => !f.id.startsWith('_'));
 }
@@ -45,11 +59,11 @@ router.get('/campaigns/:campaignId/files/:moduleId', async (req, res) => {
     const category = req.query.category as string | undefined;
 
     const files = await fileStore.list(campaignId, moduleId);
-    // Filter out system files (like _map-config) and DM-only content
+    // Three-stage filter: remove internal system files, strip DM-only entries,
+    // then optionally narrow by category (e.g., playbook move categories)
     const nonSystemFiles = filterSystemFiles(files);
     const filtered = filterDmOnlyMetadataList(nonSystemFiles);
 
-    // Apply category filter if specified (for playbook moves, etc.)
     const result = category
       ? filtered.filter((f) => (f as { category?: string }).category === category)
       : filtered;
@@ -72,12 +86,13 @@ router.get('/campaigns/:campaignId/files/:moduleId/:fileId', async (req, res) =>
       return;
     }
 
-    // Check if this item is hidden from players
+    // Hidden items return 404 (not 403) so players can't tell they exist
     if (isHiddenFromPlayers(file.frontmatter)) {
       res.status(404).json({ success: false, error: 'File not found' });
       return;
     }
 
+    // Strip DM-only sections from the file's content and frontmatter
     const filtered = filterDmOnlyContent(file);
     res.json({ success: true, data: filtered });
   } catch (error) {
@@ -142,7 +157,7 @@ router.get('/campaigns/:campaignId/search', async (req, res) => {
         // Search in name
         const nameMatch = file.name.toLowerCase().includes(query);
 
-        // Search in other visible fields (not dmOnly or hidden)
+        // Destructure away DM-only fields, then search remaining visible text
         const { dmOnly, hidden, ...visibleFields } = file as Record<string, unknown>;
         const fieldValues = Object.values(visibleFields)
           .filter((v) => typeof v === 'string')
@@ -290,7 +305,8 @@ router.put('/campaigns/:campaignId/files/player-characters/:fileId', async (req,
 });
 
 // Update trackers for a player character (for Live Play)
-// This is intentionally limited to only tracker fields for safety
+// Allowlisted to tracker fields only so players can't overwrite
+// narrative fields, portraits, or other DM-managed data.
 router.patch('/campaigns/:campaignId/files/player-characters/:fileId/trackers', async (req, res) => {
   try {
     const { campaignId, fileId } = req.params;
@@ -371,7 +387,8 @@ router.post(
 // Player Map Route (Read-Only, Filtered)
 // =============================================================================
 
-// Get the generated map HTML for players (hidden celestial bodies filtered)
+// Serve the player-specific star system map. Hidden celestial bodies are
+// excluded. The map is lazily generated and cached as an HTML file.
 router.get('/campaigns/:campaignId/map', async (req, res) => {
   try {
     const { campaignId } = req.params;
@@ -466,7 +483,9 @@ router.get('/scene-npcs', async (_req, res) => {
       allNPCs = [];
     }
 
-    // Filter to only visible NPCs and strip sensitive data
+    // Strip sensitive stat data from visible NPCs. Players should only see
+    // whether an NPC is defeated (damage >= maxDamage), not the exact numbers.
+    // This prevents metagaming around remaining hit points.
     const visibleNPCs = allNPCs
       .filter(npc => npc.visibleToPlayers !== false)
       .map(npc => {
@@ -483,12 +502,11 @@ router.get('/scene-npcs', async (_req, res) => {
           disposition: npc.disposition,
           isAntagonist: npc.isAntagonist,
           hasStats,
-          // Only include defeated status, not actual stats
+          // Binary defeated check: expose full damage or 0, nothing in between
           antagonistStats: hasStats && stats ? {
-            // Calculate if defeated without exposing actual numbers
             damage: (stats.damage || 0) >= (stats.maxDamage || 10)
-              ? (stats.maxDamage || 10) // Just indicate "full damage" for defeated
-              : 0, // Otherwise show 0
+              ? (stats.maxDamage || 10)
+              : 0,
             maxDamage: stats.maxDamage || 10,
           } : undefined,
           stats: hasStats && stats ? {
@@ -563,7 +581,9 @@ router.get('/scene-ships', async (_req, res) => {
   }
 });
 
-// Update crew ship (players can update crew ships)
+// Players can update only crew ships (isCrewShip flag) and only the
+// pressure/damage fields. The entire read-modify-write is wrapped in
+// a file lock to prevent race conditions from concurrent player updates.
 router.patch('/scene-ships/:shipId', async (req, res) => {
   try {
     const campaign = campaignManager.getActive();
@@ -669,8 +689,8 @@ router.get('/tactical-boards', async (_req, res) => {
 
     const boards = await fileStore.list(campaign.id, 'tactical-boards');
 
-    // Filter out hidden boards and filter tokens to only visible ones
-    // Note: list returns FileMetadata which includes frontmatter fields
+    // Two-level visibility filter: exclude hidden boards entirely, then
+    // within visible boards strip any tokens the DM has hidden.
     const visibleBoards = boards
       .filter((board) => !(board as Record<string, unknown>).hidden)
       .map((board) => {
@@ -728,7 +748,8 @@ router.get('/tactical-boards/:boardId', async (req, res) => {
 });
 
 // =============================================================================
-// Player Dice Rolls
+// Player Dice Rolls — Players can view rolls (if DM has made them visible)
+// and submit their own. The roller is always tagged as 'player'.
 // =============================================================================
 
 interface DiceRoll {
@@ -837,7 +858,8 @@ router.post('/dice-rolls', async (req, res) => {
 });
 
 // =============================================================================
-// Player Initiative (Read-Only)
+// Player Initiative (Read-Only) — Players see the turn order but DM notes
+// are stripped and a hidden tracker returns an empty list.
 // =============================================================================
 
 interface InitiativeEntry {
@@ -883,7 +905,8 @@ router.get('/initiative', async (_req, res) => {
       // File doesn't exist - return default state
     }
 
-    // If not visible to players, return minimal state
+    // When the DM hides the tracker, return an empty shell so the
+    // player UI can show "initiative hidden" instead of stale data.
     if (!state.visibleToPlayers) {
       res.json({
         success: true,
@@ -897,7 +920,7 @@ router.get('/initiative', async (_req, res) => {
       return;
     }
 
-    // Remove DM notes from entries
+    // DM notes may contain spoilers/tactics; strip before sending to players
     const entriesWithoutNotes = state.entries.map((entry) => ({
       ...entry,
       notes: undefined,

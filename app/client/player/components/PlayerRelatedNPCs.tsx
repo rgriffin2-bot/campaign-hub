@@ -1,3 +1,9 @@
+/**
+ * PlayerRelatedNPCs - Displays a list of NPCs related to a player character.
+ * Handles both legacy string-ID format and the newer RelatedCharacter object format.
+ * Each NPC name links to the player-facing NPC detail page.
+ */
+
 import { Link } from 'react-router-dom';
 import { usePlayerFiles } from '../hooks/usePlayerFiles';
 import type { RelatedCharacter } from '@shared/schemas/npc';

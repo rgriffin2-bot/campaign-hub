@@ -1,3 +1,10 @@
+/**
+ * PlayerProjectDetail.tsx
+ *
+ * Player (read-only) detail page for a single downtime project.
+ * Shows the progress clock, owner, description, phase info,
+ * a linear progress bar, and markdown notes.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Check } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
@@ -5,6 +12,7 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { ProjectClock } from '../modules/projects/components/ProjectClock';
 import { CLOCK_SIZE_LABELS, type ProjectFrontmatter, type ClockSize } from '@shared/schemas/project';
 
+/** Project detail page for the player view. */
 export function PlayerProjectDetail() {
   const { fileId } = useParams<{ fileId: string }>();
   const { get } = usePlayerFiles('projects');

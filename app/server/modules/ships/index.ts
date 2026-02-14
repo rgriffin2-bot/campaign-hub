@@ -1,3 +1,9 @@
+/**
+ * Ships + Vehicles module definition.
+ * Provides CRUD for starships, vehicles, mechs, drones, and other vessels.
+ * Registers relationship fields so ships appear in cross-module affiliation lookups.
+ */
+
 import { shipSchema } from '../../../shared/schemas/ship.js';
 import { createBaseRoutes } from '../base-routes.js';
 import { moduleRegistry } from '../registry.js';

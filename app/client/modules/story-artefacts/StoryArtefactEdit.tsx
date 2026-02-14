@@ -1,3 +1,10 @@
+/**
+ * StoryArtefactEdit -- create/edit form for story artefacts.
+ * New artefacts must be saved before images can be uploaded (the server
+ * needs a file ID). For existing artefacts, images can be added, set as
+ * primary, or deleted directly from this page.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Upload, Plus } from 'lucide-react';
@@ -19,6 +26,7 @@ export function StoryArtefactEdit() {
   const isNew = fileId === 'new';
   const { data: existingArtefact, isLoading, refetch } = get(isNew ? '' : fileId || '');
 
+  // -- Form state -------------------------------------------------------------
   const [name, setName] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
@@ -28,6 +36,7 @@ export function StoryArtefactEdit() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Populate form when editing an existing artefact
   useEffect(() => {
     if (existingArtefact && !isNew) {
       const fm = existingArtefact.frontmatter as unknown as StoryArtefactFrontmatter;
@@ -40,6 +49,7 @@ export function StoryArtefactEdit() {
     }
   }, [existingArtefact, isNew]);
 
+  // -- Save handler -----------------------------------------------------------
   const handleSave = async () => {
     if (!name.trim()) return;
 
@@ -91,6 +101,7 @@ export function StoryArtefactEdit() {
     }
   };
 
+  // -- Image management callbacks (upload, set primary, delete) ---------------
   const handleImageUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!e.target.files || !campaign || !fileId || isNew) return;
@@ -179,6 +190,7 @@ export function StoryArtefactEdit() {
     [campaign, fileId, refetch]
   );
 
+  // Append a suggested tag to the tags input, avoiding duplicates
   const addSuggestedTag = (tag: string) => {
     const currentTags = tags
       .split(',')
@@ -197,7 +209,7 @@ export function StoryArtefactEdit() {
     );
   }
 
-  // Get current images from the fetched data (more up-to-date than local state for images)
+  // Prefer server-fetched images over local state since uploads bypass React state
   const currentImages = existingArtefact
     ? ((existingArtefact.frontmatter as unknown as StoryArtefactFrontmatter).images || [])
     : images;

@@ -1,3 +1,9 @@
+/**
+ * Session Notes module definition.
+ * Provides CRUD for play session recaps and notes.
+ * Uses standard base routes with no custom route overrides.
+ */
+
 import { sessionNotesSchema } from '../../../shared/schemas/session-notes.js';
 import { createBaseRoutes } from '../base-routes.js';
 import { moduleRegistry } from '../registry.js';

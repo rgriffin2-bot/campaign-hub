@@ -1,3 +1,10 @@
+/**
+ * Campaign CRUD operations and active-campaign tracking.
+ *
+ * Each campaign is a folder under `campaignsDir` containing a
+ * `campaign.yaml` config file plus per-module subfolders of markdown files.
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
@@ -11,12 +18,18 @@ import type {
   UpdateCampaignInput,
 } from '../../shared/types/campaign.js';
 
+// ── State ──────────────────────────────────────────────────────────────
+// Only one campaign is "active" at a time; this is the one the UI operates on.
 let activeCampaign: CampaignConfig | null = null;
 
+// ── Filesystem Helpers ─────────────────────────────────────────────────
+
+/** Create directory (and parents) if it doesn't exist */
 async function ensureDir(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
+/** Check whether a file or directory exists at the given path */
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -26,6 +39,7 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+/** Read and parse the campaign.yaml config from a campaign folder */
 async function readCampaignConfig(campaignPath: string): Promise<CampaignConfig | null> {
   const configPath = path.join(campaignPath, 'campaign.yaml');
 
@@ -37,6 +51,7 @@ async function readCampaignConfig(campaignPath: string): Promise<CampaignConfig 
   return yaml.load(content) as CampaignConfig;
 }
 
+/** Serialize a CampaignConfig back to YAML and write it to disk */
 async function writeCampaignConfig(
   campaignPath: string,
   config: CampaignConfig
@@ -46,7 +61,10 @@ async function writeCampaignConfig(
   await fs.writeFile(configPath, content, 'utf-8');
 }
 
+// ── Campaign Manager API ───────────────────────────────────────────────
+
 export const campaignManager = {
+  /** List all campaigns, sorted by most-recently-accessed first */
   async list(): Promise<CampaignMeta[]> {
     await ensureDir(config.campaignsDir);
 
@@ -70,6 +88,7 @@ export const campaignManager = {
       }
     }
 
+    // Sort by last accessed (most recent first), fall back to alphabetical
     return campaigns.sort((a, b) => {
       if (a.lastAccessed && b.lastAccessed) {
         return new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime();
@@ -78,11 +97,13 @@ export const campaignManager = {
     });
   },
 
+  /** Load a single campaign's config by ID */
   async load(campaignId: string): Promise<CampaignConfig | null> {
     const campaignPath = path.join(config.campaignsDir, campaignId);
     return readCampaignConfig(campaignPath);
   },
 
+  /** Create a new campaign folder with config and module subdirectories */
   async create(input: CreateCampaignInput): Promise<CampaignConfig> {
     const id = input.id || generateId();
     const campaignPath = path.join(config.campaignsDir, id);
@@ -111,6 +132,7 @@ export const campaignManager = {
     return campaignConfig;
   },
 
+  /** Update campaign metadata. Preserves immutable fields (id, created). */
   async update(
     campaignId: string,
     updates: UpdateCampaignInput
@@ -122,6 +144,7 @@ export const campaignManager = {
       return null;
     }
 
+    // Merge updates but never overwrite id or created timestamp
     const updated: CampaignConfig = {
       ...existing,
       ...updates,
@@ -138,6 +161,7 @@ export const campaignManager = {
 
     await writeCampaignConfig(campaignPath, updated);
 
+    // Keep in-memory active campaign in sync if this is the one being updated
     if (activeCampaign?.id === campaignId) {
       activeCampaign = updated;
     }
@@ -145,6 +169,7 @@ export const campaignManager = {
     return updated;
   },
 
+  /** Delete a campaign and its entire folder tree */
   async delete(campaignId: string): Promise<boolean> {
     const campaignPath = path.join(config.campaignsDir, campaignId);
 
@@ -161,10 +186,12 @@ export const campaignManager = {
     return true;
   },
 
+  /** Return the currently active campaign (may be null on startup) */
   getActive(): CampaignConfig | null {
     return activeCampaign;
   },
 
+  /** Mark a campaign as active and update its lastAccessed timestamp */
   async setActive(campaignId: string): Promise<CampaignConfig | null> {
     const campaign = await this.load(campaignId);
 

@@ -1,3 +1,7 @@
+/**
+ * SessionNotesDetail -- Read-only view of a single session notes entry.
+ * Displays title, date, author, tags, copyable ID, and markdown content.
+ */
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, StickyNote, Calendar, User } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
@@ -12,6 +16,7 @@ export function SessionNotesDetail() {
 
   const { data: notes, isLoading } = get(fileId || '');
 
+  /** Delete these session notes after confirmation, then redirect to list */
   const handleDelete = async () => {
     if (!fileId) return;
     if (!confirm('Are you sure you want to delete these session notes?')) return;
@@ -20,6 +25,7 @@ export function SessionNotesDetail() {
     navigate('/modules/session-notes');
   };
 
+  // --- Loading state ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
