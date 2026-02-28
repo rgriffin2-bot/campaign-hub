@@ -108,7 +108,8 @@ const corsOptions: cors.CorsOptions = {
       origin.startsWith('http://172.29.') ||
       origin.startsWith('http://172.30.') ||
       origin.startsWith('http://172.31.') ||
-      origin.includes('.trycloudflare.com');
+      origin.includes('.trycloudflare.com') ||
+      origin.includes('khaos-kontinuum.org');
 
     if (isAllowed) {
       callback(null, true);
