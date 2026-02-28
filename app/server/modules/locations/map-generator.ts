@@ -18,9 +18,9 @@ import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import type { FileMetadata } from '@shared/types/file';
-import type { CelestialData, MapConfig } from '@shared/schemas/location';
-import { DEFAULT_MAP_CONFIG } from '@shared/schemas/location';
+import type { FileMetadata } from '../../../shared/types/file.js';
+import type { CelestialData, MapConfig } from '../../../shared/schemas/location.js';
+import { DEFAULT_MAP_CONFIG } from '../../../shared/schemas/location.js';
 
 // Resolve __dirname for ESM (needed to locate the Python script)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
