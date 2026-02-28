@@ -13,6 +13,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import * as fs from 'fs/promises';
 import { config } from './config.js';
 import { campaignManager } from './core/campaign-manager.js';
@@ -1010,6 +1011,32 @@ app.use('/api/player', auth.requirePlayer, playerRoutes);
 // DM-only. The registry auto-mounts each module's declared routes.
 app.use('/api/modules', auth.requireDm);
 moduleRegistry.mountRoutes(app);
+
+// =============================================================================
+// Production Static File Serving
+// =============================================================================
+// In production, the Express server serves the built React frontend too.
+// In dev mode, Vite handles this on port 5173 instead.
+
+if (!config.isDev) {
+  // Compute the path to the built client files (dist/client/)
+  // Works whether running from dist/server/index.js or app/server/index.ts
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const projectRoot = path.resolve(__dirname, '../..');
+  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+
+  // Serve static assets (JS, CSS, images) from the Vite build output
+  app.use(express.static(clientDistPath));
+
+  // SPA catch-all: any non-API route serves index.html so React Router can handle it.
+  // This must come AFTER all API routes are mounted.
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+
+  console.log(`Serving client from: ${clientDistPath}`);
+}
 
 // Watch campaign files on disk for external edits (e.g., text editor)
 fileWatcher.start();

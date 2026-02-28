@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-02-27 (session 3)
+
+### Session 3: Raspberry Pi Deployment Support
+
+**What changed:** Added production static file serving to the Express server (so one process serves both API and frontend), created systemd service files for auto-start on boot (`deploy/campaignhub.service`, `deploy/campaignhub-tunnel.service`), a deploy script for pushing updates from Mac to Pi (`scripts/deploy.sh`), and a first-time Pi setup script (`scripts/pi-setup.sh`). Updated `PROJECT.md` with Pi deployment docs.
+
+**Why:** To support running Campaign Hub as an always-on server on a Raspberry Pi, removing the need to have the Mac running during game sessions. The key code change was adding an SPA catch-all in the Express server for production mode — previously the server only served the API, relying on Vite's dev server for the frontend.
+
+---
+
 ## 2026-02-14 (session 2)
 
 **What changed:** Switched from ngrok to Cloudflare Tunnel for remote player access, reduced live play polling from 3 seconds to 1 second, and increased the rate limit to 5000 req/15min to support 5 players + DM.

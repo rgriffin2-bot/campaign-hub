@@ -1,0 +1,62 @@
+# =============================================================================
+# Campaign Hub — systemd Service File
+# =============================================================================
+# This tells Linux to run the Campaign Hub server automatically on boot
+# and restart it if it crashes. Think of it like the macOS .app launcher,
+# but for Linux and fully automatic.
+#
+# Install on the Pi:
+#   sudo cp deploy/campaignhub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable campaignhub    # auto-start on boot
+#   sudo systemctl start campaignhub     # start it now
+#
+# Useful commands:
+#   sudo systemctl status campaignhub    # check if it's running
+#   sudo systemctl restart campaignhub   # restart after a deploy
+#   sudo journalctl -u campaignhub -f    # watch live logs (like tail -f)
+# =============================================================================
+
+[Unit]
+# Human-readable description shown in status output
+Description=Campaign Hub RPG Dashboard
+# Wait for networking to be ready before starting
+After=network.target
+
+[Service]
+# "simple" means systemd considers the service started once the process launches
+Type=simple
+
+# Run as the "pi" user, not root (safer)
+User=pi
+Group=pi
+
+# Where the app lives on the Pi — adjust if you clone it elsewhere
+WorkingDirectory=/home/pi/campaign-hub
+
+# The actual command to run the production server.
+# Uses a bash login shell so nvm's Node is on the PATH.
+# (nvm installs Node in ~/.nvm/ rather than /usr/bin/, and systemd
+# doesn't load ~/.bashrc by default, so we need the login shell trick.)
+ExecStart=/bin/bash -lc 'node dist/server/index.js'
+
+# If the server crashes, wait 5 seconds then restart it automatically
+Restart=on-failure
+RestartSec=5
+
+# Load environment variables from the .env file
+EnvironmentFile=/home/pi/campaign-hub/.env
+
+# Set production mode
+Environment=NODE_ENV=production
+
+# Send console.log output to the system journal (viewable with journalctl)
+StandardOutput=journal
+StandardError=journal
+
+# Tag logs so you can filter them: journalctl -u campaignhub
+SyslogIdentifier=campaignhub
+
+[Install]
+# Start this service when the system reaches "multi-user" mode (normal boot)
+WantedBy=multi-user.target

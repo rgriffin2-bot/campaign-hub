@@ -190,9 +190,15 @@ campaign-hub/
 ├── Campaign Hub.app/               # macOS app bundle (convenience launcher)
 │   └── Contents/MacOS/launch       # Shell script that starts servers + Cloudflare Tunnel
 │
+├── deploy/                            # Raspberry Pi deployment files
+│   ├── campaignhub.service            # systemd service: auto-starts the server on boot
+│   └── campaignhub-tunnel.service     # systemd service: auto-starts the Cloudflare Tunnel
+│
 ├── scripts/
-│   ├── start.sh                    # Start dev servers
-│   └── stop.sh                     # Stop dev servers
+│   ├── start.sh                    # Start dev servers (Mac)
+│   ├── stop.sh                     # Stop dev servers (Mac)
+│   ├── deploy.sh                   # Deploy to Pi from Mac (pull, build, restart)
+│   └── pi-setup.sh                 # First-time Pi setup (install Node, cloudflared, etc.)
 │
 └── dist/                           # Production build output
     ├── client/                     # Vite-built SPA
@@ -279,6 +285,33 @@ Copy or edit `.env` in the project root:
 | `tailwind-merge` / `clsx` / `class-variance-authority` | CSS class merging and variant utilities |
 | `concurrently` | Runs the client and server dev processes in parallel |
 | `eslint` | Code linting |
+
+### Raspberry Pi Deployment (Always-On Server)
+
+Campaign Hub can run on a Raspberry Pi as a headless always-on server. The Pi runs the production build and a Cloudflare Tunnel, auto-starting on boot via systemd. You develop on your Mac and deploy with a single command.
+
+**First-time setup on the Pi:**
+1. Set up SSH access from your Mac to the Pi (see `deploy/` files for details)
+2. Edit `scripts/pi-setup.sh` — set `REPO_URL` to your git repo URL
+3. Run the setup script on the Pi: `bash scripts/pi-setup.sh`
+4. Edit `~/campaign-hub/.env` on the Pi with your passwords and API key
+5. Start: `sudo systemctl start campaignhub campaignhub-tunnel`
+
+**Deploying updates from your Mac:**
+```bash
+git push                    # Push your changes
+./scripts/deploy.sh         # SSHes into Pi, pulls, builds, restarts
+```
+
+**Useful Pi commands (via SSH):**
+```bash
+sudo systemctl status campaignhub         # Is the server running?
+sudo systemctl restart campaignhub        # Restart the server
+sudo journalctl -u campaignhub -f         # Watch live server logs
+cat ~/campaign-hub/.tunnel-url            # Current player URL
+```
+
+**Requirements:** Raspberry Pi 4+ (4GB RAM), Raspbian/Pi OS 64-bit, Node.js 20+, cloudflared.
 
 ---
 
