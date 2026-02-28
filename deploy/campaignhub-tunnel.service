@@ -38,7 +38,7 @@ WorkingDirectory=/home/rgriffin/campaign-hub
 # Run cloudflared and pipe its output through a script that captures the URL.
 # cloudflared prints the tunnel URL to stderr, so we redirect stderr to stdout
 # and use grep/tee to capture it.
-ExecStart=/bin/bash -c 'cloudflared tunnel --url http://localhost:3001 2>&1 | while IFS= read -r line; do echo "$line"; if echo "$line" | grep -oP "https://[a-z0-9-]+\\.trycloudflare\\.com" > /dev/null 2>&1; then echo "$line" | grep -oP "https://[a-z0-9-]+\\.trycloudflare\\.com" > /home/rgriffin/campaign-hub/.tunnel-url; fi; done'
+ExecStart=/bin/bash -c '/usr/local/bin/cloudflared tunnel --url http://localhost:3001 2>&1 | while IFS= read -r line; do echo "$line"; if echo "$line" | grep -oP "https://[a-z0-9-]+\\.trycloudflare\\.com" > /dev/null 2>&1; then echo "$line" | grep -oP "https://[a-z0-9-]+\\.trycloudflare\\.com" > /home/rgriffin/campaign-hub/.tunnel-url; fi; done'
 
 # Restart if it crashes (tunnels can drop occasionally)
 Restart=on-failure

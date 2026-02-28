@@ -35,10 +35,9 @@ Group=rgriffin
 WorkingDirectory=/home/rgriffin/campaign-hub
 
 # The actual command to run the production server.
-# Uses a bash login shell so nvm's Node is on the PATH.
-# (nvm installs Node in ~/.nvm/ rather than /usr/bin/, and systemd
-# doesn't load ~/.bashrc by default, so we need the login shell trick.)
-ExecStart=/bin/bash -lc 'node dist/server/server/index.js'
+# Uses the full path to nvm's Node because systemd doesn't load
+# ~/.bashrc, so nvm isn't available in the default PATH.
+ExecStart=/home/rgriffin/.nvm/versions/node/v20.20.0/bin/node dist/server/server/index.js
 
 # If the server crashes, wait 5 seconds then restart it automatically
 Restart=on-failure
