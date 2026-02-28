@@ -13,7 +13,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import * as fs from 'fs/promises';
 import { config } from './config.js';
 import { campaignManager } from './core/campaign-manager.js';
@@ -1020,11 +1019,8 @@ moduleRegistry.mountRoutes(app);
 
 if (!config.isDev) {
   // Compute the path to the built client files (dist/client/)
-  // Works whether running from dist/server/index.js or app/server/index.ts
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const projectRoot = path.resolve(__dirname, '../..');
-  const clientDistPath = path.join(projectRoot, 'dist', 'client');
+  // Uses process.cwd() which is always the project root (set by npm start / systemd)
+  const clientDistPath = path.join(process.cwd(), 'dist', 'client');
 
   // Serve static assets (JS, CSS, images) from the Vite build output
   app.use(express.static(clientDistPath));

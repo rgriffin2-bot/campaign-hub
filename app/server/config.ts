@@ -6,13 +6,12 @@
  */
 
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 // ── Path Resolution ────────────────────────────────────────────────────
-// Compute project root relative to this file's location (app/server/config.ts)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '../..');
+// Use the working directory as the project root. This works in both:
+// - Dev mode: tsx runs from the project root
+// - Production: npm start and systemd both set WorkingDirectory to project root
+const rootDir = process.cwd();
 
 // ── Exported Config ────────────────────────────────────────────────────
 
