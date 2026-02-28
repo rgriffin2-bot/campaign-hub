@@ -28,11 +28,11 @@ After=network.target
 Type=simple
 
 # Run as the "pi" user, not root (safer)
-User=pi
-Group=pi
+User=rgriffin
+Group=rgriffin
 
 # Where the app lives on the Pi — adjust if you clone it elsewhere
-WorkingDirectory=/home/pi/campaign-hub
+WorkingDirectory=/home/rgriffin/campaign-hub
 
 # The actual command to run the production server.
 # Uses a bash login shell so nvm's Node is on the PATH.
@@ -45,7 +45,7 @@ Restart=on-failure
 RestartSec=5
 
 # Load environment variables from the .env file
-EnvironmentFile=/home/pi/campaign-hub/.env
+EnvironmentFile=/home/rgriffin/campaign-hub/.env
 
 # Set production mode
 Environment=NODE_ENV=production
