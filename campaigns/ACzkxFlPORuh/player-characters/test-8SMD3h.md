@@ -18,7 +18,7 @@ stats:
 pressure: 3
 harm: {}
 resources: dry
-experience: 4
+experience: 3
 luck: false
 gear: []
 playerVisible: true

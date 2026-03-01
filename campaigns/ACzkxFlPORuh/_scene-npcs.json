@@ -39,6 +39,9 @@
       "maxDamage": 10,
       "armor": 0,
       "moves": ""
+    },
+    "stats": {
+      "damage": 0
     }
   },
   {
