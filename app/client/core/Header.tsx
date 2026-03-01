@@ -6,12 +6,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, Settings, Scroll, Plus, LogOut, Users, Copy, Check, ExternalLink } from 'lucide-react';
+import { ChevronDown, Settings, Scroll, Plus, LogOut, Users, Copy, Check, ExternalLink, Menu } from 'lucide-react';
 import { useCampaign } from './providers/CampaignProvider';
 import { useAuth } from './providers/AuthProvider';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { campaign, campaigns, switchCampaign } = useCampaign();
   const { authEnabled, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -45,6 +45,16 @@ export function Header() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
       <div className="flex items-center gap-3">
+        {/* Hamburger menu — mobile only */}
+        {onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:hidden"
+            title="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
         <Link to="/" className="flex items-center gap-2">
           <Scroll className="h-6 w-6 text-primary" />
           <span className="text-lg font-semibold text-foreground">
