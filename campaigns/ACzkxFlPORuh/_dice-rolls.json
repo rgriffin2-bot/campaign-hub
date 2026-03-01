@@ -1,0 +1,41 @@
+{
+  "rolls": [
+    {
+      "id": "1772245515424-zd6ylnv",
+      "diceType": "d100",
+      "result": 17,
+      "rolledBy": "dm",
+      "rollerName": "DM",
+      "rolledAt": "2026-02-28T02:25:15.424Z"
+    },
+    {
+      "id": "1772245237266-dtjrcl5",
+      "diceType": "d10",
+      "result": 5,
+      "rolledBy": "player",
+      "rolledAt": "2026-02-28T02:20:37.266Z"
+    },
+    {
+      "id": "1772245236066-d9dkcqg",
+      "diceType": "d12",
+      "result": 2,
+      "rolledBy": "player",
+      "rolledAt": "2026-02-28T02:20:36.066Z"
+    },
+    {
+      "id": "1772245234806-p01v8q3",
+      "diceType": "d12",
+      "result": 7,
+      "rolledBy": "player",
+      "rolledAt": "2026-02-28T02:20:34.806Z"
+    },
+    {
+      "id": "1772245085694-8r2fqjd",
+      "diceType": "d10",
+      "result": 3,
+      "rolledBy": "player",
+      "rolledAt": "2026-02-28T02:18:05.694Z"
+    }
+  ],
+  "visibleToPlayers": true
+}

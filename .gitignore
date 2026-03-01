@@ -33,8 +33,6 @@ __pycache__/
 npm-debug.log*
 
 # Campaign data (user-specific)
-campaigns/*
-!campaigns/.gitkeep
 
 # Player sites (generated)
 player-sites/*
