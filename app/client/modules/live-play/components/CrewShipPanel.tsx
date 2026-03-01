@@ -99,7 +99,7 @@ export function CrewShipPanel({
     <div className={`rounded-lg border-2 border-primary/30 bg-card overflow-hidden ${hasDamage ? 'border-red-500/30' : ''}`}>
       <div className="flex flex-col">
           {/* Top row: Name/class/type, Pressure, View Entry */}
-          <div className="flex items-center gap-4 border-b border-border px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 border-b border-border px-3 py-2 md:px-4 md:py-3">
             {/* Name and type info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

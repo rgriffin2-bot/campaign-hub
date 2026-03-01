@@ -210,7 +210,7 @@ function PlayerLayoutInner() {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-3 md:p-6">
           <Outlet />
         </main>
       </div>

@@ -68,10 +68,10 @@ export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPa
     return (
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {/* Header with portrait, name below, and luck indicator */}
-        <div className="flex items-start gap-2 border-b border-border p-2">
+        <div className="flex items-start gap-2 border-b border-border p-1.5 md:p-2">
           {/* Portrait and name stacked vertically */}
           <div className="flex flex-col items-start gap-1">
-            <div className="h-[120px] w-[120px] shrink-0 overflow-hidden rounded-md bg-muted">
+            <div className="h-[80px] w-[80px] md:h-[120px] md:w-[120px] shrink-0 overflow-hidden rounded-md bg-muted">
               {fm.portrait && campaign ? (
                 <img
                   src={`/api/campaigns/${campaign.id}/assets/${fm.portrait.replace('assets/', '')}`}
@@ -85,7 +85,7 @@ export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPa
               )}
             </div>
             <div className="flex items-center gap-1">
-              <h3 className="text-[18px] font-semibold text-foreground">{fm.name}</h3>
+              <h3 className="text-sm md:text-[18px] font-semibold text-foreground">{fm.name}</h3>
               <Link
                 to={`/modules/player-characters/${pc.id}`}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
@@ -119,7 +119,7 @@ export function PCPanel({ pc, editable = true, compact = false, onUpdate }: PCPa
         </div>
 
         {/* Trackers - stacked vertically for compact mode */}
-        <div className="space-y-2 p-2">
+        <div className="space-y-1.5 md:space-y-2 p-1.5 md:p-2">
           {/* Pressure & Experience stacked */}
           <div className="space-y-1">
             <PressureTracker

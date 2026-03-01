@@ -43,8 +43,10 @@ export function LivePlayDashboard() {
   const queryClient = useQueryClient();
 
   // ── UI state ──
+  // On mobile (< 768px), default to compact layout and collapsed combat tools
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [layout, setLayout] = useState<LayoutMode>('compact');
-  const [combatToolsExpanded, setCombatToolsExpanded] = useState(true);
+  const [combatToolsExpanded, setCombatToolsExpanded] = useState(!isMobile);
 
   // ── Scene providers ──
   const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
@@ -217,24 +219,25 @@ export function LivePlayDashboard() {
   }
 
   // CSS class map for the three layout modes
+  // On mobile, compact uses a single-column grid instead of flex-wrap
   const layoutClasses = {
-    grid: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3',
-    list: 'flex flex-col gap-4',
-    compact: 'flex flex-wrap gap-2',
+    grid: 'grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    list: 'flex flex-col gap-3 md:gap-4',
+    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap',
   };
 
   // ── Render ──
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {/* Page header + layout toggle */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Play className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Live Play</h1>
+        <div className="flex items-center gap-2 md:gap-3">
+          <Play className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">Live Play</h1>
         </div>
 
-        {/* Layout Toggle */}
-        <div className="flex rounded-md border border-border">
+        {/* Layout Toggle — hidden on mobile (auto-compact) */}
+        <div className="hidden md:flex rounded-md border border-border">
           <button
             onClick={() => setLayout('grid')}
             className={`flex items-center gap-1 px-3 py-1.5 text-sm ${
@@ -291,15 +294,15 @@ export function LivePlayDashboard() {
 
         {/* Collapsible content */}
         {combatToolsExpanded && (
-          <div className="border-t border-border px-4 py-4">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
+            <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-start">
               {/* Dice Roller */}
               <div className="shrink-0 lg:w-[300px]">
                 <DiceRoller isDM />
               </div>
 
               {/* Initiative Tracker */}
-              <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-4">
+              <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 md:p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Swords className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
@@ -356,7 +359,7 @@ export function LivePlayDashboard() {
       ) : (
         <div className={layoutClasses[layout]}>
           {characters.map((pc) => (
-            <div key={pc.id} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+            <div key={pc.id} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
               <PCPanel
                 pc={{
                   id: pc.id,
@@ -395,7 +398,7 @@ export function LivePlayDashboard() {
               if (entity.type === 'npc') {
                 const npc = entity.data;
                 return (
-                  <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                  <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
                     <SceneNPCPanel
                       npc={npc}
                       onRemove={() => removeNPCFromScene(npc.id)}
@@ -409,7 +412,7 @@ export function LivePlayDashboard() {
               } else {
                 const ship = entity.data;
                 return (
-                  <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}>
+                  <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
                     <SceneShipPanel
                       ship={ship}
                       onRemove={() => removeShipFromScene(ship.id)}

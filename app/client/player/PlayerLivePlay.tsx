@@ -39,8 +39,10 @@ type SceneEntity =
 export function PlayerLivePlay() {
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
+  // On mobile (< 768px), default to collapsed combat tools
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [layout, setLayout] = useState<LayoutMode>('compact');
-  const [combatToolsExpanded, setCombatToolsExpanded] = useState(true);
+  const [combatToolsExpanded, setCombatToolsExpanded] = useState(!isMobile);
   const { sceneNPCs } = useSceneNPCs();
   const { sceneShips, updateShip } = useSceneShips();
   const { initiative } = useInitiative();
@@ -132,22 +134,22 @@ export function PlayerLivePlay() {
   // ── Render ──────────────────────────────────────────────────────────
   // CSS grid/flex classes per layout mode
   const layoutClasses = {
-    grid: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3',
-    list: 'flex flex-col gap-4',
-    compact: 'flex flex-wrap gap-2',
+    grid: 'grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    list: 'flex flex-col gap-3 md:gap-4',
+    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap',
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Play className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Live Play</h1>
+        <div className="flex items-center gap-2 md:gap-3">
+          <Play className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">Live Play</h1>
         </div>
 
-        {/* Layout Toggle */}
-        <div className="flex rounded-md border border-border">
+        {/* Layout Toggle — hidden on mobile (auto-compact) */}
+        <div className="hidden md:flex rounded-md border border-border">
           <button
             onClick={() => setLayout('grid')}
             className={`flex items-center gap-1 px-3 py-1.5 text-sm ${
@@ -204,8 +206,8 @@ export function PlayerLivePlay() {
 
         {/* Collapsible content */}
         {combatToolsExpanded && (
-          <div className="border-t border-border px-4 py-4">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
+            <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-start">
               {/* Dice Roller */}
               <div className="shrink-0 lg:w-[300px]">
                 <DiceRoller />
@@ -213,7 +215,7 @@ export function PlayerLivePlay() {
 
               {/* Initiative Tracker (read-only for players, only shows if DM has made it visible) */}
               {initiative.visibleToPlayers && (
-                <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-4">
+                <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 md:p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Swords className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
@@ -252,9 +254,9 @@ export function PlayerLivePlay() {
       )}
 
       {/* Info banner - directly above character row */}
-      <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-4 py-2 text-sm text-muted-foreground">
-        <Lock className="h-4 w-4" />
-        <span>Click on a character panel to enable editing. Other panels are read-only.</span>
+      <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm text-muted-foreground">
+        <Lock className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
+        <span>Tap a character to edit. Others are read-only.</span>
       </div>
 
       {/* Party Tracker */}
@@ -278,7 +280,7 @@ export function PlayerLivePlay() {
                 key={pc.id}
                 onClick={() => setEditablePCId(pc.id)}
                 className={`cursor-pointer transition-all ${
-                  layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''
+                  layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''
                 } ${
                   isEditable ? 'ring-2 ring-primary' : 'opacity-80 hover:opacity-100'
                 }`}
@@ -326,7 +328,7 @@ export function PlayerLivePlay() {
               {sceneEntities.map(entity => (
                 <div
                   key={`${entity.type}-${entity.data.id}`}
-                  className={layout === 'compact' ? 'flex-1 min-w-[180px] max-w-[240px]' : ''}
+                  className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}
                 >
                   {entity.type === 'npc' ? (
                     <SceneNPCPanel
