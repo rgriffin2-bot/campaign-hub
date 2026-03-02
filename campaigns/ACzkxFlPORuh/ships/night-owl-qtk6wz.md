@@ -5,7 +5,7 @@ type: Starship
 class: Freighter
 isCrewShip: true
 hidden: false
-pressure: 1
+pressure: 4
 image: assets/ships/night-owl-qtk6wz.jpg
 imagePosition:
   x: 45

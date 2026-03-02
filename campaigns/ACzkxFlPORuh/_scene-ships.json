@@ -6,7 +6,7 @@
     "class": "Freighter",
     "image": "assets/ships/night-owl-qtk6wz.jpg",
     "isCrewShip": true,
-    "pressure": 1,
+    "pressure": 4,
     "visibleToPlayers": true,
     "damage": {
       "helmControl": {},
