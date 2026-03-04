@@ -1,7 +1,7 @@
 ---
 id: test
 name: Player 1
-player: Jon
+player: jon
 pronouns: ''
 species: ''
 age: ''
