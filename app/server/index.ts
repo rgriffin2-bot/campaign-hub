@@ -22,11 +22,10 @@ import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
 import { upload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage, processAndSaveArtefactImage, deleteArtefactImage } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
-import { createAuthMiddleware, login, logout, validateSession } from './core/auth-middleware.js';
+import { createAuthMiddleware, login, loginAsPlayer, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
 import {
   validate,
-  loginSchema,
   createCampaignSchema,
   updateCampaignSchema,
   createFileSchema,
@@ -123,18 +122,47 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Initialize auth middleware
-const auth = createAuthMiddleware(config.auth.dmPassword, config.auth.playerPassword);
+const auth = createAuthMiddleware(config.auth.dmPassword, config.auth.players);
 
 // =============================================================================
 // Auth Routes
 // =============================================================================
 
-// Login — issues a session cookie with role (dm or player).
-// The Secure flag is added dynamically when behind an HTTPS proxy (Cloudflare Tunnel).
-app.post('/api/auth/login', authLimiter, validate({ body: loginSchema }), (req, res) => {
-  const { password } = req.body;
+// Player list — public endpoint so the login selector can populate before auth.
+app.get('/api/auth/players', (_req, res) => {
+  res.json({ success: true, players: config.auth.players });
+});
 
-  const result = login(password, config.auth.dmPassword, config.auth.playerPassword);
+// Login — issues a session cookie with role (dm or player).
+// Accepts { password } for GM login or { playerName } for player login.
+// The Secure flag is added dynamically when behind an HTTPS proxy (Cloudflare Tunnel).
+app.post('/api/auth/login', authLimiter, (req, res) => {
+  const { password, playerName } = req.body;
+
+  // Player login: select by name, no password
+  if (playerName && typeof playerName === 'string') {
+    const result = loginAsPlayer(playerName, config.auth.players);
+    if (result.success) {
+      const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+      const securePart = isSecure ? '; Secure' : '';
+      res.setHeader(
+        'Set-Cookie',
+        `session=${result.token}; HttpOnly; SameSite=Strict${securePart}; Max-Age=${24 * 60 * 60}; Path=/`
+      );
+      res.json({ success: true, role: result.role, playerName: result.playerName });
+    } else {
+      res.status(401).json(result);
+    }
+    return;
+  }
+
+  // GM login: password required
+  if (!password || typeof password !== 'string') {
+    res.status(400).json({ success: false, error: 'Password or player name required' });
+    return;
+  }
+
+  const result = login(password, config.auth.dmPassword);
 
   if (result.success) {
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
@@ -202,7 +230,7 @@ app.get('/api/auth/session', (req, res) => {
     if (match) {
       const session = validateSession(match[1]);
       if (session) {
-        res.json({ success: true, authenticated: true, role: session.role, authEnabled: true });
+        res.json({ success: true, authenticated: true, role: session.role, playerName: session.playerName, selectedCampaignId: session.selectedCampaignId, authEnabled: true });
         return;
       }
     }
@@ -1046,7 +1074,7 @@ app.listen(config.port, '0.0.0.0', () => {
   console.log(`Authentication: ${auth.authEnabled ? 'ENABLED' : 'DISABLED (set DM_PASSWORD and PLAYER_PASSWORD in .env)'}`);
   if (auth.authEnabled) {
     console.log(`  - DM password: ${config.auth.dmPassword ? 'SET' : 'NOT SET'}`);
-    console.log(`  - Player password: ${config.auth.playerPassword ? 'SET' : 'NOT SET'}`);
+    console.log(`  - Players: ${config.auth.players.length ? config.auth.players.join(', ') : 'NONE'}`);
   }
 });
 

@@ -2,7 +2,7 @@
  * AuthProvider -- manages authentication state (session check, login, logout).
  * On mount, checks the server for an existing session. When auth is disabled
  * server-side, `authEnabled` is false and the user is treated as authenticated.
- * Exposes role ('dm' | 'player') and auth actions via React context.
+ * Supports both GM login (password) and player login (name selection, no password).
  */
 import {
   createContext,
@@ -15,15 +15,18 @@ import {
 
 type Role = 'dm' | 'player';
 
+type LoginOpts = { password: string } | { playerName: string };
+
 interface AuthState {
   authenticated: boolean;
   role: Role | null;
+  playerName: string | null;
   authEnabled: boolean;
   loading: boolean;
 }
 
 interface AuthContextValue extends AuthState {
-  login: (password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (opts: LoginOpts) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
 }
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>({
     authenticated: false,
     role: null,
+    playerName: null,
     authEnabled: true,
     loading: true,
   });
@@ -54,6 +58,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setState({
           authenticated: data.authenticated,
           role: data.role || null,
+          playerName: data.playerName || null,
           authEnabled: data.authEnabled,
           loading: false,
         });
@@ -66,13 +71,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  // Authenticate with a password; sets role on success
-  const login = useCallback(async (password: string) => {
+  // Authenticate — accepts { password } for GM or { playerName } for players
+  const login = useCallback(async (opts: LoginOpts) => {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(opts),
         credentials: 'include',
       });
 
@@ -83,6 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           ...prev,
           authenticated: true,
           role: data.role,
+          playerName: data.playerName || null,
         }));
         return { success: true };
       } else {
@@ -109,6 +115,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       ...prev,
       authenticated: false,
       role: null,
+      playerName: null,
     }));
   }, []);
 

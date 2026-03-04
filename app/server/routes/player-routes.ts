@@ -11,7 +11,7 @@
  * authentication (see server/index.ts).
  */
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileStore } from '../core/file-store.js';
@@ -23,6 +23,7 @@ import { config } from '../config.js';
 import { generateStarSystemMap } from '../modules/locations/map-generator.js';
 import { upload, processAndSavePCPortrait } from '../core/upload-handler.js';
 import { withFileLock } from '../core/file-lock.js';
+import { getTokenFromRequest, setSessionCampaign } from '../core/auth-middleware.js';
 
 const router = Router();
 
@@ -32,13 +33,67 @@ function filterSystemFiles<T extends { id: string }>(files: T[]): T[] {
   return files.filter((f) => !f.id.startsWith('_'));
 }
 
+/**
+ * Get the campaign for a player request. Prefers the player's session-selected
+ * campaign, falls back to the DM's global active campaign.
+ */
+async function getPlayerCampaign(req: Request) {
+  const selectedId = req.sessionData?.selectedCampaignId;
+  if (selectedId) {
+    return campaignManager.load(selectedId);
+  }
+  return campaignManager.getActive();
+}
+
 // =============================================================================
-// Player Campaign & Module Routes (Read-Only)
+// Player Campaign & Module Routes
 // =============================================================================
 
-// Get active campaign (players need this to know which campaign to load)
-router.get('/active-campaign', (_req, res) => {
-  const campaign = campaignManager.getActive();
+// List all campaigns (player-safe: id, name, description only)
+router.get('/campaigns', async (_req, res) => {
+  try {
+    const campaigns = await campaignManager.list();
+    const safe = campaigns.map(c => ({ id: c.id, name: c.name, description: c.description }));
+    res.json({ success: true, data: safe });
+  } catch (error) {
+    console.error('Error listing campaigns for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to list campaigns' });
+  }
+});
+
+// Select a campaign for this player's session
+router.post('/campaigns/:id/select', async (req, res) => {
+  try {
+    const campaign = await campaignManager.load(req.params.id);
+    if (!campaign) {
+      res.status(404).json({ success: false, error: 'Campaign not found' });
+      return;
+    }
+
+    const token = getTokenFromRequest(req);
+    if (token) {
+      setSessionCampaign(token, campaign.id);
+    }
+
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    console.error('Error selecting campaign for player:', error);
+    res.status(500).json({ success: false, error: 'Failed to select campaign' });
+  }
+});
+
+// Clear campaign selection (player wants to switch)
+router.post('/campaigns/clear', (req, res) => {
+  const token = getTokenFromRequest(req);
+  if (token) {
+    setSessionCampaign(token, '');
+  }
+  res.json({ success: true });
+});
+
+// Get active campaign (player's session-selected or DM's global active)
+router.get('/active-campaign', async (req, res) => {
+  const campaign = await getPlayerCampaign(req);
   res.json({ success: true, data: campaign });
 });
 
@@ -289,6 +344,13 @@ router.put('/campaigns/:campaignId/files/player-characters/:fileId', async (req,
       return;
     }
 
+    // Enforce ownership: per-player auth users can only edit their own character
+    const playerName = req.sessionData?.playerName;
+    if (playerName && pc.frontmatter.player !== playerName) {
+      res.status(403).json({ success: false, error: 'You can only edit your own character' });
+      return;
+    }
+
     // Update the character with the provided data
     const { frontmatter, content } = req.body;
 
@@ -315,6 +377,13 @@ router.patch('/campaigns/:campaignId/files/player-characters/:fileId/trackers', 
 
     if (!pc) {
       res.status(404).json({ success: false, error: 'Character not found' });
+      return;
+    }
+
+    // Enforce ownership: per-player auth users can only edit their own character
+    const playerName = req.sessionData?.playerName;
+    if (playerName && pc.frontmatter.player !== playerName) {
+      res.status(403).json({ success: false, error: 'You can only edit your own character' });
       return;
     }
 
@@ -365,6 +434,13 @@ router.post(
       const pc = await fileStore.get(campaignId, 'player-characters', pcId);
       if (!pc) {
         res.status(404).json({ success: false, error: 'Character not found' });
+        return;
+      }
+
+      // Enforce ownership: per-player auth users can only upload their own portrait
+      const playerName = req.sessionData?.playerName;
+      if (playerName && pc.frontmatter.player !== playerName) {
+        res.status(403).json({ success: false, error: 'You can only edit your own character' });
         return;
       }
 
@@ -441,9 +517,9 @@ router.get('/campaigns/:campaignId/map', async (req, res) => {
 // =============================================================================
 
 // Get scene NPCs that are visible to players
-router.get('/scene-npcs', async (_req, res) => {
+router.get('/scene-npcs', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -530,9 +606,9 @@ router.get('/scene-npcs', async (_req, res) => {
 // =============================================================================
 
 // Get scene ships that are visible to players
-router.get('/scene-ships', async (_req, res) => {
+router.get('/scene-ships', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -586,7 +662,7 @@ router.get('/scene-ships', async (_req, res) => {
 // a file lock to prevent race conditions from concurrent player updates.
 router.patch('/scene-ships/:shipId', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -679,9 +755,9 @@ router.patch('/scene-ships/:shipId', async (req, res) => {
 // =============================================================================
 
 // List tactical boards (filtered for players)
-router.get('/tactical-boards', async (_req, res) => {
+router.get('/tactical-boards', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -712,7 +788,7 @@ router.get('/tactical-boards', async (_req, res) => {
 // Get a single tactical board (filtered for players)
 router.get('/tactical-boards/:boardId', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -767,9 +843,9 @@ interface DiceRollState {
 }
 
 // Get dice rolls (only if visible to players)
-router.get('/dice-rolls', async (_req, res) => {
+router.get('/dice-rolls', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
@@ -801,13 +877,13 @@ router.get('/dice-rolls', async (_req, res) => {
 // Roll dice (players can roll)
 router.post('/dice-rolls', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;
     }
 
-    const { diceType, rollerName } = req.body;
+    const { diceType, rollerName: clientRollerName } = req.body;
 
     // Validate dice type
     const validDice = ['d4', 'd6', 'd8', 'd10', 'd12', 'd100'];
@@ -815,6 +891,9 @@ router.post('/dice-rolls', async (req, res) => {
       res.status(400).json({ success: false, error: 'Invalid dice type' });
       return;
     }
+
+    // Use authenticated player name if available, fall back to client-provided name
+    const rollerName = req.sessionData?.playerName || clientRollerName;
 
     // Generate random result
     const maxValue = diceType === 'd100' ? 100 : parseInt(diceType.substring(1));
@@ -882,9 +961,9 @@ interface InitiativeState {
 }
 
 // Get initiative state for players
-router.get('/initiative', async (_req, res) => {
+router.get('/initiative', async (req, res) => {
   try {
-    const campaign = campaignManager.getActive();
+    const campaign = await getPlayerCampaign(req);
     if (!campaign) {
       res.status(400).json({ success: false, error: 'No active campaign' });
       return;

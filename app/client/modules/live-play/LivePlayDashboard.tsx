@@ -359,7 +359,7 @@ export function LivePlayDashboard() {
       ) : (
         <div className={layoutClasses[layout]}>
           {characters.map((pc) => (
-            <div key={pc.id} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
+            <div key={pc.id} className={layout === 'compact' ? 'md:flex-shrink-0' : ''}>
               <PCPanel
                 pc={{
                   id: pc.id,
@@ -367,6 +367,7 @@ export function LivePlayDashboard() {
                 }}
                 editable
                 compact={layout === 'compact'}
+                collapsible
                 onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
               />
             </div>

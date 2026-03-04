@@ -24,6 +24,7 @@ interface CampaignContextValue {
   isLoading: boolean;
   campaigns: CampaignMeta[];
   switchCampaign: (campaignId: string) => Promise<void>;
+  selectCampaign: (campaignId: string) => Promise<void>;
   createCampaign: (config: Partial<CampaignConfig>) => Promise<void>;
   reorderModules: (newOrder: string[]) => Promise<void>;
   enabledModules: ModuleInfo[];
@@ -37,9 +38,8 @@ const CampaignContext = createContext<CampaignContextValue | null>(null);
 // Each helper selects the DM or player endpoint based on the caller's role.
 
 async function fetchCampaigns(isDm: boolean): Promise<CampaignMeta[]> {
-  // Only DMs can list all campaigns
-  if (!isDm) return [];
-  const res = await fetch('/api/campaigns', { credentials: 'include' });
+  const endpoint = isDm ? '/api/campaigns' : '/api/player/campaigns';
+  const res = await fetch(endpoint, { credentials: 'include' });
   if (!res.ok) return [];
   const data = await res.json();
   return data.data || [];
@@ -64,6 +64,16 @@ async function fetchModules(isDm: boolean): Promise<ModuleInfo[]> {
 
 async function activateCampaign(campaignId: string): Promise<CampaignConfig> {
   const res = await fetch(`/api/campaigns/${campaignId}/activate`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error);
+  return data.data;
+}
+
+async function playerSelectCampaign(campaignId: string): Promise<CampaignConfig> {
+  const res = await fetch(`/api/player/campaigns/${campaignId}/select`, {
     method: 'POST',
     credentials: 'include',
   });
@@ -149,6 +159,16 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     [activateMutation]
   );
 
+  // Player campaign selection — stores choice in their session
+  const selectCampaign = useCallback(
+    async (campaignId: string) => {
+      const data = await playerSelectCampaign(campaignId);
+      setCampaign(data);
+      queryClient.invalidateQueries({ queryKey: ['active-campaign'] });
+    },
+    [queryClient]
+  );
+
   const createCampaignFn = useCallback(
     async (config: Partial<CampaignConfig>) => {
       await createMutation.mutateAsync(config);
@@ -211,6 +231,7 @@ export function CampaignProvider({ children }: CampaignProviderProps) {
     isLoading: campaignsLoading || activeLoading,
     campaigns,
     switchCampaign,
+    selectCampaign,
     createCampaign: createCampaignFn,
     reorderModules,
     enabledModules,

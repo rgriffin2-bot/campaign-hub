@@ -7,6 +7,14 @@
 
 import path from 'path';
 
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Parse comma-separated player names: "jon,mike,scott" → ["jon","mike","scott"] */
+function parsePlayers(envVal?: string): string[] {
+  if (!envVal) return [];
+  return envVal.split(',').map(s => s.trim()).filter(Boolean);
+}
+
 // ── Path Resolution ────────────────────────────────────────────────────
 // Use the working directory as the project root. This works in both:
 // - Dev mode: tsx runs from the project root
@@ -46,7 +54,7 @@ export const config = {
   // Authentication - set these in .env to enable password protection
   auth: {
     dmPassword: process.env.DM_PASSWORD,
-    playerPassword: process.env.PLAYER_PASSWORD,
+    players: parsePlayers(process.env.PLAYERS),
   },
 
   // Security settings

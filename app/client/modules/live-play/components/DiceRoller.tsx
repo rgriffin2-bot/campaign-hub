@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dices, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../core/providers/AuthProvider';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { DiceRollState, DiceType, DiceRoll } from '@shared/types/scene';
 import type { ApiResponse } from '@shared/types/api';
@@ -21,6 +22,7 @@ interface DiceRollerProps {
 }
 
 export function DiceRoller({ isDM = false }: DiceRollerProps) {
+  const { playerName } = useAuth();
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   const [isRolling, setIsRolling] = useState(false);
@@ -54,7 +56,7 @@ export function DiceRoller({ isDM = false }: DiceRollerProps) {
         body: JSON.stringify({
           diceType,
           rolledBy: isDM ? 'dm' : 'player',
-          rollerName: isDM ? 'DM' : undefined,
+          rollerName: isDM ? 'DM' : (playerName || undefined),
         }),
         credentials: 'include',
       });

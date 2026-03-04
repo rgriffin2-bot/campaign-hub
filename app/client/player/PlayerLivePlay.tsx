@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Play, LayoutGrid, LayoutList, Columns, Lock, Users, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
+import { useAuth } from '../core/providers/AuthProvider';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { PCPanel } from '../modules/live-play/components/PCPanel';
 import { SceneNPCPanel } from '../modules/live-play/components/SceneNPCPanel';
@@ -37,6 +38,7 @@ type SceneEntity =
   | { type: 'ship'; data: SceneShip };
 
 export function PlayerLivePlay() {
+  const { playerName } = useAuth();
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
   // On mobile (< 768px), default to collapsed combat tools
@@ -47,9 +49,9 @@ export function PlayerLivePlay() {
   const { sceneShips, updateShip } = useSceneShips();
   const { initiative } = useInitiative();
 
-  // Track which PC panel is "active" for editing -- clicking a panel selects it.
-  // TODO: restrict editing to the logged-in player's own character.
-  const [editablePCId, setEditablePCId] = useState<string | null>(null);
+  // When per-player auth is active, auto-lock editing to the player's own character.
+  // Otherwise fall back to click-to-select behaviour.
+  const [selectedPCId, setSelectedPCId] = useState<string | null>(null);
 
   // ── Character data (polled) ────────────────────────────────────────
   const { data: characters = [], isLoading, error } = useQuery({
@@ -68,6 +70,12 @@ export function PlayerLivePlay() {
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
     retry: false, // Don't retry on auth errors
   });
+
+  // If per-player auth is active, find the character that belongs to this player
+  const ownPCId = playerName
+    ? characters.find((pc) => (pc as Record<string, unknown>).player === playerName)?.id ?? null
+    : null;
+  const editablePCId = ownPCId ?? selectedPCId;
 
   // ── Tracker mutation ────────────────────────────────────────────────
   // PATCH-only mutation for tracker fields (pressure, harm, etc.)
@@ -256,7 +264,11 @@ export function PlayerLivePlay() {
       {/* Info banner - directly above character row */}
       <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm text-muted-foreground">
         <Lock className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
-        <span>Tap a character to edit. Others are read-only.</span>
+        <span>
+          {ownPCId
+            ? `Editing ${characters.find(c => c.id === ownPCId)?.name ?? 'your character'}`
+            : 'Tap a character to edit. Others are read-only.'}
+        </span>
       </div>
 
       {/* Party Tracker */}
@@ -274,15 +286,18 @@ export function PlayerLivePlay() {
         <div className={layoutClasses[layout]}>
           {characters.map((pc) => {
             const isEditable = editablePCId === pc.id;
+            const canSelect = !ownPCId; // Click-to-select only when no per-player auth
 
             return (
               <div
                 key={pc.id}
-                onClick={() => setEditablePCId(pc.id)}
-                className={`cursor-pointer transition-all ${
-                  layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''
+                onClick={() => canSelect && setSelectedPCId(pc.id)}
+                className={`transition-all ${
+                  canSelect ? 'cursor-pointer' : ''
                 } ${
-                  isEditable ? 'ring-2 ring-primary' : 'opacity-80 hover:opacity-100'
+                  layout === 'compact' ? 'md:flex-shrink-0' : ''
+                } ${
+                  isEditable ? 'ring-2 ring-primary' : 'opacity-80' + (canSelect ? ' hover:opacity-100' : '')
                 }`}
               >
                 <PCPanel
@@ -292,6 +307,8 @@ export function PlayerLivePlay() {
                   }}
                   editable={isEditable}
                   compact={layout === 'compact'}
+                  collapsible
+                  defaultExpanded={isEditable || !ownPCId}
                   onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
                 />
               </div>

@@ -5,10 +5,12 @@
  * Provides the header, sidebar navigation (collapsible + mobile drawer),
  * and content outlet. Only modules with player-facing views are shown.
  */
+import { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
-import { Scroll, Home, LogOut, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Scroll, Home, LogOut, Menu, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useCampaign } from '../core/providers/CampaignProvider';
 import { useAuth } from '../core/providers/AuthProvider';
+import type { CampaignMeta } from '@shared/types/campaign';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { SidebarProvider, useSidebar } from '../core/providers/SidebarProvider';
 
@@ -18,12 +20,82 @@ const PLAYER_VIEW_MODULES = [
   'live-play', 'ships', 'session-notes', 'factions', 'projects', 'tactical-board',
 ];
 
+/** Campaign selector shown when the player hasn't picked a campaign yet */
+function CampaignSelector({
+  campaigns,
+  selecting,
+  onSelect,
+  playerName,
+  authEnabled,
+  onLogout,
+}: {
+  campaigns: CampaignMeta[];
+  selecting: boolean;
+  onSelect: (id: string) => void;
+  playerName: string | null;
+  authEnabled: boolean;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <Scroll className="mx-auto h-12 w-12 text-primary" />
+          <h2 className="mt-4 text-xl font-semibold text-foreground">
+            {playerName ? `Welcome, ${playerName}` : 'Select a Campaign'}
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            Choose a campaign to explore
+          </p>
+        </div>
+
+        {campaigns.length === 0 ? (
+          <div className="text-center text-muted-foreground">
+            <p>No campaigns available yet.</p>
+            <p className="text-sm mt-1">Ask your GM to create one.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {campaigns.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c.id)}
+                disabled={selecting}
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                <Scroll className="h-5 w-5 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground truncate">{c.name}</div>
+                  {c.description && (
+                    <div className="text-xs text-muted-foreground truncate">{c.description}</div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {authEnabled && (
+          <button
+            onClick={onLogout}
+            className="mt-6 flex items-center gap-2 mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Inner layout that consumes sidebar context */
 function PlayerLayoutInner() {
-  const { campaign, enabledModules, isLoading } = useCampaign();
-  const { authEnabled, logout } = useAuth();
+  const { campaign, campaigns, enabledModules, isLoading, selectCampaign } = useCampaign();
+  const { authEnabled, logout, playerName } = useAuth();
   const { isCollapsed, toggleCollapsed, isMobileOpen, setMobileOpen } = useSidebar();
   const navigate = useNavigate();
+  const [selecting, setSelecting] = useState(false);
 
   // --- Loading and empty states ---
   if (isLoading) {
@@ -39,17 +111,18 @@ function PlayerLayoutInner() {
 
   if (!campaign) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <Scroll className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 text-xl font-semibold text-foreground">
-            No Campaign Available
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            The DM hasn't set up a campaign yet.
-          </p>
-        </div>
-      </div>
+      <CampaignSelector
+        campaigns={campaigns}
+        selecting={selecting}
+        onSelect={async (id) => {
+          setSelecting(true);
+          await selectCampaign(id);
+          setSelecting(false);
+        }}
+        playerName={playerName}
+        authEnabled={authEnabled}
+        onLogout={logout}
+      />
     );
   }
 
@@ -175,6 +248,20 @@ function PlayerLayoutInner() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
+          {campaigns.length > 1 && (
+            <button
+              onClick={() => {
+                // POST to clear session campaign, then reload to show selector
+                fetch('/api/player/campaigns/clear', { method: 'POST', credentials: 'include' })
+                  .finally(() => window.location.reload());
+              }}
+              className="flex items-center gap-1 rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              title="Switch campaign"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Switch
+            </button>
+          )}
           <span className="rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">
             Player View
           </span>

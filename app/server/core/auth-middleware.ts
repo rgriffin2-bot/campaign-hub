@@ -2,17 +2,43 @@
  * Auth middleware for DM/player role-based access control.
  *
  * Uses in-memory sessions with Bearer tokens or cookies.
- * When no passwords are configured, auth is bypassed entirely
+ * Players authenticate by selecting their name (no password).
+ * Only the DM requires a password.
+ * When no passwords or players are configured, auth is bypassed entirely
  * to keep local development frictionless.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 
+// ── Types ────────────────────────────────────────────────────────────
+
+export interface SessionData {
+  role: 'dm' | 'player';
+  playerName?: string;
+  selectedCampaignId?: string;
+}
+
+// Augment Express Request so route handlers can read req.sessionData
+declare global {
+  namespace Express {
+    interface Request {
+      sessionData?: SessionData;
+    }
+  }
+}
+
 // ── Session Store ──────────────────────────────────────────────────────
 // In-memory store is sufficient here because CampaignHub runs as a
 // single-process local server; no need for Redis or a DB-backed store.
-const sessions = new Map<string, { role: 'dm' | 'player'; expires: number }>();
+interface Session {
+  role: 'dm' | 'player';
+  playerName?: string;
+  selectedCampaignId?: string;
+  expires: number;
+}
+
+const sessions = new Map<string, Session>();
 
 // Session duration: 24 hours
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
@@ -51,15 +77,12 @@ function secureCompare(a: string, b: string): boolean {
 // ── Login / Logout / Session Validation ────────────────────────────────
 
 /**
- * Verify password against configured DM and player passwords.
- * DM password is checked first, so if both are the same the user gets DM role.
+ * DM login — verify password against configured DM password.
  */
 export function login(
   password: string,
-  dmPassword: string | undefined,
-  playerPassword: string | undefined
-): { success: true; token: string; role: 'dm' | 'player' } | { success: false; error: string } {
-  // Check DM password first
+  dmPassword: string | undefined
+): { success: true; token: string; role: 'dm' } | { success: false; error: string } {
   if (dmPassword && secureCompare(password, dmPassword)) {
     const token = generateToken();
     sessions.set(token, {
@@ -69,23 +92,33 @@ export function login(
     return { success: true, token, role: 'dm' };
   }
 
-  // Check player password
-  if (playerPassword && secureCompare(password, playerPassword)) {
-    const token = generateToken();
-    sessions.set(token, {
-      role: 'player',
-      expires: Date.now() + SESSION_DURATION,
-    });
-    return { success: true, token, role: 'player' };
-  }
-
   return { success: false, error: 'Invalid password' };
 }
 
 /**
- * Validate a session token
+ * Player login — no password, just validate that the name is in the configured list.
  */
-export function validateSession(token: string): { role: 'dm' | 'player' } | null {
+export function loginAsPlayer(
+  playerName: string,
+  configuredPlayers: string[]
+): { success: true; token: string; role: 'player'; playerName: string } | { success: false; error: string } {
+  if (!configuredPlayers.includes(playerName)) {
+    return { success: false, error: 'Unknown player' };
+  }
+
+  const token = generateToken();
+  sessions.set(token, {
+    role: 'player',
+    playerName,
+    expires: Date.now() + SESSION_DURATION,
+  });
+  return { success: true, token, role: 'player', playerName };
+}
+
+/**
+ * Validate a session token and return its data.
+ */
+export function validateSession(token: string): SessionData | null {
   const session = sessions.get(token);
   if (!session) return null;
 
@@ -96,7 +129,21 @@ export function validateSession(token: string): { role: 'dm' | 'player' } | null
 
   // Extend session on use
   session.expires = Date.now() + SESSION_DURATION;
-  return { role: session.role };
+  return {
+    role: session.role,
+    playerName: session.playerName,
+    selectedCampaignId: session.selectedCampaignId,
+  };
+}
+
+/**
+ * Update the selected campaign for a session.
+ */
+export function setSessionCampaign(token: string, campaignId: string): boolean {
+  const session = sessions.get(token);
+  if (!session) return false;
+  session.selectedCampaignId = campaignId;
+  return true;
 }
 
 /**
@@ -109,7 +156,7 @@ export function logout(token: string): void {
 // ── Token Extraction ───────────────────────────────────────────────────
 
 /** Extract session token from Authorization header (Bearer) or cookie */
-function getTokenFromRequest(req: Request): string | null {
+export function getTokenFromRequest(req: Request): string | null {
   // Check Authorization header first
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
@@ -148,6 +195,7 @@ export function requireDm(req: Request, res: Response, next: NextFunction): void
     return;
   }
 
+  req.sessionData = session;
   next();
 }
 
@@ -167,6 +215,7 @@ export function requirePlayer(req: Request, res: Response, next: NextFunction): 
   }
 
   // Both DM and player can access player routes
+  req.sessionData = session;
   next();
 }
 
@@ -174,19 +223,23 @@ export function requirePlayer(req: Request, res: Response, next: NextFunction): 
 
 /**
  * Creates auth middleware configured for the current environment.
- * When neither password is set, returns no-op middleware so the app
- * works without any authentication (convenient for local development).
+ * When no passwords or players are configured, returns no-op middleware so the
+ * app works without any authentication (convenient for local development).
  */
-export function createAuthMiddleware(dmPassword?: string, playerPassword?: string) {
-  const authEnabled = Boolean(dmPassword || playerPassword);
+export function createAuthMiddleware(
+  dmPassword?: string,
+  players?: string[]
+) {
+  const authEnabled = Boolean(dmPassword || (players && players.length > 0));
+
+  const noopMiddleware = (req: Request, _res: Response, next: NextFunction) => {
+    req.sessionData = { role: 'dm' };
+    next();
+  };
 
   return {
-    requireDm: authEnabled
-      ? requireDm
-      : (_req: Request, _res: Response, next: NextFunction) => next(),
-    requirePlayer: authEnabled
-      ? requirePlayer
-      : (_req: Request, _res: Response, next: NextFunction) => next(),
+    requireDm: authEnabled ? requireDm : noopMiddleware,
+    requirePlayer: authEnabled ? requirePlayer : noopMiddleware,
     authEnabled,
   };
 }
