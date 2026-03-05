@@ -12,13 +12,14 @@
  */
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords } from 'lucide-react';
+import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords, Plus } from 'lucide-react';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
 import { SceneNPCPanel } from './components/SceneNPCPanel';
 import { SceneShipPanel } from './components/SceneShipPanel';
 import { CrewShipPanel } from './components/CrewShipPanel';
 import { DiceRoller } from './components/DiceRoller';
+import { AddToSceneDialog } from './components/AddToSceneDialog';
 import { InitiativeTracker } from '../../components/InitiativeTracker';
 import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../../core/providers/SceneShipsProvider';
@@ -47,6 +48,8 @@ export function LivePlayDashboard() {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [layout, setLayout] = useState<LayoutMode>('compact');
   const [combatToolsExpanded, setCombatToolsExpanded] = useState(!isMobile);
+  const [sceneExpanded, setSceneExpanded] = useState(true);
+  const [addToSceneOpen, setAddToSceneOpen] = useState(false);
 
   // ── Scene providers ──
   const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
@@ -60,8 +63,7 @@ export function LivePlayDashboard() {
     clearAllEntries,
     nextTurn,
     prevTurn,
-    moveEntryUp,
-    moveEntryDown,
+    reorderList,
   } = useInitiative();
 
   // ── Derived data ──
@@ -223,7 +225,7 @@ export function LivePlayDashboard() {
   const layoutClasses = {
     grid: 'grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
     list: 'flex flex-col gap-3 md:gap-4',
-    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap',
+    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch',
   };
 
   // ── Render ──
@@ -316,8 +318,7 @@ export function LivePlayDashboard() {
                   onClearAllEntries={clearAllEntries}
                   onNextTurn={nextTurn}
                   onPrevTurn={prevTurn}
-                  onMoveEntryUp={moveEntryUp}
-                  onMoveEntryDown={moveEntryDown}
+                  onReorderList={reorderList}
                   onAddInScene={handleAddInScene}
                 />
               </div>
@@ -358,8 +359,8 @@ export function LivePlayDashboard() {
         </div>
       ) : (
         <div className={layoutClasses[layout]}>
-          {characters.map((pc) => (
-            <div key={pc.id} className={layout === 'compact' ? 'md:flex-shrink-0' : ''}>
+          {characters.map((pc, i) => (
+            <div key={pc.id} className={layout === 'compact' ? 'contents' : ''}>
               <PCPanel
                 pc={{
                   id: pc.id,
@@ -368,6 +369,7 @@ export function LivePlayDashboard() {
                 editable
                 compact={layout === 'compact'}
                 collapsible
+                index={i}
                 onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
               />
             </div>
@@ -375,60 +377,96 @@ export function LivePlayDashboard() {
         </div>
       )}
 
-      {/* Scene Entities (NPCs + Non-Crew Ships) - Sorted by disposition */}
+      {/* Scene Entities (NPCs + Non-Crew Ships) - Collapsible, sorted by disposition */}
+      {sceneEntities.length === 0 && (
+        <button
+          onClick={() => setAddToSceneOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+        >
+          <Plus className="h-4 w-4" />
+          Add NPCs or ships to the scene
+        </button>
+      )}
       {sceneEntities.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <Rocket className="h-4 w-4" />
-              <span>NPCs & Entities in Scene ({sceneEntities.length})</span>
-            </div>
+        <div className="rounded-lg border border-border bg-card">
+          {/* Collapsible header */}
+          <div className="flex items-center justify-between px-4 py-3">
             <button
-              onClick={handleClearScene}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              title="Clear all from scene"
+              type="button"
+              onClick={() => setSceneExpanded(!sceneExpanded)}
+              className="flex items-center gap-2 text-left transition-colors hover:text-foreground"
             >
-              <Trash2 className="h-3 w-3" />
-              Clear Scene
+              {sceneExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">NPCs & Entities in Scene</span>
+              <span className="text-xs text-muted-foreground">({sceneEntities.length})</span>
             </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setAddToSceneOpen(true)}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                title="Add NPC or ship to scene"
+              >
+                <Plus className="h-3 w-3" />
+                Add
+              </button>
+              <button
+                onClick={handleClearScene}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                title="Clear all from scene"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear
+              </button>
+            </div>
           </div>
 
-          <div className={layoutClasses[layout]}>
-            {sceneEntities.map((entity) => {
-              if (entity.type === 'npc') {
-                const npc = entity.data;
-                return (
-                  <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
-                    <SceneNPCPanel
-                      npc={npc}
-                      onRemove={() => removeNPCFromScene(npc.id)}
-                      onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
-                      onUpdateDisposition={(disposition) => updateNPCDisposition(npc.id, disposition)}
-                      onToggleVisibility={() => toggleNPCVisibility(npc.id)}
-                      compact={layout === 'compact'}
-                    />
-                  </div>
-                );
-              } else {
-                const ship = entity.data;
-                return (
-                  <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
-                    <SceneShipPanel
-                      ship={ship}
-                      onRemove={() => removeShipFromScene(ship.id)}
-                      onUpdateDisposition={(disposition: ShipDisposition) => updateShipDisposition(ship.id, disposition)}
-                      onToggleVisibility={() => toggleShipVisibility(ship.id)}
-                      compact={layout === 'compact'}
-                    />
-                  </div>
-                );
-              }
-            })}
-          </div>
+          {/* Collapsible content */}
+          {sceneExpanded && (
+            <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
+              <div className={layoutClasses[layout]}>
+                {sceneEntities.map((entity) => {
+                  if (entity.type === 'npc') {
+                    const npc = entity.data;
+                    return (
+                      <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
+                        <SceneNPCPanel
+                          npc={npc}
+                          onRemove={() => removeNPCFromScene(npc.id)}
+                          onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
+                          onUpdateDisposition={(disposition) => updateNPCDisposition(npc.id, disposition)}
+                          onToggleVisibility={() => toggleNPCVisibility(npc.id)}
+                          compact={layout === 'compact'}
+                        />
+                      </div>
+                    );
+                  } else {
+                    const ship = entity.data;
+                    return (
+                      <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
+                        <SceneShipPanel
+                          ship={ship}
+                          onRemove={() => removeShipFromScene(ship.id)}
+                          onUpdateDisposition={(disposition: ShipDisposition) => updateShipDisposition(ship.id, disposition)}
+                          onToggleVisibility={() => toggleShipVisibility(ship.id)}
+                          compact={layout === 'compact'}
+                        />
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Add to Scene Dialog */}
+      <AddToSceneDialog open={addToSceneOpen} onClose={() => setAddToSceneOpen(false)} />
     </div>
   );
 }

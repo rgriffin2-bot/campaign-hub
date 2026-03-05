@@ -2,7 +2,7 @@
  * InitiativeTracker.tsx
  *
  * Displays the combat initiative order with turn navigation, entry
- * management, and reordering. Supports three layout modes:
+ * management, and drag-and-drop reordering. Supports three layout modes:
  *   1. tacticalBoardMode - vertical sidebar layout
  *   2. compact - horizontal bottom-bar layout
  *   3. full - wrapping card layout for the Live Play module
@@ -18,6 +18,21 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { InitiativeEntryComponent } from './InitiativeEntry';
 import type { InitiativeEntry, InitiativeState } from '@shared/types/initiative';
 
@@ -42,8 +57,7 @@ interface InitiativeTrackerProps {
   onPrevTurn?: () => void;
 
   // ── Reordering ──
-  onMoveEntryUp?: (entryId: string) => void;
-  onMoveEntryDown?: (entryId: string) => void;
+  onReorderList?: (orderedIds: string[]) => void;
 
   // ── Bulk population ──
   /** Adds all PCs/NPCs/ships currently in the scene */
@@ -64,8 +78,7 @@ export const InitiativeTracker = memo(function InitiativeTracker({
   onClearAllEntries,
   onNextTurn,
   onPrevTurn,
-  onMoveEntryUp,
-  onMoveEntryDown,
+  onReorderList,
   onAddInScene,
   compact = false,
   tacticalBoardMode = false,
@@ -74,6 +87,12 @@ export const InitiativeTracker = memo(function InitiativeTracker({
   // Local UI state for the "add custom entry" form
   const [showAddForm, setShowAddForm] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   // Creates a new initiative entry with default values (initiative 0, inactive)
   const handleAddEntry = useCallback(() => {
@@ -90,10 +109,46 @@ export const InitiativeTracker = memo(function InitiativeTracker({
     setShowAddForm(false);
   }, [newEntryName, onAddEntry]);
 
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorderList) return;
+
+    const entries = initiative.entries;
+    const oldIndex = entries.findIndex(e => e.id === active.id);
+    const newIndex = entries.findIndex(e => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Build new ordered ID list
+    const ids = entries.map(e => e.id);
+    ids.splice(oldIndex, 1);
+    ids.splice(newIndex, 0, active.id as string);
+    onReorderList(ids);
+  }, [initiative.entries, onReorderList]);
+
   // Hide the tracker from non-DM users when visibility is toggled off
   if (!initiative.visibleToPlayers && !isDm) {
     return null;
   }
+
+  const entryIds = initiative.entries.map(e => e.id);
+
+  // Helper to wrap entries in DndContext when DM
+  const renderSortableEntries = (
+    entries: InitiativeEntry[],
+    strategy: typeof verticalListSortingStrategy,
+    renderEntry: (entry: InitiativeEntry, index: number) => React.ReactNode
+  ) => {
+    if (isDm && onReorderList) {
+      return (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={entryIds} strategy={strategy}>
+            {entries.map((entry, index) => renderEntry(entry, index))}
+          </SortableContext>
+        </DndContext>
+      );
+    }
+    return entries.map((entry, index) => renderEntry(entry, index));
+  };
 
   // ── Layout 1: Tactical Board sidebar (vertical, narrow) ──
   if (tacticalBoardMode) {
@@ -190,17 +245,13 @@ export const InitiativeTracker = memo(function InitiativeTracker({
               No entries
             </div>
           ) : (
-            initiative.entries.map((entry, index) => (
+            renderSortableEntries(initiative.entries, verticalListSortingStrategy, (entry) => (
               <InitiativeEntryComponent
                 key={entry.id}
                 entry={entry}
                 isDm={isDm}
-                isFirst={index === 0}
-                isLast={index === initiative.entries.length - 1}
                 onUpdate={onUpdateEntry}
                 onRemove={onRemoveEntry}
-                onMoveUp={onMoveEntryUp}
-                onMoveDown={onMoveEntryDown}
                 tacticalBoardMode={true}
               />
             ))
@@ -250,13 +301,11 @@ export const InitiativeTracker = memo(function InitiativeTracker({
           {initiative.entries.length === 0 ? (
             <span className="text-xs text-muted-foreground">No entries</span>
           ) : (
-            initiative.entries.map((entry, index) => (
+            initiative.entries.map((entry) => (
               <InitiativeEntryComponent
                 key={entry.id}
                 entry={entry}
                 isDm={isDm}
-                isFirst={index === 0}
-                isLast={index === initiative.entries.length - 1}
                 compact={true}
               />
             ))
@@ -408,17 +457,13 @@ export const InitiativeTracker = memo(function InitiativeTracker({
             No entries in initiative order
           </div>
         ) : (
-          initiative.entries.map((entry, index) => (
+          renderSortableEntries(initiative.entries, horizontalListSortingStrategy, (entry) => (
             <InitiativeEntryComponent
               key={entry.id}
               entry={entry}
               isDm={isDm}
-              isFirst={index === 0}
-              isLast={index === initiative.entries.length - 1}
               onUpdate={onUpdateEntry}
               onRemove={onRemoveEntry}
-              onMoveUp={onMoveEntryUp}
-              onMoveDown={onMoveEntryDown}
             />
           ))
         )}

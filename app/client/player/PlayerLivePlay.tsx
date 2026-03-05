@@ -45,6 +45,7 @@ export function PlayerLivePlay() {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [layout, setLayout] = useState<LayoutMode>('compact');
   const [combatToolsExpanded, setCombatToolsExpanded] = useState(!isMobile);
+  const [sceneExpanded, setSceneExpanded] = useState(true);
   const { sceneNPCs } = useSceneNPCs();
   const { sceneShips, updateShip } = useSceneShips();
   const { initiative } = useInitiative();
@@ -144,7 +145,7 @@ export function PlayerLivePlay() {
   const layoutClasses = {
     grid: 'grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
     list: 'flex flex-col gap-3 md:gap-4',
-    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap',
+    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch',
   };
 
   return (
@@ -284,18 +285,36 @@ export function PlayerLivePlay() {
         </div>
       ) : (
         <div className={layoutClasses[layout]}>
-          {characters.map((pc) => {
+          {characters.map((pc, i) => {
             const isEditable = editablePCId === pc.id;
             const canSelect = !ownPCId; // Click-to-select only when no per-player auth
 
-            return (
+            return layout === 'compact' ? (
+                <PCPanel
+                  key={pc.id}
+                  pc={{
+                    id: pc.id,
+                    frontmatter: pc as unknown as PlayerCharacterFrontmatter,
+                  }}
+                  editable={isEditable}
+                  compact
+                  collapsible
+                  defaultExpanded={isEditable || !ownPCId}
+                  index={i}
+                  className={`transition-all ${
+                    canSelect ? 'cursor-pointer' : ''
+                  } ${
+                    isEditable ? 'ring-2 ring-primary' : 'opacity-80' + (canSelect ? ' hover:opacity-100' : '')
+                  }`}
+                  onClick={() => canSelect && setSelectedPCId(pc.id)}
+                  onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
+                />
+            ) : (
               <div
                 key={pc.id}
                 onClick={() => canSelect && setSelectedPCId(pc.id)}
                 className={`transition-all ${
                   canSelect ? 'cursor-pointer' : ''
-                } ${
-                  layout === 'compact' ? 'md:flex-shrink-0' : ''
                 } ${
                   isEditable ? 'ring-2 ring-primary' : 'opacity-80' + (canSelect ? ' hover:opacity-100' : '')
                 }`}
@@ -306,9 +325,9 @@ export function PlayerLivePlay() {
                     frontmatter: pc as unknown as PlayerCharacterFrontmatter,
                   }}
                   editable={isEditable}
-                  compact={layout === 'compact'}
                   collapsible
                   defaultExpanded={isEditable || !ownPCId}
+                  index={i}
                   onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
                 />
               </div>
@@ -335,34 +354,50 @@ export function PlayerLivePlay() {
         if (sceneEntities.length === 0) return null;
 
         return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>NPCs & Entities in Scene ({sceneEntities.length})</span>
-            </div>
+          <div className="rounded-lg border border-border bg-card">
+            {/* Collapsible header */}
+            <button
+              type="button"
+              onClick={() => setSceneExpanded(!sceneExpanded)}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+            >
+              {sceneExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">NPCs & Entities in Scene</span>
+              <span className="text-xs text-muted-foreground">({sceneEntities.length})</span>
+            </button>
 
-            <div className={layoutClasses[layout]}>
-              {sceneEntities.map(entity => (
-                <div
-                  key={`${entity.type}-${entity.data.id}`}
-                  className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}
-                >
-                  {entity.type === 'npc' ? (
-                    <SceneNPCPanel
-                      npc={entity.data}
-                      compact={layout === 'compact'}
-                      showStats={false}
-                    />
-                  ) : (
-                    <SceneShipPanel
-                      ship={entity.data}
-                      compact={layout === 'compact'}
-                      showControls={false}
-                    />
-                  )}
+            {/* Collapsible content */}
+            {sceneExpanded && (
+              <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
+                <div className={layoutClasses[layout]}>
+                  {sceneEntities.map(entity => (
+                    <div
+                      key={`${entity.type}-${entity.data.id}`}
+                      className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}
+                    >
+                      {entity.type === 'npc' ? (
+                        <SceneNPCPanel
+                          npc={entity.data}
+                          compact={layout === 'compact'}
+                          showStats={false}
+                        />
+                      ) : (
+                        <SceneShipPanel
+                          ship={entity.data}
+                          compact={layout === 'compact'}
+                          showControls={false}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         );
       })()}

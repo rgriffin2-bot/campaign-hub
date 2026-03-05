@@ -35,13 +35,21 @@ interface PCPanelProps {
   compact?: boolean;
   collapsible?: boolean;
   defaultExpanded?: boolean;
+  /** Index in the list, used for alternating background shading */
+  index?: number;
+  /** Extra classes applied to the outermost container (e.g. ring for selection) */
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
   onUpdate?: (updates: Partial<PlayerCharacterFrontmatter>) => void;
 }
 
-export function PCPanel({ pc, editable = true, compact = false, collapsible = false, defaultExpanded = true, onUpdate }: PCPanelProps) {
+export function PCPanel({ pc, editable = true, compact = false, collapsible = false, defaultExpanded = true, index = 0, className = '', onClick, onUpdate }: PCPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { campaign } = useCampaign();
   const fm = pc.frontmatter;
+
+  // Alternating shade: even indices get normal card bg, odd indices get accent bg
+  const cardBg = index % 2 === 0 ? 'bg-card' : 'bg-accent';
 
   // --- Tracker change handlers (each propagates a partial frontmatter update) ---
 
@@ -91,8 +99,8 @@ export function PCPanel({ pc, editable = true, compact = false, collapsible = fa
   if (collapsible && !expanded) {
     return (
       <div
-        className="flex flex-col items-center gap-2 overflow-hidden rounded-lg border border-border bg-card p-2 cursor-pointer hover:bg-accent/50 transition-colors"
-        onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+        className={`flex self-stretch w-14 shrink-0 grow-0 flex-col items-center gap-2 overflow-hidden rounded-lg border border-border ${cardBg} p-2 cursor-pointer hover:bg-accent/50 transition-colors ${className}`}
+        onClick={(e) => { e.stopPropagation(); onClick?.(e); setExpanded(true); }}
         title={`Expand ${fm.name}`}
       >
         {portrait('h-10 w-10')}
@@ -120,7 +128,7 @@ export function PCPanel({ pc, editable = true, compact = false, collapsible = fa
   // ── Compact layout (expanded) ────────────────────────────────────
   if (compact) {
     return (
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className={`overflow-hidden rounded-lg border border-border ${cardBg} md:flex-1 md:min-w-0 ${className}`} onClick={onClick}>
         {/* Header with portrait, name below, and luck indicator */}
         <div className="flex items-start gap-2 border-b border-border p-1.5 md:p-2">
           {/* Portrait and name stacked vertically */}
@@ -219,7 +227,7 @@ export function PCPanel({ pc, editable = true, compact = false, collapsible = fa
 
   // ── Standard layout (expanded) ───────────────────────────────────
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
+    <div className={`overflow-hidden rounded-lg border border-border ${cardBg} ${className}`} onClick={onClick}>
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border p-3">
         {/* Portrait */}

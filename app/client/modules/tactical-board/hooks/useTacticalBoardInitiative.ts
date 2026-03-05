@@ -27,6 +27,7 @@ export interface TacticalBoardInitiativeState {
   prevTurn: () => void;
   moveEntryUp: (entryId: string) => void;
   moveEntryDown: (entryId: string) => void;
+  reorderList: (orderedIds: string[]) => void;
   addFromTokens: () => void; // No longer requires tokens parameter
 }
 
@@ -181,6 +182,23 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     });
   }, []);
 
+  /** Reorder all entries by providing the full ordered ID list. */
+  const reorderList = useCallback((orderedIds: string[]) => {
+    setInitiative((prev) => {
+      const entryMap = new Map(prev.entries.map(e => [e.id, e]));
+      const reordered = orderedIds
+        .map(id => entryMap.get(id))
+        .filter(Boolean) as InitiativeEntry[];
+      // Append any entries not in orderedIds (safety net)
+      for (const entry of prev.entries) {
+        if (!orderedIds.includes(entry.id)) {
+          reordered.push(entry);
+        }
+      }
+      return { ...prev, entries: reordered };
+    });
+  }, []);
+
   // ── Bulk import from board ──────────────────────────────────────────
 
   /**
@@ -262,6 +280,7 @@ export function useTacticalBoardInitiative(tokens: BoardToken[]): TacticalBoardI
     prevTurn,
     moveEntryUp,
     moveEntryDown,
+    reorderList,
     addFromTokens,
   };
 }

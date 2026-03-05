@@ -931,6 +931,49 @@ const reorderInitiative: RequestHandler = async (req, res) => {
   }
 };
 
+// POST /initiative/reorder-list - Reorder all entries by providing ordered ID array
+const reorderInitiativeList: RequestHandler = async (req, res) => {
+  try {
+    const campaign = campaignManager.getActive();
+    if (!campaign) {
+      res.status(400).json({ success: false, error: 'No active campaign' });
+      return;
+    }
+
+    const { orderedIds } = req.body;
+
+    if (!Array.isArray(orderedIds)) {
+      res.status(400).json({ success: false, error: 'orderedIds must be an array' });
+      return;
+    }
+
+    const state = await readInitiativeState(campaign.id);
+
+    // Build a lookup map for O(1) access
+    const entryMap = new Map(state.entries.map(e => [e.id, e]));
+
+    // Rebuild entries in the specified order, keeping any entries not in orderedIds at the end
+    const reordered = orderedIds
+      .map(id => entryMap.get(id))
+      .filter(Boolean) as typeof state.entries;
+
+    // Append any entries that weren't in orderedIds (safety net)
+    for (const entry of state.entries) {
+      if (!orderedIds.includes(entry.id)) {
+        reordered.push(entry);
+      }
+    }
+
+    state.entries = reordered;
+    await writeInitiativeState(campaign.id, state);
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error('Error reordering initiative list:', error);
+    res.status(500).json({ success: false, error: 'Failed to reorder initiative' });
+  }
+};
+
 // PATCH /initiative/state - Update state-level properties (visibility, active, round, entries)
 const updateInitiativeState: RequestHandler = async (req, res) => {
   try {
@@ -1004,6 +1047,7 @@ export const livePlayModule: ModuleDefinition = {
     { method: 'POST', path: '/initiative/next-turn', handler: nextTurn },
     { method: 'POST', path: '/initiative/prev-turn', handler: prevTurn },
     { method: 'POST', path: '/initiative/reorder', handler: reorderInitiative },
+    { method: 'POST', path: '/initiative/reorder-list', handler: reorderInitiativeList },
     { method: 'PATCH', path: '/initiative/state', handler: updateInitiativeState },
   ],
   views: {

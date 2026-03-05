@@ -35,8 +35,7 @@ export const InitiativePanel = memo(function InitiativePanel({
     clearAllEntries,
     nextTurn,
     prevTurn,
-    moveEntryUp,
-    moveEntryDown,
+    reorderList,
     addFromTokens,
   } = initiativeState;
 
@@ -83,8 +82,7 @@ export const InitiativePanel = memo(function InitiativePanel({
           onClearAllEntries={clearAllEntries}
           onNextTurn={nextTurn}
           onPrevTurn={prevTurn}
-          onMoveEntryUp={moveEntryUp}
-          onMoveEntryDown={moveEntryDown}
+          onReorderList={reorderList}
           onAddInScene={addFromTokens}
           compact={!isRight}
           tacticalBoardMode={isRight}

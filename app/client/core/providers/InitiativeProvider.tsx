@@ -7,7 +7,7 @@
  *
  * All write operations are gated on `isDm` -- player clients silently no-op.
  */
-import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useRef, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useCampaign } from './CampaignProvider';
@@ -46,6 +46,7 @@ interface InitiativeContextValue {
   // Reordering
   moveEntryUp: (entryId: string) => void;
   moveEntryDown: (entryId: string) => void;
+  reorderList: (orderedIds: string[]) => void;
 
   // Visibility & state
   toggleVisibility: () => void;
@@ -81,18 +82,27 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     ? '/api/modules/live-play/initiative'
     : '/api/player/initiative';
 
+  // Temporarily pause polling during reorder mutations to prevent stale data overwrites
+  const reorderInFlight = useRef(false);
+
   // Fetch initiative state with polling
   const { data: initiative = DEFAULT_STATE, isLoading } = useQuery({
     queryKey: ['initiative', campaign?.id, isDm],
     queryFn: async () => {
       if (!campaign) return DEFAULT_STATE;
+      // During a reorder mutation, skip the server fetch entirely.
+      // Return current cached data so the optimistic update isn't overwritten
+      // by an already-scheduled poll timer.
+      if (reorderInFlight.current) {
+        return queryClient.getQueryData<InitiativeState>(['initiative', campaign?.id, isDm]) || DEFAULT_STATE;
+      }
       const res = await fetch(endpoint, { credentials: 'include' });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       return data.data || DEFAULT_STATE;
     },
     enabled: !!campaign,
-    refetchInterval: POLL_INTERVAL,
+    refetchInterval: () => reorderInFlight.current ? false : POLL_INTERVAL,
     refetchIntervalInBackground: true,
   });
 
@@ -220,6 +230,60 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Mutation for reordering by full ID list (drag-and-drop)
+  // Uses optimistic updates so the UI reorders instantly without waiting for the server.
+  const reorderListMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const res = await fetch('/api/modules/live-play/initiative/reorder-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      return data.data;
+    },
+    onMutate: async (orderedIds) => {
+      // Pause polling and cancel in-flight fetches to prevent stale data overwrites
+      reorderInFlight.current = true;
+      await queryClient.cancelQueries({ queryKey: ['initiative', campaign?.id, isDm] });
+
+      const previousState = queryClient.getQueryData<InitiativeState>(['initiative', campaign?.id, isDm]);
+
+      // Optimistically reorder entries in the cache
+      if (previousState) {
+        const entryMap = new Map(previousState.entries.map(e => [e.id, e]));
+        const reordered = orderedIds
+          .map(id => entryMap.get(id))
+          .filter(Boolean) as InitiativeEntry[];
+        for (const entry of previousState.entries) {
+          if (!orderedIds.includes(entry.id)) reordered.push(entry);
+        }
+        queryClient.setQueryData(['initiative', campaign?.id, isDm], {
+          ...previousState,
+          entries: reordered,
+        });
+      }
+
+      return { previousState };
+    },
+    onError: (_err, _orderedIds, context) => {
+      // Revert on error and resume polling
+      if (context?.previousState) {
+        queryClient.setQueryData(['initiative', campaign?.id, isDm], context.previousState);
+      }
+      reorderInFlight.current = false;
+    },
+    onSuccess: (newState) => {
+      queryClient.setQueryData(['initiative', campaign?.id, isDm], newState);
+    },
+    onSettled: () => {
+      // Resume polling after mutation completes (success or error)
+      reorderInFlight.current = false;
+    },
+  });
+
   // Mutation for updating state-level properties
   const stateMutation = useMutation({
     mutationFn: async (updates: Partial<InitiativeState>) => {
@@ -317,6 +381,14 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
     [reorderMutation, isDm]
   );
 
+  const reorderList = useCallback(
+    (orderedIds: string[]) => {
+      if (!isDm) return;
+      reorderListMutation.mutate(orderedIds);
+    },
+    [reorderListMutation, isDm]
+  );
+
   const toggleVisibility = useCallback(() => {
     if (!isDm) return;
     stateMutation.mutate({ visibleToPlayers: !initiative.visibleToPlayers });
@@ -355,6 +427,7 @@ export function InitiativeProvider({ children }: { children: ReactNode }) {
         setActiveEntry,
         moveEntryUp,
         moveEntryDown,
+        reorderList,
         toggleVisibility,
         toggleActive,
         setRound,
