@@ -1,20 +1,8 @@
 [
   {
-    "id": "another-monster-jf4rkc",
-    "name": "another Monster",
-    "visibleToPlayers": false,
-    "isAntagonist": true,
-    "antagonistStats": {
-      "damage": 0,
-      "maxDamage": 10,
-      "armor": 0,
-      "moves": ""
-    },
-    "disposition": "hostile"
-  },
-  {
     "id": "a-third-monster-VdFcG-",
     "name": "A third monster",
+    "disposition": "neutral",
     "visibleToPlayers": true,
     "isAntagonist": true,
     "antagonistStats": {
@@ -23,45 +11,8 @@
       "armor": 0,
       "moves": ""
     },
-    "disposition": "friendly",
     "stats": {
       "damage": 2
     }
-  },
-  {
-    "id": "test-JvGgPH",
-    "name": "Monster 2",
-    "occupation": "test",
-    "visibleToPlayers": true,
-    "isAntagonist": true,
-    "antagonistStats": {
-      "damage": 0,
-      "maxDamage": 10,
-      "armor": 0,
-      "moves": ""
-    },
-    "stats": {
-      "damage": 0
-    }
-  },
-  {
-    "id": "monster-O-C3lC",
-    "name": "Monster",
-    "occupation": "A big old monster",
-    "portrait": "assets/portraits/monster-O-C3lC.jpg",
-    "portraitPosition": {
-      "x": 0,
-      "y": 0,
-      "scale": 1
-    },
-    "visibleToPlayers": true,
-    "isAntagonist": true,
-    "antagonistStats": {
-      "damage": 2,
-      "maxDamage": 10,
-      "armor": 1,
-      "moves": "some moves"
-    },
-    "disposition": "friendly"
   }
 ]

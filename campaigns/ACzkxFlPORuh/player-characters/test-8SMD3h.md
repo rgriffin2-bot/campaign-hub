@@ -1,6 +1,6 @@
 ---
 id: test
-name: Test Name
+name: Mauren
 player: jon
 pronouns: ''
 species: ''

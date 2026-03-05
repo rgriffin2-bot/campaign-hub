@@ -1,6 +1,6 @@
 ---
 id: test4
-name: Player 4
+name: Mike
 player: test4
 pronouns: ''
 species: ''
@@ -22,6 +22,6 @@ experience: 0
 luck: false
 gear: []
 playerVisible: true
-portrait: ''
+portrait: assets/pc-portraits/test4.jpg
 ---
 

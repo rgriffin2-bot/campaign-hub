@@ -1,5 +1,59 @@
 {
-  "entries": [],
+  "entries": [
+    {
+      "id": "init-1772681138680-wpfhdpan4-1",
+      "sourceType": "pc",
+      "sourceId": "test2",
+      "name": "Mark",
+      "portrait": "assets/pc-portraits/test2.jpg",
+      "initiative": 0,
+      "isActive": true
+    },
+    {
+      "id": "init-1772681138680-u2rycie44-2",
+      "sourceType": "pc",
+      "sourceId": "test5",
+      "name": "Maude",
+      "portrait": "assets/pc-portraits/test5.jpg",
+      "initiative": 0,
+      "isActive": false
+    },
+    {
+      "id": "init-1772681138680-4ra41o1x5-0",
+      "sourceType": "pc",
+      "sourceId": "test3",
+      "name": "Maple",
+      "portrait": "assets/pc-portraits/test3.jpg",
+      "initiative": 0,
+      "isActive": false
+    },
+    {
+      "id": "init-1772681166908-9wi4cqkdd-0",
+      "sourceType": "npc",
+      "sourceId": "a-third-monster-VdFcG-",
+      "name": "A third monster",
+      "initiative": 0,
+      "isActive": false
+    },
+    {
+      "id": "init-1772681138680-y3eo2csmk-4",
+      "sourceType": "pc",
+      "sourceId": "test4",
+      "name": "Mike",
+      "portrait": "assets/pc-portraits/test4.jpg",
+      "initiative": 0,
+      "isActive": false
+    },
+    {
+      "id": "init-1772681138680-idl87pq5b-3",
+      "sourceType": "pc",
+      "sourceId": "test",
+      "name": "Mauren",
+      "portrait": "assets/pc-portraits/test.jpg",
+      "initiative": 0,
+      "isActive": false
+    }
+  ],
   "currentRound": 1,
   "isActive": false,
   "visibleToPlayers": true

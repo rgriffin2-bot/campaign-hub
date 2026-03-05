@@ -7,7 +7,6 @@
     "image": "assets/ships/night-owl-qtk6wz.jpg",
     "isCrewShip": true,
     "pressure": 4,
-    "visibleToPlayers": true,
     "damage": {
       "helmControl": {},
       "enginesDrives": {},
@@ -15,17 +14,7 @@
       "hullStructure": {},
       "powerLifeSupport": {},
       "weaponsBoarding": {}
-    }
-  },
-  {
-    "id": "test-2-7t9V3O",
-    "name": "Ship test",
-    "type": "Whatever",
-    "class": "blog",
-    "image": "assets/ships/test-2-7t9V3O.jpg",
-    "isCrewShip": false,
-    "pressure": 0,
-    "visibleToPlayers": true,
-    "disposition": "hostile"
+    },
+    "visibleToPlayers": true
   }
 ]

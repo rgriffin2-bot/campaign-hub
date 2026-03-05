@@ -1,6 +1,6 @@
 ---
 id: test3
-name: Player 3
+name: Maple
 player: test3
 pronouns: ''
 species: ''
@@ -15,13 +15,13 @@ stats:
   grit: 0
   presence: 0
   resonance: 0
-pressure: 0
+pressure: 3
 harm: {}
 resources: covered
 experience: 2
 luck: false
 gear: []
 playerVisible: true
-portrait: ''
+portrait: assets/pc-portraits/test3.jpg
 ---
 
