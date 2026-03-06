@@ -3,9 +3,11 @@
  * Shows portrait, metadata, antagonist combat stats, DM-only secrets,
  * related characters, and markdown body content.
  */
+import { useState } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, User, MapPin, Lock, Eye, EyeOff, Swords, Shield, Heart } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
@@ -23,12 +25,13 @@ export function NPCDetail() {
   const { get, delete: deleteMutation, toggleVisibility } = useFiles('npcs');
 
   const { data: npc, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /** Delete NPC after user confirmation, then redirect to the list */
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this NPC?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/npcs');
   };
@@ -173,11 +176,12 @@ export function NPCDetail() {
               Edit
             </Link>
             <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
@@ -349,6 +353,13 @@ export function NPCDetail() {
           <MarkdownContent content={content} />
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete NPC"
+        message={`Are you sure you want to delete "${npc.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

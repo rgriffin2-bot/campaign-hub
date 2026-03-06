@@ -152,7 +152,7 @@ function PlayerLayoutInner() {
             </button>
           )}
           <span className="rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">
-            Player View
+            {playerName || 'Player View'}
           </span>
           {authEnabled && (
             <button

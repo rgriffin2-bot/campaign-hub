@@ -14,7 +14,8 @@
  */
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords, Plus } from 'lucide-react';
+import { Play, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords, Plus, Eye, EyeOff } from 'lucide-react';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAuth } from '../../core/providers/AuthProvider';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
@@ -34,7 +35,7 @@ import type { ApiResponse } from '@shared/types/api';
 
 // ─── Constants ────────────────────────────────────────────────────
 
-const POLL_INTERVAL = 1000;
+const POLL_INTERVAL = 3000;
 
 const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 };
 
@@ -62,6 +63,8 @@ export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
   const [visiblePCIds, setVisiblePCIds] = useState<Set<string> | null>(null);
   // Player click-to-select (when no per-player auth)
   const [selectedPCId, setSelectedPCId] = useState<string | null>(null);
+  // Confirm dialog for clear scene
+  const [confirmClearScene, setConfirmClearScene] = useState(false);
 
   // ── Scene providers ──
   const {
@@ -90,6 +93,7 @@ export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
     nextTurn,
     prevTurn,
     reorderList,
+    toggleVisibility: toggleInitiativeVisibility,
   } = useInitiative();
 
   // ── Derived data ──
@@ -171,8 +175,13 @@ export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
   };
 
   const handleClearScene = () => {
+    setConfirmClearScene(true);
+  };
+
+  const executeClearScene = () => {
     clearNPCScene();
     clearShipScene();
+    setConfirmClearScene(false);
   };
 
   // ── "Add In Scene" (DM only) ──
@@ -310,6 +319,20 @@ export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
                   <div className="mb-3 flex items-center gap-2">
                     <Swords className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
+                    {isDm && (
+                      <button
+                        onClick={toggleInitiativeVisibility}
+                        className={`ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                          initiative.visibleToPlayers
+                            ? 'text-muted-foreground hover:bg-accent'
+                            : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+                        }`}
+                        title={initiative.visibleToPlayers ? 'Visible to players' : 'Hidden from players'}
+                      >
+                        {initiative.visibleToPlayers ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                        {initiative.visibleToPlayers ? 'Visible' : 'Hidden'}
+                      </button>
+                    )}
                   </div>
                   <InitiativeTracker
                     initiative={initiative}
@@ -591,6 +614,16 @@ export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
 
       {/* Add to Scene Dialog (DM only) */}
       {isDm && <AddToSceneDialog open={addToSceneOpen} onClose={() => setAddToSceneOpen(false)} />}
+
+      {/* Clear Scene Confirmation */}
+      <ConfirmDialog
+        open={confirmClearScene}
+        title="Clear Scene"
+        message="Remove all NPCs and ships from the scene? This won't delete them from your campaign."
+        confirmLabel="Clear All"
+        onConfirm={executeClearScene}
+        onCancel={() => setConfirmClearScene(false)}
+      />
     </div>
   );
 }

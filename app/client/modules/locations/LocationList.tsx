@@ -110,7 +110,7 @@ export function LocationList() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Search locations by name, type, or description..."
+          placeholder="Search locations..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-4 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"

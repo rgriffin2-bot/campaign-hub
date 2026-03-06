@@ -4,9 +4,11 @@
  * and biography/notes sections. All data comes from the file's frontmatter.
  */
 
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Users } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
@@ -31,6 +33,8 @@ export function PlayerCharacterDetail() {
 
   // -- Data fetching ----------------------------------------------------------
   const { data: pc, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch character's playbook moves from a dedicated endpoint
   const { data: moves } = useQuery({
@@ -49,8 +53,7 @@ export function PlayerCharacterDetail() {
   // -- Delete handler ---------------------------------------------------------
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this character?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/player-characters');
   };
@@ -147,11 +150,12 @@ export function PlayerCharacterDetail() {
             Edit
           </Link>
           <button
-            onClick={handleDelete}
-            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
-            Delete
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>
@@ -217,6 +221,13 @@ export function PlayerCharacterDetail() {
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Character"
+        message={`Are you sure you want to delete "${fm.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

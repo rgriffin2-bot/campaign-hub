@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Star, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import type { ArtefactImage } from '@shared/schemas/story-artefact';
 
 interface ImageGalleryProps {
@@ -26,6 +27,7 @@ export function ImageGallery({
 }: ImageGalleryProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
 
   // Strip the "assets/" prefix to build the correct API asset URL
   const getImageUrl = (path: string) => {
@@ -116,9 +118,7 @@ export function ImageGallery({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm('Delete this image?')) {
-                        onDelete(image.id);
-                      }
+                      setDeleteImageId(image.id);
                     }}
                     className="rounded bg-destructive/50 p-1 text-white hover:bg-destructive/70"
                     title="Delete image"
@@ -221,6 +221,18 @@ export function ImageGallery({
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={deleteImageId !== null}
+        title="Delete Image"
+        message="Are you sure you want to delete this image? This cannot be undone."
+        onConfirm={() => {
+          if (deleteImageId && onDelete) {
+            onDelete(deleteImageId);
+          }
+          setDeleteImageId(null);
+        }}
+        onCancel={() => setDeleteImageId(null)}
+      />
     </>
   );
 }

@@ -5,9 +5,11 @@
  * description, DM-only secrets, and markdown notes.
  */
 
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Users, Lock, Eye, EyeOff, MapPin, User } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
 import { affinityLabels, FACTION_TYPE_LABELS, type FactionType, type FactionFrontmatter } from '@shared/schemas/faction';
@@ -18,11 +20,12 @@ export function FactionDetail() {
   const { get, delete: deleteMutation, toggleVisibility, update } = useFiles('factions');
 
   const { data: faction, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this faction?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/factions');
   };
@@ -171,11 +174,12 @@ export function FactionDetail() {
                 Edit
               </Link>
               <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
+                className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -280,6 +284,13 @@ export function FactionDetail() {
           <MarkdownContent content={content} />
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Faction"
+        message={`Are you sure you want to delete "${frontmatter.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

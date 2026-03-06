@@ -5,10 +5,12 @@
  * Shows phase info for multi-phase projects, tags, and markdown notes.
  */
 
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Clock, Eye, EyeOff, Minus, Plus, Check } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
@@ -23,6 +25,8 @@ export function ProjectDetail() {
   const { get, delete: deleteMutation, toggleVisibility } = useFiles('projects');
 
   const { data: project, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Direct API mutation for updating progress (bypasses full form save)
   const updateMutation = useMutation({
@@ -57,8 +61,7 @@ export function ProjectDetail() {
 
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this project?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/projects');
   };
@@ -226,11 +229,12 @@ export function ProjectDetail() {
                 Edit
               </Link>
               <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
+                className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
 
@@ -267,6 +271,13 @@ export function ProjectDetail() {
           <MarkdownContent content={content} />
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${frontmatter.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

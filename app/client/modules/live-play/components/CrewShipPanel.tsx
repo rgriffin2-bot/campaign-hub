@@ -143,7 +143,7 @@ export function CrewShipPanel({
             {/* View Entry button */}
             <Link
               to={`/modules/ships/${ship.id}?from=live-play`}
-              className="shrink-0 flex items-center gap-1 rounded bg-secondary px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="shrink-0 flex items-center gap-1 rounded bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <ExternalLink className="h-3 w-3" />
               View Entry

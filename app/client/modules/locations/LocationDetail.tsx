@@ -3,9 +3,11 @@
  * Displays hero image, breadcrumb hierarchy, child locations,
  * DM-only secrets, and markdown content.
  */
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
@@ -20,12 +22,13 @@ export function LocationDetail() {
 
   const { data: location, isLoading } = get(fileId || '');
   const allLocations = list.data || [];
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /** Delete location after confirmation, then redirect to list */
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this location?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/locations');
   };
@@ -190,11 +193,12 @@ export function LocationDetail() {
               Edit
             </Link>
             <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
@@ -270,6 +274,13 @@ export function LocationDetail() {
           <MarkdownContent content={content} />
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Location"
+        message={`Are you sure you want to delete "${frontmatter.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

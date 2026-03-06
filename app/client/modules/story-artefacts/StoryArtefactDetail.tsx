@@ -4,9 +4,11 @@
  * Deletion warns that all associated images will also be removed.
  */
 
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Scroll, Eye, EyeOff } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
@@ -20,12 +22,13 @@ export function StoryArtefactDetail() {
   const { get, delete: deleteMutation, toggleVisibility } = useFiles('story-artefacts');
 
   const { data: artefact, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // -- Delete handler (also removes all server-side images) ------------------
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete this artefact? This will also delete all associated images.')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/story-artefacts');
   };
@@ -131,11 +134,12 @@ export function StoryArtefactDetail() {
             Edit
           </Link>
           <button
-            onClick={handleDelete}
-            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
-            Delete
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>
@@ -179,6 +183,13 @@ export function StoryArtefactDetail() {
           <MarkdownContent content={frontmatter.dmOnly.notes} />
         </div>
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Artefact"
+        message={`Are you sure you want to delete "${frontmatter.name}"? This will also delete all associated images.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

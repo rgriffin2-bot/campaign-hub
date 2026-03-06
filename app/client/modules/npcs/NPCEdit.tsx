@@ -208,8 +208,13 @@ export function NPCEdit() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Thaldrin Ironforge"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+              className={`w-full rounded-md border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring ${
+                name.length === 0 ? 'border-destructive/50' : 'border-input'
+              }`}
             />
+            {name.length === 0 && (
+              <p className="mt-1 text-xs text-destructive">Name is required</p>
+            )}
           </div>
 
           <div>

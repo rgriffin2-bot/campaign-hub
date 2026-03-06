@@ -2,9 +2,11 @@
  * SessionNotesDetail -- Read-only view of a single session notes entry.
  * Displays title, date, author, tags, copyable ID, and markdown content.
  */
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, StickyNote, Calendar, User } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CopyableId } from '../../components/CopyableId';
 import type { SessionNotesFrontmatter } from '@shared/schemas/session-notes';
@@ -15,12 +17,13 @@ export function SessionNotesDetail() {
   const { get, delete: deleteMutation } = useFiles('session-notes');
 
   const { data: notes, isLoading } = get(fileId || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /** Delete these session notes after confirmation, then redirect to list */
   const handleDelete = async () => {
     if (!fileId) return;
-    if (!confirm('Are you sure you want to delete these session notes?')) return;
-
+    setIsDeleting(true);
     await deleteMutation.mutateAsync(fileId);
     navigate('/modules/session-notes');
   };
@@ -111,11 +114,12 @@ export function SessionNotesDetail() {
             Edit
           </Link>
           <button
-            onClick={handleDelete}
-            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+            className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
-            Delete
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>
@@ -128,6 +132,13 @@ export function SessionNotesDetail() {
           <p className="text-muted-foreground italic">No content yet.</p>
         )}
       </div>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Session Notes"
+        message={`Are you sure you want to delete "${frontmatter.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

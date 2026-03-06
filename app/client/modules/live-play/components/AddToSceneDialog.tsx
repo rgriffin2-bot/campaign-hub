@@ -79,7 +79,7 @@ export function AddToSceneDialog({ open, onClose }: AddToSceneDialogProps) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative z-10 w-full max-w-md rounded-lg border border-border bg-card shadow-xl">
+      <div className="relative z-10 w-[95vw] max-w-md rounded-lg border border-border bg-card shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Add to Scene</h2>

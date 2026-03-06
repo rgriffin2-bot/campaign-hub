@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { BackgroundUpload } from './components/BackgroundUpload';
 import type { TacticalBoard } from '@shared/schemas/tactical-board';
 
@@ -33,6 +34,7 @@ export function TacticalBoardEdit() {
   const [backgroundY, setBackgroundY] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch existing board data
   const { data: parsedFile, isLoading } = get(isNew ? '' : (fileId || ''));
@@ -105,11 +107,6 @@ export function TacticalBoardEdit() {
 
   const handleDelete = async () => {
     if (!fileId || isNew) return;
-
-    if (!confirm('Are you sure you want to delete this board? This cannot be undone.')) {
-      return;
-    }
-
     setIsDeleting(true);
     try {
       await remove.mutateAsync(fileId);
@@ -320,7 +317,7 @@ export function TacticalBoardEdit() {
           {!isNew && (
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
               className="flex items-center gap-2 rounded-md bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
             >
@@ -347,6 +344,13 @@ export function TacticalBoardEdit() {
           </button>
         </div>
       </div>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Board"
+        message={`Are you sure you want to delete "${name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }
