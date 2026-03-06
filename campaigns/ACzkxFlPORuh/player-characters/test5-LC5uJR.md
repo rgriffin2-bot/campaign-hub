@@ -18,7 +18,7 @@ stats:
 pressure: 0
 harm: {}
 resources: covered
-experience: 0
+experience: 1
 luck: false
 gear: []
 playerVisible: true

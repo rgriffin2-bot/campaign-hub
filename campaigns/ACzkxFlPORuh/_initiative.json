@@ -7,7 +7,7 @@
       "name": "Mark",
       "portrait": "assets/pc-portraits/test2.jpg",
       "initiative": 0,
-      "isActive": true
+      "isActive": false
     },
     {
       "id": "init-1772681138680-u2rycie44-2",
@@ -25,7 +25,7 @@
       "name": "Maple",
       "portrait": "assets/pc-portraits/test3.jpg",
       "initiative": 0,
-      "isActive": false
+      "isActive": true
     },
     {
       "id": "init-1772681166908-9wi4cqkdd-0",
