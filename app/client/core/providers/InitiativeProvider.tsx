@@ -9,9 +9,8 @@
  */
 import { createContext, useContext, useCallback, useRef, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
 import { useCampaign } from './CampaignProvider';
-import { useAuth } from './AuthProvider';
+import { useMode } from './ModeProvider';
 import type {
   InitiativeEntry,
   InitiativeState,
@@ -68,14 +67,8 @@ const DEFAULT_STATE: InitiativeState = {
 
 export function InitiativeProvider({ children }: { children: ReactNode }) {
   const { campaign } = useCampaign();
-  const { role, authEnabled } = useAuth();
+  const { isDMMode: isDm } = useMode();
   const queryClient = useQueryClient();
-  const location = useLocation();
-
-  // ── Role detection ─────────────────────────────────────────────────
-  // Player routes always get the player endpoint, even if the user has DM creds
-  const isPlayerRoute = location.pathname.startsWith('/player');
-  const isDm = !isPlayerRoute && (!authEnabled || role === 'dm');
 
   // DM and player endpoints differ: the player one filters hidden entries
   const endpoint = isDm

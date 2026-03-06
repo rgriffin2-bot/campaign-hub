@@ -22,7 +22,7 @@ export function NPCCard({ npc }: NPCCardProps) {
   // --- Derived status flags ---
   const isHidden = npc.hidden === true;
   const inScene = isInScene(npc.id);
-  const isAntagonist = npc.isAntagonist === true;
+  const hasStats = (npc.hasStats ?? npc.isAntagonist) === true;
 
   // Build portrait asset URL from the stored relative path
   const portrait = npc.portrait as string | undefined;
@@ -53,8 +53,8 @@ export function NPCCard({ npc }: NPCCardProps) {
         occupation: npc.occupation as string | undefined,
         portrait: portrait,
         portraitPosition: portraitPosition,
-        isAntagonist: isAntagonist,
-        antagonistStats: npc.antagonistStats as {
+        hasStats: hasStats,
+        stats: (npc.stats ?? npc.antagonistStats) as {
           damage?: number;
           maxDamage?: number;
           armor?: number;
@@ -74,7 +74,7 @@ export function NPCCard({ npc }: NPCCardProps) {
     >
       {/* Status badges */}
       <div className="absolute -right-2 -top-2 flex gap-1">
-        {isAntagonist && (
+        {hasStats && (
           <div className="flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
             <Swords className="h-3 w-3" />
           </div>

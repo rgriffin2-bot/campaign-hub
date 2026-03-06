@@ -130,7 +130,7 @@ export function CrewShipPanel({
                     type="button"
                     onClick={() => handlePressureClick(i)}
                     disabled={!editable}
-                    className={`h-5 w-5 rounded border-2 transition-colors ${
+                    className={`h-4 w-4 rounded-full border transition-colors ${
                       i < pressure
                         ? 'border-amber-500 bg-amber-500'
                         : 'border-muted-foreground/30 bg-transparent'
@@ -162,72 +162,62 @@ export function CrewShipPanel({
           {(
             <div className="flex-1 px-4 py-3">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px] text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="w-16 pb-2 text-left font-medium text-muted-foreground"></th>
-                      {SUBSYSTEM_KEYS.map((key) => (
-                        <th key={key} className="pb-2 text-center font-medium text-muted-foreground">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {SUBSYSTEM_KEYS.map((key) => {
+                    const subsystem = damage[key] || {};
+                    const hasDmg = subsystem.minor || subsystem.major;
+                    return (
+                      <div
+                        key={key}
+                        className={`rounded-lg border p-2 ${hasDmg ? 'border-red-500/30 bg-red-500/5' : 'border-border'}`}
+                      >
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
                           {SUBSYSTEM_SHORT_LABELS[key]}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Minor row */}
-                    <tr className="border-b border-border">
-                      <td className="py-2 text-yellow-500 font-medium">Minor</td>
-                      {SUBSYSTEM_KEYS.map((key) => {
-                        const subsystem = damage[key] || {};
-                        return (
-                          <td key={key} className="px-1 py-2">
+                        </div>
+                        <div className="space-y-1">
+                          {/* Minor */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-11 shrink-0 text-[10px] font-medium text-yellow-500">Minor</span>
                             {editable ? (
                               <input
                                 type="text"
                                 value={subsystem.minor || ''}
                                 onChange={(e) => handleDamageChange(key, 'minor', e.target.value)}
                                 placeholder="—"
-                                className={`w-full rounded border bg-transparent px-2 py-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring ${
+                                className={`w-full rounded border bg-transparent px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring ${
                                   subsystem.minor ? 'border-yellow-500 text-foreground' : 'border-border text-muted-foreground'
                                 }`}
                               />
                             ) : (
-                              <div className={`text-center ${subsystem.minor ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                              <span className={`text-xs ${subsystem.minor ? 'text-yellow-500' : 'text-muted-foreground'}`}>
                                 {subsystem.minor || '—'}
-                              </div>
+                              </span>
                             )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    {/* Major row */}
-                    <tr>
-                      <td className="py-2 text-red-500 font-medium">Major</td>
-                      {SUBSYSTEM_KEYS.map((key) => {
-                        const subsystem = damage[key] || {};
-                        return (
-                          <td key={key} className="px-1 py-2">
+                          </div>
+                          {/* Major */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-11 shrink-0 text-[10px] font-medium text-red-500">Major</span>
                             {editable ? (
                               <input
                                 type="text"
                                 value={subsystem.major || ''}
                                 onChange={(e) => handleDamageChange(key, 'major', e.target.value)}
                                 placeholder="—"
-                                className={`w-full rounded border bg-transparent px-2 py-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring ${
+                                className={`w-full rounded border bg-transparent px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring ${
                                   subsystem.major ? 'border-red-500 text-foreground' : 'border-border text-muted-foreground'
                                 }`}
                               />
                             ) : (
-                              <div className={`text-center ${subsystem.major ? 'text-red-500' : 'text-muted-foreground'}`}>
+                              <span className={`text-xs ${subsystem.major ? 'text-red-500' : 'text-muted-foreground'}`}>
                                 {subsystem.major || '—'}
-                              </div>
+                              </span>
                             )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

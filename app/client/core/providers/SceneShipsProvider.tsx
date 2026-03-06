@@ -7,9 +7,8 @@
  */
 import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
 import { useCampaign } from './CampaignProvider';
-import { useAuth } from './AuthProvider';
+import { useMode } from './ModeProvider';
 import type { ShipDisposition } from '@shared/schemas/ship';
 import type { SceneShip } from '@shared/types/scene';
 
@@ -35,13 +34,8 @@ const SceneShipsContext = createContext<SceneShipsContextValue | null>(null);
 
 export function SceneShipsProvider({ children }: { children: ReactNode }) {
   const { campaign } = useCampaign();
-  const { role, authEnabled } = useAuth();
+  const { isDMMode: isDm } = useMode();
   const queryClient = useQueryClient();
-  const location = useLocation();
-
-  // ── Role detection ─────────────────────────────────────────────────
-  const isPlayerRoute = location.pathname.startsWith('/player');
-  const isDm = !isPlayerRoute && (!authEnabled || role === 'dm');
 
   // Player endpoint filters hidden ships server-side
   const endpoint = isDm

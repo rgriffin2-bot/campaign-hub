@@ -1,18 +1,27 @@
 /**
- * Sidebar -- left navigation panel listing the Dashboard link and all
+ * Sidebar -- left navigation panel listing the Dashboard/Home link and all
  * enabled modules for the active campaign. DMs can drag-and-drop modules
- * to reorder them; players see a read-only list.
+ * to reorder them; players see a filtered, read-only list.
  *
- * Supports two modes:
+ * Supports two visual widths:
  * - Expanded (w-56 / 224px): full labels + icons
  * - Collapsed (w-14 / 56px): icons only
+ *
+ * Use `variant="player"` for the player view, which filters to
+ * player-visible modules and adjusts link paths.
  */
 import { useState, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCampaign } from './providers/CampaignProvider';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { useAuth } from './providers/AuthProvider';
+
+/** Modules that have player-facing views */
+const PLAYER_VIEW_MODULES = [
+  'npcs', 'lore', 'locations', 'rules', 'player-characters',
+  'live-play', 'ships', 'session-notes', 'factions', 'projects',
+  'tactical-board', 'story-artefacts',
+];
 
 interface SidebarProps {
   collapsed?: boolean;
@@ -21,15 +30,25 @@ interface SidebarProps {
   onClose?: () => void;
   /** Hide the collapse toggle (e.g. on mobile where it's not needed) */
   hideToggle?: boolean;
+  /** 'dm' (default) shows all modules with drag-and-drop; 'player' filters and disables reorder */
+  variant?: 'dm' | 'player';
 }
 
-export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = false, variant = 'dm' }: SidebarProps) {
   const { enabledModules, reorderModules, campaign } = useCampaign();
-  const { role, authEnabled } = useAuth();
-  const isDm = !authEnabled || role === 'dm';
   const navigate = useNavigate();
+  const isPlayer = variant === 'player';
 
-  // --- Drag-and-drop reordering state ---
+  // Base paths differ between DM and player views
+  const homePath = isPlayer ? '/player' : '/';
+  const modulesBasePath = isPlayer ? '/player/modules' : '/modules';
+
+  // Player view only shows modules with player-facing views
+  const visibleModules = isPlayer
+    ? enabledModules.filter(m => PLAYER_VIEW_MODULES.includes(m.id))
+    : enabledModules;
+
+  // --- Drag-and-drop reordering state (DM only) ---
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const dragNode = useRef<HTMLLIElement | null>(null);
@@ -39,7 +58,6 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
     dragNode.current = e.currentTarget;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', moduleId);
-    // Add a slight delay to allow the drag image to be captured
     setTimeout(() => {
       if (dragNode.current) {
         dragNode.current.style.opacity = '0.5';
@@ -76,7 +94,6 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
 
     if (draggedIndex === -1 || targetIndex === -1) return;
 
-    // Remove dragged item and insert at new position
     currentOrder.splice(draggedIndex, 1);
     currentOrder.splice(targetIndex, 0, draggedId);
 
@@ -94,6 +111,8 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
     }
   };
 
+  const canDrag = !isPlayer && !collapsed;
+
   return (
     <aside
       className={`flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200 ${
@@ -102,12 +121,12 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
     >
       <nav className="flex-1 overflow-auto p-2">
         <ul className="space-y-1">
-          {/* Dashboard Link */}
+          {/* Dashboard / Home Link */}
           <li>
             <NavLink
-              to="/"
+              to={homePath}
               end
-              onClick={handleNavClick('/')}
+              onClick={handleNavClick(homePath)}
               className={({ isActive }) =>
                 `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   collapsed ? 'justify-center' : 'gap-3'
@@ -119,33 +138,31 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
               }
             >
               <Home className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>Dashboard</span>}
+              {!collapsed && <span>{isPlayer ? 'Home' : 'Dashboard'}</span>}
             </NavLink>
           </li>
 
           {/* Module Links */}
-          {enabledModules.length > 0 && (
+          {visibleModules.length > 0 && (
             <>
-              {/* Section header — hidden when collapsed */}
               {!collapsed && (
                 <li className="pt-4">
                   <span className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Modules
+                    {isPlayer ? 'Browse' : 'Modules'}
                   </span>
                 </li>
               )}
-              {/* Spacer when collapsed (replaces the "Modules" header) */}
               {collapsed && <li className="pt-2" />}
 
-              {enabledModules.map((module) => (
+              {visibleModules.map((module) => (
                 <li
                   key={module.id}
-                  draggable={isDm && !collapsed}
-                  onDragStart={(e) => isDm && !collapsed && handleDragStart(e, module.id)}
+                  draggable={canDrag}
+                  onDragStart={(e) => canDrag && handleDragStart(e, module.id)}
                   onDragEnd={handleDragEnd}
-                  onDragOver={(e) => isDm && !collapsed && handleDragOver(e, module.id)}
+                  onDragOver={(e) => canDrag && handleDragOver(e, module.id)}
                   onDragLeave={handleDragLeave}
-                  onDrop={(e) => isDm && !collapsed && handleDrop(e, module.id)}
+                  onDrop={(e) => canDrag && handleDrop(e, module.id)}
                   className={`relative ${
                     dragOverId === module.id && draggedId !== module.id
                       ? 'before:absolute before:left-0 before:right-0 before:top-0 before:h-0.5 before:bg-primary'
@@ -153,11 +170,11 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
                   }`}
                 >
                   <NavLink
-                    to={`/modules/${module.id}`}
-                    onClick={handleNavClick(`/modules/${module.id}`)}
+                    to={`${modulesBasePath}/${module.id}`}
+                    onClick={handleNavClick(`${modulesBasePath}/${module.id}`)}
                     className={({ isActive }) =>
-                      `flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                        collapsed ? 'justify-center' : 'gap-2'
+                      `flex items-center rounded-md ${canDrag ? 'px-2 gap-2' : 'px-3 gap-3'} py-2 text-sm font-medium transition-colors ${
+                        collapsed ? 'justify-center' : ''
                       } ${
                         isActive
                           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -167,7 +184,7 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
                     title={collapsed ? module.name : undefined}
                   >
                     {/* Drag handle — only in expanded mode for DMs */}
-                    {isDm && !collapsed && (
+                    {canDrag && (
                       <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab active:cursor-grabbing" />
                     )}
                     <DynamicIcon name={module.icon} className="h-4 w-4 shrink-0" />
@@ -178,7 +195,7 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
             </>
           )}
 
-          {enabledModules.length === 0 && !collapsed && (
+          {visibleModules.length === 0 && !collapsed && (
             <li className="px-3 py-4 text-center text-sm text-muted-foreground">
               No modules enabled.
               <br />
@@ -202,7 +219,9 @@ export function Sidebar({ collapsed = false, onToggle, onClose, hideToggle = fal
               <ChevronRight className="h-4 w-4" />
             ) : (
               <div className="flex w-full items-center justify-between px-1">
-                <span className="text-xs text-muted-foreground">Campaign Hub v0.1.0</span>
+                <span className="text-xs text-muted-foreground">
+                  {isPlayer ? 'Read-only view' : 'Campaign Hub v0.1.0'}
+                </span>
                 <ChevronLeft className="h-4 w-4" />
               </div>
             )}

@@ -193,28 +193,6 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// Discover the public Cloudflare Tunnel URL so the DM can share a link with players.
-// Reads from a .tunnel-url file written by the launcher script.
-app.get('/api/tunnel-url', auth.requireDm, async (_req, res) => {
-  try {
-    const urlFilePath = path.join(process.cwd(), '.tunnel-url');
-    try {
-      const url = await fs.readFile(urlFilePath, 'utf-8');
-      if (url.trim()) {
-        res.json({ success: true, data: { url: url.trim() } });
-        return;
-      }
-    } catch {
-      // File doesn't exist — tunnel not running
-    }
-
-    res.json({ success: true, data: { url: null } });
-  } catch (error) {
-    console.error('Error getting tunnel URL:', error);
-    res.status(500).json({ success: false, error: 'Failed to get tunnel URL' });
-  }
-});
-
 // Session check — used by the frontend on load to determine current role.
 // When auth is disabled (no passwords configured), everyone gets DM access.
 app.get('/api/auth/session', (req, res) => {

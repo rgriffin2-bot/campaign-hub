@@ -26,7 +26,7 @@ import { PlayerLocationList } from './player/PlayerLocationList';
 import { PlayerLocationDetail } from './player/PlayerLocationDetail';
 import { PlayerRulesList } from './player/PlayerRulesList';
 import { PlayerRulesDetail } from './player/PlayerRulesDetail';
-import { PlayerLivePlay } from './player/PlayerLivePlay';
+import { LivePlayDashboard } from './modules/live-play';
 import { PlayerCharacterList } from './player/PlayerCharacterList';
 import { PlayerCharacterDetail } from './player/PlayerCharacterDetail';
 import { PlayerCharacterEdit } from './player/PlayerCharacterEdit';
@@ -101,7 +101,6 @@ function RequireAuth({ children, requiredRole }: { children: React.ReactNode; re
 
 function AppRoutes() {
   return (
-    <ModeProvider>
       <Routes>
         {/* DM Routes - require DM auth */}
         <Route
@@ -152,7 +151,7 @@ function AppRoutes() {
           <Route path="modules/factions/:fileId" element={<PlayerFactionDetail />} />
           <Route path="modules/projects" element={<PlayerProjectList />} />
           <Route path="modules/projects/:fileId" element={<PlayerProjectDetail />} />
-          <Route path="modules/live-play" element={<PlayerLivePlay />} />
+          <Route path="modules/live-play" element={<LivePlayDashboard isDm={false} />} />
           <Route path="modules/tactical-board" element={<PlayerTacticalBoardList />} />
           <Route path="tactical-board/:boardId" element={<PlayerTacticalBoardDetail />} />
           <Route path="modules/story-artefacts" element={<PlayerStoryArtefactList />} />
@@ -161,7 +160,6 @@ function AppRoutes() {
           <Route path="modules/*" element={<PlayerModuleNotFound />} />
         </Route>
       </Routes>
-    </ModeProvider>
   );
 }
 
@@ -171,13 +169,15 @@ export function App() {
       <AuthProvider>
         <CampaignProvider>
           <BrowserRouter>
-            <SceneNPCsProvider>
-              <SceneShipsProvider>
-                <InitiativeProvider>
-                  <AppRoutes />
-                </InitiativeProvider>
-              </SceneShipsProvider>
-            </SceneNPCsProvider>
+            <ModeProvider>
+              <SceneNPCsProvider>
+                <SceneShipsProvider>
+                  <InitiativeProvider>
+                    <AppRoutes />
+                  </InitiativeProvider>
+                </SceneShipsProvider>
+              </SceneNPCsProvider>
+            </ModeProvider>
           </BrowserRouter>
         </CampaignProvider>
       </AuthProvider>

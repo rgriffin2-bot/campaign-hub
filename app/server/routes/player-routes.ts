@@ -13,6 +13,8 @@
 
 import { Router, type Request } from 'express';
 import * as fs from 'fs/promises';
+import type { DiceRoll, DiceRollState } from '@shared/types/scene';
+import type { InitiativeEntry, InitiativeState } from '@shared/types/initiative';
 import * as path from 'path';
 import { fileStore } from '../core/file-store.js';
 import { relationshipIndex } from '../core/relationship-index.js';
@@ -828,20 +830,6 @@ router.get('/tactical-boards/:boardId', async (req, res) => {
 // and submit their own. The roller is always tagged as 'player'.
 // =============================================================================
 
-interface DiceRoll {
-  id: string;
-  diceType: string;
-  result: number;
-  rolledBy: 'dm' | 'player';
-  rollerName?: string;
-  rolledAt: string;
-}
-
-interface DiceRollState {
-  rolls: DiceRoll[];
-  visibleToPlayers: boolean;
-}
-
 // Get dice rolls (only if visible to players)
 router.get('/dice-rolls', async (req, res) => {
   try {
@@ -940,25 +928,6 @@ router.post('/dice-rolls', async (req, res) => {
 // Player Initiative (Read-Only) — Players see the turn order but DM notes
 // are stripped and a hidden tracker returns an empty list.
 // =============================================================================
-
-interface InitiativeEntry {
-  id: string;
-  sourceType: 'pc' | 'npc' | 'ship' | 'custom';
-  sourceId?: string;
-  name: string;
-  portrait?: string;
-  portraitPosition?: { x: number; y: number; scale: number };
-  initiative: number;
-  isActive: boolean;
-  notes?: string;
-}
-
-interface InitiativeState {
-  entries: InitiativeEntry[];
-  currentRound: number;
-  isActive: boolean;
-  visibleToPlayers: boolean;
-}
 
 // Get initiative state for players
 router.get('/initiative', async (req, res) => {

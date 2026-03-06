@@ -1,8 +1,5 @@
 /**
  * PCPanel -- displays a single player character's trackers during live play.
- * Has two layout modes:
- *   - compact: portrait + vertically stacked trackers (for side-by-side multi-PC views)
- *   - standard: horizontal header with inline trackers
  * When collapsible, panels can be horizontally collapsed to a narrow strip
  * showing just a small portrait and the character name displayed vertically.
  * All tracker values are editable when `editable` is true and propagated via onUpdate.

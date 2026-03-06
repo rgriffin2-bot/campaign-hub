@@ -46,8 +46,8 @@ export function AddToSceneDialog({ open, onClose }: AddToSceneDialogProps) {
       occupation: npc.occupation as string | undefined,
       portrait: npc.portrait as string | undefined,
       portraitPosition: npc.portraitPosition as { x: number; y: number; scale: number } | undefined,
-      isAntagonist: npc.isAntagonist as boolean | undefined,
-      antagonistStats: npc.antagonistStats as SceneNPC['antagonistStats'],
+      hasStats: (npc.hasStats ?? npc.isAntagonist) as boolean | undefined,
+      stats: (npc.stats ?? npc.antagonistStats) as SceneNPC['stats'],
       disposition: (npc.disposition as SceneNPC['disposition']) || 'neutral',
       visibleToPlayers: true,
     };

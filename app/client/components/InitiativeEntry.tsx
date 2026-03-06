@@ -89,7 +89,7 @@ export const InitiativeEntryComponent = memo(function InitiativeEntryComponent({
         className={cn(
           'flex items-center gap-2 rounded-lg border p-2 transition-all',
           entry.isActive
-            ? 'border-primary bg-primary/10 ring-1 ring-primary'
+            ? 'border-primary bg-primary/10 ring-2 ring-primary'
             : 'border-border bg-card/50'
         )}
       >

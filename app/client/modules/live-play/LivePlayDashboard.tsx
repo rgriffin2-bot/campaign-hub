@@ -1,18 +1,21 @@
 /**
  * LivePlayDashboard.tsx
  *
- * Top-level orchestration component for a live play session. Brings together:
+ * Unified live play dashboard for both DM and player views.
+ * Brings together:
  *   - Player character panels (polled for real-time updates)
  *   - Scene NPCs and ships (hostile/neutral/friendly)
  *   - Crew ships / vehicles
  *   - Combat tools: dice roller + initiative tracker
  *
- * PC data is polled every 3 seconds so that changes made by players
- * (e.g. tracker updates) appear in near-real-time for the DM.
+ * The `isDm` prop controls which features are available:
+ *   - DM: full editing, scene management, initiative controls, per-player selector
+ *   - Player: read-only scene, editable own PC only, dice roller
  */
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Play, LayoutGrid, LayoutList, Columns, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords, Plus } from 'lucide-react';
+import { Play, Users, Trash2, Rocket, ChevronDown, ChevronRight, Swords, Plus } from 'lucide-react';
+import { useAuth } from '../../core/providers/AuthProvider';
 import { useCampaign } from '../../core/providers/CampaignProvider';
 import { PCPanel } from './components/PCPanel';
 import { SceneNPCPanel } from './components/SceneNPCPanel';
@@ -21,7 +24,7 @@ import { CrewShipPanel } from './components/CrewShipPanel';
 import { DiceRoller } from './components/DiceRoller';
 import { AddToSceneDialog } from './components/AddToSceneDialog';
 import { InitiativeTracker } from '../../components/InitiativeTracker';
-import { useSceneNPCs } from '../../core/providers/SceneNPCsProvider';
+import { useSceneNPCs, type SceneNPC } from '../../core/providers/SceneNPCsProvider';
 import { useSceneShips, type SceneShip } from '../../core/providers/SceneShipsProvider';
 import { useInitiative } from '../../core/providers/InitiativeProvider';
 import type { PlayerCharacterFrontmatter } from '@shared/schemas/player-character';
@@ -31,29 +34,52 @@ import type { ApiResponse } from '@shared/types/api';
 
 // ─── Constants ────────────────────────────────────────────────────
 
-type LayoutMode = 'grid' | 'list' | 'compact';
-
-// How often to refetch PC data for near-real-time updates
 const POLL_INTERVAL = 1000;
 
-// Sort order for mixed NPC/ship lists: hostiles first so DM sees threats at the top
 const dispositionOrder = { hostile: 0, neutral: 1, friendly: 2 };
 
-export function LivePlayDashboard() {
+type SceneEntity =
+  | { type: 'npc'; data: SceneNPC }
+  | { type: 'ship'; data: SceneShip };
+
+interface LivePlayDashboardProps {
+  isDm?: boolean;
+}
+
+export function LivePlayDashboard({ isDm = true }: LivePlayDashboardProps) {
+  const { playerName } = useAuth();
   const { campaign } = useCampaign();
   const queryClient = useQueryClient();
 
   // ── UI state ──
-  // On mobile (< 768px), default to compact layout and collapsed combat tools
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const [layout, setLayout] = useState<LayoutMode>('compact');
   const [combatToolsExpanded, setCombatToolsExpanded] = useState(!isMobile);
   const [sceneExpanded, setSceneExpanded] = useState(true);
+  const [crewShipsExpanded, setCrewShipsExpanded] = useState(true);
+  const [partyExpanded, setPartyExpanded] = useState(true);
   const [addToSceneOpen, setAddToSceneOpen] = useState(false);
+  // Per-player visibility (DM only): which PC cards are shown. null = show all.
+  const [visiblePCIds, setVisiblePCIds] = useState<Set<string> | null>(null);
+  // Player click-to-select (when no per-player auth)
+  const [selectedPCId, setSelectedPCId] = useState<string | null>(null);
 
   // ── Scene providers ──
-  const { sceneNPCs, removeFromScene: removeNPCFromScene, clearScene: clearNPCScene, updateNPCStats, updateDisposition: updateNPCDisposition, toggleVisibility: toggleNPCVisibility } = useSceneNPCs();
-  const { sceneShips, removeFromScene: removeShipFromScene, clearScene: clearShipScene, updateShip, updateDisposition: updateShipDisposition, toggleVisibility: toggleShipVisibility } = useSceneShips();
+  const {
+    sceneNPCs,
+    removeFromScene: removeNPCFromScene,
+    clearScene: clearNPCScene,
+    updateNPCStats,
+    updateDisposition: updateNPCDisposition,
+    toggleVisibility: toggleNPCVisibility,
+  } = useSceneNPCs();
+  const {
+    sceneShips,
+    removeFromScene: removeShipFromScene,
+    clearScene: clearShipScene,
+    updateShip,
+    updateDisposition: updateShipDisposition,
+    toggleVisibility: toggleShipVisibility,
+  } = useSceneShips();
   const {
     initiative,
     addEntry,
@@ -67,13 +93,8 @@ export function LivePlayDashboard() {
   } = useInitiative();
 
   // ── Derived data ──
-  // Crew ships get their own top-level section; all other entities are
-  // merged and sorted by disposition for the scene panel.
   const crewShips = sceneShips.filter((ship: SceneShip) => ship.isCrewShip);
   const nonCrewShips = sceneShips.filter((ship: SceneShip) => !ship.isCrewShip);
-  type SceneEntity =
-    | { type: 'npc'; data: typeof sceneNPCs[0] }
-    | { type: 'ship'; data: SceneShip };
 
   const sceneEntities: SceneEntity[] = [
     ...sceneNPCs.map(npc => ({ type: 'npc' as const, data: npc })),
@@ -85,26 +106,34 @@ export function LivePlayDashboard() {
   });
 
   // ── Player character polling ──
-  // Uses a dedicated query key so polling doesn't interfere with the
-  // main file-list cache. Continues polling even when the tab loses focus.
+  // DM and player use different API endpoints
+  const apiBase = isDm
+    ? `/api/campaigns/${campaign?.id}/files/player-characters`
+    : `/api/player/campaigns/${campaign?.id}/files/player-characters`;
+  const queryKeyPrefix = isDm ? 'live-play' : 'player-live-play';
+
   const { data: characters = [], isLoading, error } = useQuery({
-    queryKey: ['live-play', campaign?.id, 'player-characters'],
+    queryKey: [queryKeyPrefix, campaign?.id, 'player-characters'],
     queryFn: async () => {
       if (!campaign) return [];
-      const res = await fetch(`/api/campaigns/${campaign.id}/files/player-characters`, {
-        credentials: 'include',
-      });
+      const res = await fetch(apiBase, { credentials: 'include' });
       const data: ApiResponse<FileMetadata[]> = await res.json();
       if (!data.success) throw new Error(data.error);
       return data.data || [];
     },
     enabled: !!campaign,
-    refetchInterval: POLL_INTERVAL, // Poll every 1 second for live updates
-    refetchIntervalInBackground: true, // Keep polling even when tab is not focused
-    retry: false, // Don't retry on auth errors
+    refetchInterval: POLL_INTERVAL,
+    refetchIntervalInBackground: true,
+    retry: false,
   });
 
-  // PATCH a PC's tracker values (HP, stress, etc.) and refresh immediately
+  // ── Player-side: auto-lock to own character ──
+  const ownPCId = !isDm && playerName
+    ? characters.find((pc) => (pc as Record<string, unknown>).player === playerName)?.id ?? null
+    : null;
+  const editablePCId = isDm ? null : (ownPCId ?? selectedPCId);
+
+  // ── Tracker mutation ──
   const updateTrackers = useMutation({
     mutationFn: async ({
       pcId,
@@ -115,24 +144,24 @@ export function LivePlayDashboard() {
     }) => {
       if (!campaign) throw new Error('No active campaign');
 
-      const res = await fetch(
-        `/api/modules/player-characters/${pcId}/trackers`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-          credentials: 'include',
-        }
-      );
+      const url = isDm
+        ? `/api/modules/player-characters/${pcId}/trackers`
+        : `/api/player/campaigns/${campaign.id}/files/player-characters/${pcId}/trackers`;
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+        credentials: 'include',
+      });
 
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       return data.data;
     },
     onSuccess: () => {
-      // Invalidate live-play query to refresh data immediately
       queryClient.invalidateQueries({
-        queryKey: ['live-play', campaign?.id, 'player-characters'],
+        queryKey: [queryKeyPrefix, campaign?.id, 'player-characters'],
       });
     },
   });
@@ -146,14 +175,10 @@ export function LivePlayDashboard() {
     clearShipScene();
   };
 
-  // ── "Add In Scene" ──
-  // Collects all PCs, scene NPCs, and scene ships into a single batch
-  // request. The server handles duplicate prevention, so this is safe to
-  // call repeatedly without clearing initiative first.
+  // ── "Add In Scene" (DM only) ──
   const handleAddInScene = useCallback(() => {
     const entriesToAdd: Array<Omit<import('@shared/types/initiative').InitiativeEntry, 'id'>> = [];
 
-    // Add all player characters (always considered "in scene")
     for (const pc of characters) {
       const frontmatter = pc as unknown as PlayerCharacterFrontmatter;
       entriesToAdd.push({
@@ -166,7 +191,6 @@ export function LivePlayDashboard() {
       });
     }
 
-    // Add all scene NPCs
     for (const npc of sceneNPCs) {
       entriesToAdd.push({
         sourceType: 'npc',
@@ -179,7 +203,6 @@ export function LivePlayDashboard() {
       });
     }
 
-    // Add all scene ships (including crew ships)
     for (const ship of sceneShips) {
       entriesToAdd.push({
         sourceType: 'ship',
@@ -192,12 +215,37 @@ export function LivePlayDashboard() {
       });
     }
 
-    // Send all entries in a single batch request - server handles duplicate prevention
     if (entriesToAdd.length > 0) {
       addEntriesBatch(entriesToAdd);
     }
   }, [characters, sceneNPCs, sceneShips, addEntriesBatch]);
 
+  // ── Per-player visibility helpers (DM only) ──
+  const shownCharacters = visiblePCIds === null
+    ? characters
+    : characters.filter(pc => visiblePCIds.has(pc.id));
+
+  const togglePC = (pcId: string) => {
+    setVisiblePCIds(prev => {
+      if (prev === null) {
+        const allIds = new Set(characters.map(c => c.id));
+        allIds.delete(pcId);
+        return allIds;
+      }
+      const next = new Set(prev);
+      if (next.has(pcId)) {
+        next.delete(pcId);
+      } else {
+        next.add(pcId);
+      }
+      return next;
+    });
+  };
+
+  const showAllPCs = () => setVisiblePCIds(null);
+  const hideAllPCs = () => setVisiblePCIds(new Set());
+
+  // ── Loading / error states ──
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -220,65 +268,20 @@ export function LivePlayDashboard() {
     );
   }
 
-  // CSS class map for the three layout modes
-  // On mobile, compact uses a single-column grid instead of flex-wrap
-  const layoutClasses = {
-    grid: 'grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-    list: 'flex flex-col gap-3 md:gap-4',
-    compact: 'flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch',
-  };
+  // For player view, characters to render are all of them (no per-player selector)
+  const displayedCharacters = isDm ? shownCharacters : characters;
 
   // ── Render ──
   return (
     <div className="space-y-3 md:space-y-6">
-      {/* Page header + layout toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 md:gap-3">
-          <Play className="h-5 w-5 md:h-6 md:w-6 text-primary" />
-          <h1 className="text-lg md:text-2xl font-bold text-foreground">Live Play</h1>
-        </div>
-
-        {/* Layout Toggle — hidden on mobile (auto-compact) */}
-        <div className="hidden md:flex rounded-md border border-border">
-          <button
-            onClick={() => setLayout('grid')}
-            className={`flex items-center gap-1 px-3 py-1.5 text-sm ${
-              layout === 'grid'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Grid layout"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setLayout('list')}
-            className={`flex items-center gap-1 border-x border-border px-3 py-1.5 text-sm ${
-              layout === 'list'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="List layout"
-          >
-            <LayoutList className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setLayout('compact')}
-            className={`flex items-center gap-1 px-3 py-1.5 text-sm ${
-              layout === 'compact'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Compact layout"
-          >
-            <Columns className="h-4 w-4" />
-          </button>
-        </div>
+      {/* Page header */}
+      <div className="flex items-center gap-2 md:gap-3">
+        <Play className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+        <h1 className="text-lg md:text-2xl font-bold text-foreground">Live Play</h1>
       </div>
 
       {/* Combat Tools Section - Collapsible Dice Roller + Initiative */}
       <div className="rounded-lg border border-border bg-card">
-        {/* Collapsible header */}
         <button
           type="button"
           onClick={() => setCombatToolsExpanded(!combatToolsExpanded)}
@@ -294,59 +297,75 @@ export function LivePlayDashboard() {
           <span className="text-xs text-muted-foreground">(Dice Roller + Initiative)</span>
         </button>
 
-        {/* Collapsible content */}
         {combatToolsExpanded && (
           <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
             <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-start">
-              {/* Dice Roller */}
               <div className="shrink-0 lg:w-[300px]">
-                <DiceRoller isDM />
+                <DiceRoller isDM={isDm} />
               </div>
 
-              {/* Initiative Tracker */}
-              <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 md:p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Swords className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
+              {/* Initiative Tracker — DM gets full controls; players see read-only if visible */}
+              {(isDm || initiative.visibleToPlayers) && (
+                <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 md:p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Swords className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">Initiative Order</h3>
+                  </div>
+                  <InitiativeTracker
+                    initiative={initiative}
+                    isDm={isDm}
+                    {...(isDm ? {
+                      onAddEntry: addEntry,
+                      onRemoveEntry: removeEntry,
+                      onUpdateEntry: updateEntry,
+                      onClearAllEntries: clearAllEntries,
+                      onNextTurn: nextTurn,
+                      onPrevTurn: prevTurn,
+                      onReorderList: reorderList,
+                      onAddInScene: handleAddInScene,
+                    } : {})}
+                  />
                 </div>
-                <InitiativeTracker
-                  initiative={initiative}
-                  isDm={true}
-                  onAddEntry={addEntry}
-                  onRemoveEntry={removeEntry}
-                  onUpdateEntry={updateEntry}
-                  onClearAllEntries={clearAllEntries}
-                  onNextTurn={nextTurn}
-                  onPrevTurn={prevTurn}
-                  onReorderList={reorderList}
-                  onAddInScene={handleAddInScene}
-                />
-              </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Crew Ships + Vehicles Section - Spans full width above party */}
+      {/* Crew Ships + Vehicles Section - Collapsible */}
       {crewShips.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Rocket className="h-4 w-4" />
-            <span>Crew Ships + Vehicles</span>
-          </div>
-          {crewShips.map((ship: SceneShip) => (
-            <CrewShipPanel
-              key={ship.id}
-              ship={ship}
-              editable
-              onUpdatePressure={(pressure) => updateShip(ship.id, { pressure })}
-              onUpdateDamage={(damage: ShipDamage) => updateShip(ship.id, { damage })}
-            />
-          ))}
+        <div className="rounded-lg border border-border bg-card">
+          <button
+            type="button"
+            onClick={() => setCrewShipsExpanded(!crewShipsExpanded)}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+          >
+            {crewShipsExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+            <Rocket className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">Crew Ships + Vehicles</span>
+            <span className="text-xs text-muted-foreground">({crewShips.length})</span>
+          </button>
+          {crewShipsExpanded && (
+            <div className="border-t border-border px-3 py-3 md:px-4 md:py-4 space-y-2">
+              {crewShips.map((ship: SceneShip) => (
+                <CrewShipPanel
+                  key={ship.id}
+                  ship={ship}
+                  editable
+                  onUpdatePressure={(pressure) => updateShip(ship.id, { pressure })}
+                  onUpdateDamage={(damage: ShipDamage) => updateShip(ship.id, { damage })}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Party Tracker */}
+      {/* Party Tracker - Collapsible with per-player selector (DM) or click-to-select (Player) */}
       {characters.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
           <Play className="h-12 w-12 text-muted-foreground" />
@@ -354,31 +373,126 @@ export function LivePlayDashboard() {
             No characters yet
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            Add player characters to use the Live Play tracker.
+            {isDm
+              ? 'Add player characters to use the Live Play tracker.'
+              : "The DM hasn't added any player characters yet."}
           </p>
         </div>
       ) : (
-        <div className={layoutClasses[layout]}>
-          {characters.map((pc, i) => (
-            <div key={pc.id} className={layout === 'compact' ? 'contents' : ''}>
-              <PCPanel
-                pc={{
-                  id: pc.id,
-                  frontmatter: pc as unknown as PlayerCharacterFrontmatter,
-                }}
-                editable
-                compact={layout === 'compact'}
-                collapsible
-                index={i}
-                onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
-              />
+        <div className="rounded-lg border border-border bg-card">
+          {/* Collapsible header */}
+          <button
+            type="button"
+            onClick={() => setPartyExpanded(!partyExpanded)}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+          >
+            {partyExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+            <Users className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">Player Characters</span>
+            <span className="text-xs text-muted-foreground">({characters.length})</span>
+            {!isDm && (
+              <span className="ml-auto text-xs text-muted-foreground italic">
+                {ownPCId
+                  ? `Editing ${characters.find(c => c.id === ownPCId)?.name ?? 'your character'}`
+                  : 'Tap a character to edit. Others are read-only.'}
+              </span>
+            )}
+          </button>
+
+          {partyExpanded && (
+            <div className="border-t border-border">
+              {/* Per-player selector bar (DM only) */}
+              {isDm && (
+                <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 md:px-4 border-b border-border bg-muted/30">
+                  <button
+                    onClick={showAllPCs}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                      visiblePCIds === null
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={hideAllPCs}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                      visiblePCIds !== null && visiblePCIds.size === 0
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    }`}
+                  >
+                    None
+                  </button>
+                  <div className="mx-1 h-4 w-px bg-border" />
+                  {characters.map((pc) => {
+                    const fm = pc as unknown as PlayerCharacterFrontmatter;
+                    const isVisible = visiblePCIds === null || visiblePCIds.has(pc.id);
+                    return (
+                      <button
+                        key={pc.id}
+                        onClick={() => togglePC(pc.id)}
+                        className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                          isVisible
+                            ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                        }`}
+                      >
+                        {fm.name || pc.id}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* PC cards */}
+              <div className="px-3 py-3 md:px-4 md:py-4">
+                {displayedCharacters.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-muted-foreground">
+                    No characters selected
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch">
+                    {displayedCharacters.map((pc, i) => {
+                      const isEditable = isDm || editablePCId === pc.id;
+                      const canSelect = !isDm && !ownPCId;
+
+                      return (
+                        <PCPanel
+                          key={pc.id}
+                          pc={{
+                            id: pc.id,
+                            frontmatter: pc as unknown as PlayerCharacterFrontmatter,
+                          }}
+                          editable={isEditable}
+                          compact
+                          collapsible
+                          defaultExpanded={isDm || isEditable || !ownPCId}
+                          index={i}
+                          className={!isDm ? `transition-all ${
+                            canSelect ? 'cursor-pointer' : ''
+                          } ${
+                            isEditable ? 'ring-2 ring-primary' : 'opacity-80' + (canSelect ? ' hover:opacity-100' : '')
+                          }` : ''}
+                          onClick={canSelect ? () => setSelectedPCId(pc.id) : undefined}
+                          onUpdate={(updates) => handleUpdatePC(pc.id, updates)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {/* Scene Entities (NPCs + Non-Crew Ships) - Collapsible, sorted by disposition */}
-      {sceneEntities.length === 0 && (
+      {isDm && sceneEntities.length === 0 && (
         <button
           onClick={() => setAddToSceneOpen(true)}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
@@ -405,55 +519,65 @@ export function LivePlayDashboard() {
               <span className="text-sm font-medium text-foreground">NPCs & Entities in Scene</span>
               <span className="text-xs text-muted-foreground">({sceneEntities.length})</span>
             </button>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setAddToSceneOpen(true)}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                title="Add NPC or ship to scene"
-              >
-                <Plus className="h-3 w-3" />
-                Add
-              </button>
-              <button
-                onClick={handleClearScene}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                title="Clear all from scene"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear
-              </button>
-            </div>
+            {isDm && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setAddToSceneOpen(true)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  title="Add NPC or ship to scene"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add
+                </button>
+                <button
+                  onClick={handleClearScene}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  title="Clear all from scene"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Collapsible content */}
           {sceneExpanded && (
             <div className="border-t border-border px-3 py-3 md:px-4 md:py-4">
-              <div className={layoutClasses[layout]}>
+              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch">
                 {sceneEntities.map((entity) => {
                   if (entity.type === 'npc') {
                     const npc = entity.data;
                     return (
-                      <div key={`npc-${npc.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
+                      <div key={`npc-${npc.id}`} className="w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]">
                         <SceneNPCPanel
                           npc={npc}
-                          onRemove={() => removeNPCFromScene(npc.id)}
-                          onUpdateStats={(updates) => updateNPCStats(npc.id, updates)}
-                          onUpdateDisposition={(disposition) => updateNPCDisposition(npc.id, disposition)}
-                          onToggleVisibility={() => toggleNPCVisibility(npc.id)}
-                          compact={layout === 'compact'}
+                          compact
+                          {...(isDm ? {
+                            onRemove: () => removeNPCFromScene(npc.id),
+                            onUpdateStats: (updates: Parameters<typeof updateNPCStats>[1]) => updateNPCStats(npc.id, updates),
+                            onUpdateDisposition: (disposition: Parameters<typeof updateNPCDisposition>[1]) => updateNPCDisposition(npc.id, disposition),
+                            onToggleVisibility: () => toggleNPCVisibility(npc.id),
+                          } : {
+                            showStats: false,
+                          })}
                         />
                       </div>
                     );
                   } else {
                     const ship = entity.data;
                     return (
-                      <div key={`ship-${ship.id}`} className={layout === 'compact' ? 'w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]' : ''}>
+                      <div key={`ship-${ship.id}`} className="w-full md:flex-1 md:min-w-[180px] md:max-w-[240px]">
                         <SceneShipPanel
                           ship={ship}
-                          onRemove={() => removeShipFromScene(ship.id)}
-                          onUpdateDisposition={(disposition: ShipDisposition) => updateShipDisposition(ship.id, disposition)}
-                          onToggleVisibility={() => toggleShipVisibility(ship.id)}
-                          compact={layout === 'compact'}
+                          compact
+                          {...(isDm ? {
+                            onRemove: () => removeShipFromScene(ship.id),
+                            onUpdateDisposition: (disposition: ShipDisposition) => updateShipDisposition(ship.id, disposition),
+                            onToggleVisibility: () => toggleShipVisibility(ship.id),
+                          } : {
+                            showControls: false,
+                          })}
                         />
                       </div>
                     );
@@ -465,8 +589,8 @@ export function LivePlayDashboard() {
         </div>
       )}
 
-      {/* Add to Scene Dialog */}
-      <AddToSceneDialog open={addToSceneOpen} onClose={() => setAddToSceneOpen(false)} />
+      {/* Add to Scene Dialog (DM only) */}
+      {isDm && <AddToSceneDialog open={addToSceneOpen} onClose={() => setAddToSceneOpen(false)} />}
     </div>
   );
 }

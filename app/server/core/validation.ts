@@ -23,12 +23,6 @@ export const fileIdSchema = z.string().min(1, 'File ID is required');
 // Module ID parameter
 export const moduleIdSchema = z.string().min(1, 'Module ID is required');
 
-// Pagination params
-export const paginationSchema = z.object({
-  limit: z.coerce.number().min(1).max(100).optional().default(50),
-  offset: z.coerce.number().min(0).optional().default(0),
-});
-
 // =============================================================================
 // File Operation Schemas — Used by the generic CRUD file endpoints
 // =============================================================================
@@ -44,14 +38,6 @@ export const updateFileSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   content: z.string().optional(),
   frontmatter: z.record(z.unknown()).optional(),
-});
-
-// =============================================================================
-// Auth Schemas
-// =============================================================================
-
-export const loginSchema = z.object({
-  password: z.string().min(1, 'Password is required'),
 });
 
 // =============================================================================

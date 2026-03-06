@@ -13,7 +13,7 @@ export function PlayerDashboard() {
   const { campaign, enabledModules } = useCampaign();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* Welcome */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-foreground">

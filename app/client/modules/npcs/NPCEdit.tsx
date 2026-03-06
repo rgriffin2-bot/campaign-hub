@@ -13,7 +13,7 @@ import { ArrowLeft, Save, Swords } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
 import { RelatedCharacterInput, normalizeRelatedCharacters } from '../../components/RelatedCharacterInput';
 import { PortraitUpload } from '../../components/PortraitUpload';
-import type { NPCFrontmatter, NPCDmOnly, RelatedCharacter, AntagonistStats } from '@shared/schemas/npc';
+import type { NPCFrontmatter, NPCDmOnly, RelatedCharacter, NPCStatsType as NPCStatsType } from '@shared/schemas/npc';
 
 export function NPCEdit() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -40,8 +40,8 @@ export function NPCEdit() {
   const [content, setContent] = useState('');
   const [portrait, setPortrait] = useState<string | undefined>();
   const [portraitPosition, setPortraitPosition] = useState<{ x: number; y: number; scale: number } | undefined>();
-  const [isAntagonist, setIsAntagonist] = useState(false);
-  const [antagonistStats, setAntagonistStats] = useState<AntagonistStats>({
+  const [hasStats, setHasStats] = useState(false);
+  const [npcStats, setNpcStats] = useState<NPCStatsType>({
     damage: 0,
     maxDamage: 10,
     armor: 0,
@@ -69,8 +69,8 @@ export function NPCEdit() {
       setContent(existingNPC.content);
       setPortrait(fm.portrait);
       setPortraitPosition(fm.portraitPosition);
-      setIsAntagonist(fm.isAntagonist || false);
-      setAntagonistStats(fm.antagonistStats || {
+      setHasStats(fm.hasStats ?? fm.isAntagonist ?? false);
+      setNpcStats(fm.stats ?? fm.antagonistStats ?? {
         damage: 0,
         maxDamage: 10,
         armor: 0,
@@ -114,8 +114,8 @@ export function NPCEdit() {
         tags: tagsArray.length > 0 ? tagsArray : undefined,
         portrait: portrait || undefined,
         portraitPosition: portraitPosition || undefined,
-        isAntagonist: isAntagonist || undefined,
-        antagonistStats: isAntagonist ? antagonistStats : undefined,
+        hasStats: hasStats || undefined,
+        stats: hasStats ? npcStats : undefined,
       };
 
       if (isNew) {
@@ -301,26 +301,26 @@ export function NPCEdit() {
       </div>
 
       {/* Antagonist Section */}
-      <div className={`space-y-4 rounded-lg border p-6 ${isAntagonist ? 'border-red-500/30 bg-red-500/5' : 'border-border bg-card'}`}>
+      <div className={`space-y-4 rounded-lg border p-6 ${hasStats ? 'border-red-500/30 bg-red-500/5' : 'border-border bg-card'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Swords className={`h-5 w-5 ${isAntagonist ? 'text-red-500' : 'text-muted-foreground'}`} />
-            <h2 className={`font-semibold ${isAntagonist ? 'text-red-500' : 'text-foreground'}`}>
+            <Swords className={`h-5 w-5 ${hasStats ? 'text-red-500' : 'text-muted-foreground'}`} />
+            <h2 className={`font-semibold ${hasStats ? 'text-red-500' : 'text-foreground'}`}>
               Antagonist / Combat Entity
             </h2>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={isAntagonist}
-              onChange={(e) => setIsAntagonist(e.target.checked)}
+              checked={hasStats}
+              onChange={(e) => setHasStats(e.target.checked)}
               className="h-4 w-4 rounded border-input bg-background text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">Potential Antagonist</span>
           </label>
         </div>
 
-        {isAntagonist && (
+        {hasStats && (
           <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
               Combat stats for encounters. Track damage during live play.
@@ -334,8 +334,8 @@ export function NPCEdit() {
                 <input
                   type="number"
                   min={1}
-                  value={antagonistStats.maxDamage || 10}
-                  onChange={(e) => setAntagonistStats(prev => ({
+                  value={npcStats.maxDamage || 10}
+                  onChange={(e) => setNpcStats(prev => ({
                     ...prev,
                     maxDamage: parseInt(e.target.value) || 10,
                   }))}
@@ -350,8 +350,8 @@ export function NPCEdit() {
                 <input
                   type="number"
                   min={0}
-                  value={antagonistStats.damage || 0}
-                  onChange={(e) => setAntagonistStats(prev => ({
+                  value={npcStats.damage || 0}
+                  onChange={(e) => setNpcStats(prev => ({
                     ...prev,
                     damage: parseInt(e.target.value) || 0,
                   }))}
@@ -366,8 +366,8 @@ export function NPCEdit() {
                 <input
                   type="number"
                   min={0}
-                  value={antagonistStats.armor || 0}
-                  onChange={(e) => setAntagonistStats(prev => ({
+                  value={npcStats.armor || 0}
+                  onChange={(e) => setNpcStats(prev => ({
                     ...prev,
                     armor: parseInt(e.target.value) || 0,
                   }))}
@@ -381,8 +381,8 @@ export function NPCEdit() {
                 Moves / Abilities
               </label>
               <textarea
-                value={antagonistStats.moves || ''}
-                onChange={(e) => setAntagonistStats(prev => ({
+                value={npcStats.moves || ''}
+                onChange={(e) => setNpcStats(prev => ({
                   ...prev,
                   moves: e.target.value,
                 }))}
