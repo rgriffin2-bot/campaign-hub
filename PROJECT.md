@@ -143,7 +143,7 @@ campaign-hub/
 │   │   │
 │   │   ├── modules/                # Module-specific UI (mirrors server/modules/)
 │   │   │   ├── npcs/               # NPC list, detail, edit, AI generate views
-│   │   │   ├── locations/          # Location list, detail, edit + map components
+│   │   │   ├── locations/          # Location list, detail, edit + 3D solar system map (R3F)
 │   │   │   ├── lore/               # Lore list, detail, edit
 │   │   │   ├── rules/              # Rules list, detail, edit
 │   │   │   ├── player-characters/  # PC list, detail, edit + stats/gear/tracker components

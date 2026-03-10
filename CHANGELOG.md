@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-03-10 (session 4)
+
+### 3D Solar System Map & Holographic HUD
+
+**What changed:** Added a full 3D solar system map using React Three Fiber with wireframe celestial bodies, FBM noise nebula, and asteroid belts. Includes GPU holographic post-processing (scan lines, sweep band, vignette, film grain) via Three.js EffectComposer/ShaderPass. HUD-style selection brackets billboard to face camera. Search bar finds and zooms to bodies. Detail sidebar redesigned as a sci-fi clipped panel with beveled corners (CSS clip-path), blue glow borders (drop-shadow), and monospace typography. Player-side map now uses the shared FullMapView component instead of a sandboxed iframe. Added three.js, @react-three/fiber, and @react-three/drei dependencies.
+
+**Why:** The flat location list didn't convey the spatial relationships between celestial bodies in the campaign's star system. The 3D map gives players an immersive, interactive way to explore the system, with the holographic overlay and HUD panel reinforcing the sci-fi setting.
+
+---
+
 ## 2026-02-27 (session 3)
 
 ### Session 3: Raspberry Pi Deployment Support

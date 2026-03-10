@@ -1,26 +1,33 @@
 /**
- * FullMapView -- Full-screen interactive star-system map.
- * Generates (or loads a cached) HTML/JS map via the server, renders it in an
- * iframe, and overlays a selection sidebar when the user clicks a celestial body.
+ * FullMapView -- Full-screen 3D star-system map.
+ * Renders the solar system using Three.js with a minimalist wireframe aesthetic.
+ * Click a celestial body to open the detail sidebar.
  */
-import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ExternalLink, X, RefreshCw, MapPin } from 'lucide-react';
+import { useState, Suspense, lazy } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
+import { X, MapPin } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { FileMetadata } from '@shared/types/file';
 import type { CelestialData } from '@shared/schemas/location';
 
+// Lazy-load the Three.js scene so it never blocks the main app bundle
+const SolarSystem3D = lazy(() =>
+  import('./SolarSystem3D').then((m) => ({ default: m.SolarSystem3D }))
+);
+
 interface FullMapViewProps {
   locations: FileMetadata[];
   onClose?: () => void;
+  basePath?: string;
 }
 
 interface MapSidebarProps {
   location: FileMetadata | null;
   onClose: () => void;
+  basePath: string;
 }
 
-// Human-readable labels for celestial body types
 const BODY_TYPE_LABELS: Record<string, string> = {
   star: 'Star',
   planet: 'Planet',
@@ -29,19 +36,30 @@ const BODY_TYPE_LABELS: Record<string, string> = {
   asteroid_ring: 'Asteroid Belt',
 };
 
-// ============================================================
-// Inline sidebar shown when a celestial body is selected
-// ============================================================
+// ── Sci-fi HUD sidebar styles ──────────────────────────────────────────────
 
-function InlineMapSidebar({ location, onClose }: MapSidebarProps) {
+const HUD_BLUE = 'rgba(59,130,246,';
+const CLIP_OUTER = 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))';
+const CLIP_INNER = 'polygon(1px 1px, calc(100% - 21px) 1px, calc(100% - 1px) 21px, calc(100% - 1px) calc(100% - 1px), 21px calc(100% - 1px), 1px calc(100% - 21px))';
+const FONT_MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+
+const hudText: React.CSSProperties = {
+  fontFamily: FONT_MONO,
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+};
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+
+function InlineMapSidebar({ location, onClose, basePath }: MapSidebarProps) {
   const { campaign } = useCampaign();
 
   if (!location) {
     return (
-      <div className="flex flex-col items-center justify-center p-4 text-center">
-        <MapPin className="h-8 w-8 text-muted-foreground" />
-        <p className="mt-2 text-sm text-muted-foreground">
-          Click on a celestial body to view details
+      <div style={{ padding: 16, textAlign: 'center', fontFamily: FONT_MONO, color: `${HUD_BLUE}0.4)` }}>
+        <MapPin style={{ width: 32, height: 32, margin: '0 auto 8px' }} />
+        <p style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>
+          Select a body
         </p>
       </div>
     );
@@ -49,28 +67,53 @@ function InlineMapSidebar({ location, onClose }: MapSidebarProps) {
 
   const celestial = location.celestial as CelestialData | undefined;
   const image = location.image as string | undefined;
-  const description: string | undefined = typeof location.description === 'string' ? location.description : undefined;
+  const description: string | undefined =
+    typeof location.description === 'string' ? location.description : undefined;
   const imageUrl =
     image && campaign
       ? `/api/campaigns/${campaign.id}/assets/${image.replace('assets/', '')}`
       : null;
 
   return (
-    <div className="flex flex-col">
-      {/* Header with close button */}
-      <div className="flex items-start justify-between p-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-foreground">
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: 12 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h3 style={{
+            ...hudText,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#e2e8f0',
+            margin: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
             {location.name}
           </h3>
-          <div className="mt-1 flex items-center gap-2">
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             {celestial && (
-              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              <span style={{
+                ...hudText,
+                fontSize: 9,
+                fontWeight: 600,
+                color: `${HUD_BLUE}0.9)`,
+                background: `${HUD_BLUE}0.15)`,
+                padding: '2px 8px',
+                clipPath: 'polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%)',
+              }}>
                 {BODY_TYPE_LABELS[celestial.bodyType] || celestial.bodyType}
               </span>
             )}
             {location.type ? (
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span style={{
+                ...hudText,
+                fontSize: 9,
+                color: `${HUD_BLUE}0.5)`,
+                border: `1px solid ${HUD_BLUE}0.2)`,
+                padding: '1px 6px',
+                borderRadius: 2,
+              }}>
                 {String(location.type)}
               </span>
             ) : null}
@@ -78,200 +121,171 @@ function InlineMapSidebar({ location, onClose }: MapSidebarProps) {
         </div>
         <button
           onClick={onClose}
-          className="ml-2 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          style={{
+            marginLeft: 8,
+            flexShrink: 0,
+            background: 'none',
+            border: `1px solid ${HUD_BLUE}0.3)`,
+            borderRadius: 2,
+            padding: 2,
+            color: `${HUD_BLUE}0.5)`,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <X className="h-4 w-4" />
+          <X style={{ width: 14, height: 14 }} />
         </button>
       </div>
 
-      {/* Image preview */}
+      {/* Image */}
       {imageUrl ? (
-        <div className="mx-3 mb-3 overflow-hidden rounded-lg border border-border">
-          <img
-            src={imageUrl}
-            alt={location.name}
-            className="h-24 w-full object-cover"
-          />
+        <div style={{
+          margin: '0 12px 12px',
+          overflow: 'hidden',
+          borderRadius: 4,
+          boxShadow: `0 0 8px ${HUD_BLUE}0.3), inset 0 0 4px ${HUD_BLUE}0.1)`,
+          border: `1px solid ${HUD_BLUE}0.3)`,
+        }}>
+          <img src={imageUrl} alt={location.name} style={{ display: 'block', width: '100%', height: 96, objectFit: 'cover' }} />
         </div>
       ) : null}
 
       {/* Description */}
       {description ? (
-        <p className="mb-3 px-3 text-xs text-muted-foreground">
+        <p style={{
+          fontFamily: FONT_MONO,
+          fontSize: 11,
+          lineHeight: 1.5,
+          color: 'rgba(148,163,184,0.8)',
+          margin: '0 12px 12px',
+        }}>
           {description}
         </p>
       ) : null}
 
-      {/* View Details link */}
-      <div className="border-t border-border p-3">
+      {/* Separator + nav link */}
+      <div style={{ borderTop: `1px solid ${HUD_BLUE}0.2)`, padding: 12 }}>
         <Link
-          to={`/modules/locations/${location.id}`}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          to={`${basePath}/${location.id}`}
+          style={{
+            ...hudText,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            fontSize: 10,
+            fontWeight: 600,
+            color: `${HUD_BLUE}0.9)`,
+            background: `${HUD_BLUE}0.08)`,
+            border: `1px solid ${HUD_BLUE}0.4)`,
+            borderRadius: 2,
+            padding: '6px 12px',
+            textDecoration: 'none',
+            transition: 'background 0.2s, border-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = `${HUD_BLUE}0.18)`;
+            e.currentTarget.style.borderColor = `${HUD_BLUE}0.6)`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = `${HUD_BLUE}0.08)`;
+            e.currentTarget.style.borderColor = `${HUD_BLUE}0.4)`;
+          }}
         >
           View Details
-          <ExternalLink className="h-3 w-3" />
         </Link>
       </div>
     </div>
   );
 }
 
-// ============================================================
-// Main full-screen map component
-// ============================================================
+// ── Main ───────────────────────────────────────────────────────────────────
 
-export function FullMapView({ locations, onClose }: FullMapViewProps) {
-  const { campaign } = useCampaign();
-  const navigate = useNavigate();
+export function FullMapView({ locations, onClose, basePath = '/modules/locations' }: FullMapViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<FileMetadata | null>(null);
-  const [mapHtml, setMapHtml] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // The iframe sends postMessage events when the user clicks "Go to Entry"
-  const handleIframeMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type === 'navigate-to-location' && event.data?.locationId) {
-      // Close the map and navigate to the location
-      onClose?.();
-      navigate(`/modules/locations/${event.data.locationId}`);
-    }
-  }, [onClose, navigate]);
+  const celestialCount = locations.filter((l) => l.celestial).length;
 
-  // Listen for postMessage from iframe
-  useEffect(() => {
-    window.addEventListener('message', handleIframeMessage);
-    return () => window.removeEventListener('message', handleIframeMessage);
-  }, [handleIframeMessage]);
-
-  // On mount, check if a previously generated map HTML file exists for this campaign
-  useEffect(() => {
-    if (campaign) {
-      checkForGeneratedMap();
-    }
-  }, [campaign]);
-
-  const checkForGeneratedMap = async () => {
-    if (!campaign) return;
-
-    try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/map`);
-      if (response.ok) {
-        const html = await response.text();
-        setMapHtml(html);
-      }
-    } catch {
-      // No map exists yet, that's fine
-    }
-  };
-
-  /** Request the server to (re)generate the star-system map HTML */
-  const generateMap = async () => {
-    if (!campaign) return;
-
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/map/generate`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to generate map');
-      }
-
-      // Re-fetch the generated map
-      await checkForGeneratedMap();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate map');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Only locations with celestial data are relevant to the map
-  const celestialLocations = locations.filter(
-    (loc) => loc.celestial !== undefined && loc.celestial !== null
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950">
-      {/* Header bar */}
-      <div className="absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur">
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#04040a' }}>
+      {/* Header */}
+      <div className="absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between border-b border-white/10 bg-black/40 px-4 backdrop-blur">
         <div className="flex items-center gap-3">
           <MapPin className="h-5 w-5 text-primary" />
           <span className="font-medium text-foreground">System Map</span>
-          <span className="text-sm text-muted-foreground">
-            {celestialLocations.length} celestial bodies
-          </span>
+          <span className="text-sm text-muted-foreground">{celestialCount} bodies</span>
         </div>
-
-        <div className="flex items-center gap-2">
+        {onClose && (
           <button
-            onClick={generateMap}
-            disabled={isGenerating}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-            {isGenerating ? 'Generating...' : mapHtml ? 'Regenerate Map' : 'Generate Map'}
+            <X className="h-5 w-5" />
           </button>
-
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Main content area - positioned below header */}
-      <div className="absolute inset-x-0 bottom-0 top-12 overflow-hidden">
-        {error && (
-          <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-md bg-destructive/90 px-4 py-2 text-sm text-destructive-foreground">
-            {error}
-          </div>
-        )}
-
-        {mapHtml ? (
-          // Render the generated HTML map in an iframe
-          <iframe
-            srcDoc={mapHtml}
-            className="h-full w-full border-0"
-            title="Star System Map"
-            sandbox="allow-scripts"
-          />
-        ) : (
-          // Fallback: Show placeholder or simple visualization
+      {/* 3D canvas fills the entire viewport, header floats on top */}
+      <div className="absolute inset-0">
+        {celestialCount === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
             <MapPin className="h-16 w-16 text-muted-foreground" />
             <div>
-              <h3 className="text-lg font-medium text-foreground">No Map Generated</h3>
+              <h3 className="text-lg font-medium text-foreground">No Celestial Bodies</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Click "Generate Map" to create an interactive star system visualization.
+                Add celestial data to your locations to see them on the map.
               </p>
             </div>
-            {celestialLocations.length === 0 && (
-              <p className="text-sm text-amber-500">
-                Add celestial data to your locations first.
-              </p>
-            )}
           </div>
-        )}
-
-        {/* Sidebar overlay */}
-        {selectedLocation && (
-          <div className="absolute right-4 top-4 w-64 rounded-lg border border-border bg-card/95 shadow-lg backdrop-blur">
-            <InlineMapSidebar
-              location={selectedLocation}
-              onClose={() => setSelectedLocation(null)}
+        ) : (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Loading 3D map...
+              </div>
+            }
+          >
+            <SolarSystem3D
+              locations={locations}
+              selectedId={selectedLocation?.id ?? null}
+              onSelect={setSelectedLocation}
             />
-          </div>
+          </Suspense>
         )}
       </div>
-    </div>
+
+      {/* Sidebar overlay — sci-fi HUD panel */}
+      {selectedLocation && (
+        <div style={{
+          position: 'absolute',
+          right: 16,
+          top: 64,
+          zIndex: 20,
+          width: 256,
+          filter: `drop-shadow(0 0 8px ${HUD_BLUE}0.4)) drop-shadow(0 0 20px ${HUD_BLUE}0.15))`,
+        }}>
+          {/* Border layer */}
+          <div style={{
+            clipPath: CLIP_OUTER,
+            background: `${HUD_BLUE}0.5)`,
+          }}>
+            {/* Content layer */}
+            <div style={{
+              clipPath: CLIP_INNER,
+              background: 'rgba(4, 8, 22, 0.92)',
+            }}>
+              <InlineMapSidebar
+                location={selectedLocation}
+                onClose={() => setSelectedLocation(null)}
+                basePath={basePath}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }

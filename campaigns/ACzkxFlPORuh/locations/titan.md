@@ -10,17 +10,22 @@ tags:
   - skimmers
 celestial:
   bodyType: planet
-  orbitDistance: 450
+  orbitDistance: 900
   radius: 15
-  color: "#C4A080"
+  color: '#C4A080'
   startPosition: 270
   showLabel: true
-  orbitColor: "#C4A080"
+  orbitColor: '#C4A080'
 dmOnly:
-  secrets: The Skimmers have discovered something deep in Titan's atmosphere - a massive structure that predates human arrival in the system. They're keeping it secret while they explore.
-  plotHooks: A Skimmer captain wants to defect to the Alliance, claiming to have evidence of alien technology. She needs help getting out before her people silence her.
+  secrets: >-
+    The Skimmers have discovered something deep in Titan's atmosphere - a
+    massive structure that predates human arrival in the system. They're keeping
+    it secret while they explore.
+  plotHooks: >-
+    A Skimmer captain wants to defect to the Alliance, claiming to have evidence
+    of alien technology. She needs help getting out before her people silence
+    her.
 ---
-
 Titan is a massive gas giant in the outer system, its swirling bands of ammonia and methane clouds hiding vast stores of hydrogen and helium. The planet is home to the Skimmers, a unique culture that lives permanently in the planet's upper atmosphere.
 
 ## The Skimmers

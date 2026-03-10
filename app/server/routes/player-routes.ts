@@ -14,7 +14,7 @@
 import { Router, type Request } from 'express';
 import * as fs from 'fs/promises';
 import type { DiceRoll, DiceRollState } from '@shared/types/scene';
-import type { InitiativeEntry, InitiativeState } from '@shared/types/initiative';
+import type { InitiativeState } from '@shared/types/initiative';
 import * as path from 'path';
 import { fileStore } from '../core/file-store.js';
 import { relationshipIndex } from '../core/relationship-index.js';

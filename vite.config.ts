@@ -79,6 +79,9 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+  optimizeDeps: {
+    exclude: ['@react-three/fiber', '@react-three/drei', '@react-three/postprocessing'],
+  },
   build: {
     outDir: '../../dist/client',
     emptyOutDir: true,

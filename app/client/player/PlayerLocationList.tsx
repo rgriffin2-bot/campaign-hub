@@ -8,13 +8,13 @@
  *
  * Locations are fetched via the player files hook and displayed read-only.
  */
-import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, List, LayoutGrid, Globe, X, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Search, MapPin, List, LayoutGrid, Globe } from 'lucide-react';
 import { usePlayerFiles } from './hooks/usePlayerFiles';
 import { useCampaign } from '../hooks/useCampaign';
+import { FullMapView } from '../modules/locations/components/FullMapView';
 import type { FileMetadata } from '@shared/types/file';
-import type { CelestialData } from '@shared/schemas/location'; // Keep for type checking in sidebar
 
 type ViewMode = 'tree' | 'cards' | 'map';
 
@@ -181,230 +181,7 @@ function TreeNodeComponent({
   );
 }
 
-// ── Map sidebar ──────────────────────────────────────────────────────
-
-// Human-readable labels for celestial body types
-const BODY_TYPE_LABELS: Record<string, string> = {
-  star: 'Star',
-  planet: 'Planet',
-  moon: 'Moon',
-  station: 'Station',
-  asteroid_ring: 'Asteroid Belt',
-};
-
-interface MapSidebarProps {
-  location: FileMetadata | null;
-  onClose: () => void;
-}
-
-/** Detail sidebar shown when a celestial body is selected on the map. */
-function PlayerMapSidebar({ location, onClose }: MapSidebarProps) {
-  const { campaign } = useCampaign();
-
-  if (!location) {
-    return (
-      <div className="flex flex-col items-center justify-center p-4 text-center">
-        <MapPin className="h-8 w-8 text-muted-foreground" />
-        <p className="mt-2 text-sm text-muted-foreground">
-          Click on a celestial body to view details
-        </p>
-      </div>
-    );
-  }
-
-  const celestial = location.celestial as CelestialData | undefined;
-  const image = location.image as string | undefined;
-  const description: string | undefined = typeof location.description === 'string' ? location.description : undefined;
-  const imageUrl =
-    image && campaign
-      ? `/api/campaigns/${campaign.id}/assets/${image.replace('assets/', '')}`
-      : null;
-
-  return (
-    <div className="flex flex-col">
-      {/* Header with close button */}
-      <div className="flex items-start justify-between p-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-foreground">
-            {location.name}
-          </h3>
-          <div className="mt-1 flex items-center gap-2">
-            {celestial && (
-              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                {BODY_TYPE_LABELS[celestial.bodyType] || celestial.bodyType}
-              </span>
-            )}
-            {location.type ? (
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {String(location.type)}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="ml-2 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Image preview */}
-      {imageUrl ? (
-        <div className="mx-3 mb-3 overflow-hidden rounded-lg border border-border">
-          <img
-            src={imageUrl}
-            alt={location.name}
-            className="h-24 w-full object-cover"
-          />
-        </div>
-      ) : null}
-
-      {/* Description */}
-      {description ? (
-        <p className="mb-3 px-3 text-xs text-muted-foreground">
-          {description}
-        </p>
-      ) : null}
-
-      {/* View Details link */}
-      <div className="border-t border-border p-3">
-        <Link
-          to={`/player/modules/locations/${location.id}`}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          View Details
-          <ExternalLink className="h-3 w-3" />
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ── Full-screen map view ─────────────────────────────────────────────
-
-/**
- * Renders the star-system map in a sandboxed iframe. The HTML is fetched from
- * the server's player map endpoint. "Go to Entry" messages from the iframe
- * are forwarded via postMessage to navigate to the location detail page.
- */
-function PlayerFullMapView({ locations, onClose }: { locations: FileMetadata[]; onClose: () => void }) {
-  const { campaign } = useCampaign();
-  const navigate = useNavigate();
-  const [selectedLocation, setSelectedLocation] = useState<FileMetadata | null>(null);
-  const [mapHtml, setMapHtml] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const celestialLocations = locations.filter(
-    (loc) => loc.celestial !== undefined && loc.celestial !== null
-  );
-
-  // Handle messages from iframe (for "Go to Entry" button)
-  const handleIframeMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type === 'navigate-to-location' && event.data?.locationId) {
-      // Close the map and navigate to the player location view
-      onClose();
-      navigate(`/player/modules/locations/${event.data.locationId}`);
-    }
-  }, [onClose, navigate]);
-
-  // Listen for postMessage from iframe
-  useEffect(() => {
-    window.addEventListener('message', handleIframeMessage);
-    return () => window.removeEventListener('message', handleIframeMessage);
-  }, [handleIframeMessage]);
-
-  // Fetch the generated player map
-  useEffect(() => {
-    if (campaign) {
-      fetchPlayerMap();
-    }
-  }, [campaign]);
-
-  const fetchPlayerMap = async () => {
-    if (!campaign) return;
-
-    try {
-      const response = await fetch(`/api/player/campaigns/${campaign.id}/map`);
-      if (response.ok) {
-        const html = await response.text();
-        setMapHtml(html);
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Map not available');
-      }
-    } catch {
-      setError('Failed to load map');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950">
-      {/* Header bar */}
-      <div className="absolute inset-x-0 top-0 z-10 flex h-12 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <MapPin className="h-5 w-5 text-primary" />
-          <span className="font-medium text-foreground">System Map</span>
-          <span className="text-sm text-muted-foreground">
-            {celestialLocations.length} celestial bodies
-          </span>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Main content area - positioned below header */}
-      <div className="absolute inset-x-0 bottom-0 top-12 overflow-hidden">
-        {error && (
-          <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-md bg-destructive/90 px-4 py-2 text-sm text-destructive-foreground">
-            {error}
-          </div>
-        )}
-
-        {mapHtml ? (
-          // Render the generated HTML map in an iframe
-          <iframe
-            srcDoc={mapHtml}
-            className="h-full w-full border-0"
-            title="Star System Map"
-            sandbox="allow-scripts"
-          />
-        ) : (
-          // Fallback: Show placeholder
-          <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-            <MapPin className="h-16 w-16 text-muted-foreground" />
-            <div>
-              <h3 className="text-lg font-medium text-foreground">Map Not Available</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                The star system map hasn't been generated yet.
-              </p>
-            </div>
-            {celestialLocations.length === 0 && (
-              <p className="text-sm text-amber-500">
-                No celestial bodies available to display.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Sidebar overlay */}
-        {selectedLocation && (
-          <div className="absolute right-4 top-4 w-64 rounded-lg border border-border bg-card/95 shadow-lg backdrop-blur">
-            <PlayerMapSidebar
-              location={selectedLocation}
-              onClose={() => setSelectedLocation(null)}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// ── Map view uses the shared FullMapView component ───────────────────
 
 // ── Main exported component ──────────────────────────────────────────
 
@@ -549,7 +326,7 @@ export function PlayerLocationList() {
           </p>
         </div>
       ) : viewMode === 'map' ? (
-        <PlayerFullMapView locations={locations} onClose={() => setViewMode('tree')} />
+        <FullMapView locations={locations} onClose={() => setViewMode('tree')} basePath="/player/modules/locations" />
       ) : viewMode === 'tree' ? (
         <div className="rounded-lg border border-border bg-card p-4">
           {filteredTree.length === 0 ? (
