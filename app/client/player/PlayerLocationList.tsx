@@ -4,7 +4,7 @@
  * Three view modes:
  *  - Tree: hierarchical list with expand/collapse and search highlight
  *  - Cards: flat grid of location cards with images
- *  - Map: full-screen star-system map rendered in a sandboxed iframe
+ *  - Map: full-screen star-system map rendered with Three.js (shared FullMapView component)
  *
  * Locations are fetched via the player files hook and displayed read-only.
  */

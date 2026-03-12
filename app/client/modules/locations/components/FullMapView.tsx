@@ -3,7 +3,7 @@
  * Renders the solar system using Three.js with a minimalist wireframe aesthetic.
  * Click a celestial body to open the detail sidebar.
  */
-import { useState, Suspense, lazy } from 'react';
+import { useState, useMemo, useEffect, Suspense, lazy } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { X, MapPin } from 'lucide-react';
@@ -48,6 +48,73 @@ const hudText: React.CSSProperties = {
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
 };
+
+// ── System Status Bar ─────────────────────────────────────────────────────
+
+const WAVEFORM_STYLE_ID = 'hud-waveform-keyframes';
+
+function SystemStatusBar({ locations }: { locations: FileMetadata[] }) {
+  const systemName = useMemo(() => {
+    const star = locations.find((l) => (l.celestial as CelestialData | undefined)?.bodyType === 'star');
+    return star?.name?.replace(/\s*Prime$/i, '') ?? 'Unknown System';
+  }, [locations]);
+
+  useEffect(() => {
+    if (document.getElementById(WAVEFORM_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = WAVEFORM_STYLE_ID;
+    style.textContent = `
+      @keyframes hud-wave {
+        0%, 100% { height: 4px; }
+        50% { height: 12px; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
+
+  const barBase: React.CSSProperties = {
+    width: 2,
+    background: 'rgba(59,130,246,0.5)',
+    borderRadius: 1,
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 14,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      background: 'rgba(4,8,22,0.8)',
+      backdropFilter: 'blur(8px)',
+      border: '1px solid rgba(59,130,246,0.2)',
+      borderRadius: 4,
+      padding: '5px 16px',
+      fontFamily: FONT_MONO,
+      fontSize: 10,
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
+      color: '#5a7a8e',
+      pointerEvents: 'none',
+    }}>
+      <span style={{ color: '#93C5FD' }}>{systemName}</span>
+      <span style={{ opacity: 0.3 }}>|</span>
+      <span>Telemetry: Live</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 14 }}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} style={{
+            ...barBase,
+            animation: `hud-wave 1.2s ease-in-out ${i * 0.15}s infinite`,
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
 
@@ -204,6 +271,7 @@ function InlineMapSidebar({ location, onClose, basePath }: MapSidebarProps) {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 export function FullMapView({ locations, onClose, basePath = '/modules/locations' }: FullMapViewProps) {
+  const { campaign } = useCampaign();
   const [selectedLocation, setSelectedLocation] = useState<FileMetadata | null>(null);
 
   const celestialCount = locations.filter((l) => l.celestial).length;
@@ -226,6 +294,9 @@ export function FullMapView({ locations, onClose, basePath = '/modules/locations
           </button>
         )}
       </div>
+
+      {/* HUD frame elements */}
+      <SystemStatusBar locations={locations} />
 
       {/* 3D canvas fills the entire viewport, header floats on top */}
       <div className="absolute inset-0">
@@ -251,6 +322,7 @@ export function FullMapView({ locations, onClose, basePath = '/modules/locations
               locations={locations}
               selectedId={selectedLocation?.id ?? null}
               onSelect={setSelectedLocation}
+              campaignId={campaign?.id ?? null}
             />
           </Suspense>
         )}

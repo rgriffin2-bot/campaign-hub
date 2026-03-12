@@ -27,6 +27,18 @@ const PlaceholderView = () => null;
 // The `parent` field establishes the location hierarchy for the relationship index
 relationshipIndex.registerFields('locations', ['parent']);
 
+// ── Model reference block appended to every new location file ──────────
+const MODEL_REFERENCE = `<!--
+3D MODEL (optional)
+Upload a .glb or .gltf file via Settings → 3D Models, then add these fields
+under the \`celestial:\` block in the frontmatter above:
+
+  model: assets/3d-models/your-file.glb
+  modelStyle: wireframe   # wireframe | solid | textured  (default: wireframe)
+  modelEdgeAngle: 15      # 1–89 °  raise to 30–60 for high-poly models
+                          # (wireframe only — ignored by solid & textured)
+-->`;
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Exclude internal system files (e.g. `_map-config`) from API responses */
@@ -126,7 +138,11 @@ const createWithCycleCheck: RequestHandler = async (req, res) => {
       }
     }
 
-    const file = await fileStore.create(campaign.id, 'locations', req.body);
+    const bodyWithModelDocs = {
+      ...req.body,
+      content: (req.body.content ? req.body.content + '\n\n' : '') + MODEL_REFERENCE,
+    };
+    const file = await fileStore.create(campaign.id, 'locations', bodyWithModelDocs);
     await invalidatePlayerMapCache(campaign.id);
     res.status(201).json({ success: true, data: file });
   } catch (error) {

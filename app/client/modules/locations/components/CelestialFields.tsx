@@ -7,7 +7,7 @@
  * celestial data from the parent location.
  */
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Globe, X, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, Globe, X, Image, Box } from 'lucide-react';
 import {
   celestialBodyTypes,
   type CelestialData,
@@ -57,7 +57,9 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
   const [isExpanded, setIsExpanded] = useState(!!value);
   const [enabled, setEnabled] = useState(!!value);
   const [uploading, setUploading] = useState(false);
+  const [uploadingModel, setUploadingModel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelInputRef = useRef<HTMLInputElement>(null);
 
   // Keep local toggle in sync when the parent loads or resets the value
   useEffect(() => {
@@ -145,6 +147,39 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
 
   const removeMapImage = () => {
     updateField('mapImage', undefined);
+  };
+
+  // Upload a GLB/GLTF 3D model for this celestial body
+  const handleModelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !campaign || !locationId || !value) return;
+
+    setUploadingModel(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(
+        `/api/campaigns/${campaign.id}/3d-models/${locationId}`,
+        { method: 'POST', body: formData }
+      );
+
+      if (!response.ok) throw new Error('Failed to upload model');
+
+      const result = await response.json();
+      if (result.success && result.data.path) {
+        updateField('model', result.data.path);
+      }
+    } catch (error) {
+      console.error('Failed to upload 3D model:', error);
+    } finally {
+      setUploadingModel(false);
+      if (modelInputRef.current) modelInputRef.current.value = '';
+    }
+  };
+
+  const removeModel = () => {
+    onChange({ ...value!, model: undefined, modelStyle: undefined, modelEdgeAngle: undefined });
   };
 
   // Build a displayable URL for the current map image, if one exists
@@ -320,6 +355,132 @@ export function CelestialFields({ value, onChange, hasParent, locationId }: Cele
                         <>
                           <Image className="h-4 w-4" />
                           {locationId ? 'Upload Map Image' : 'Save location first to upload'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3D Model */}
+              <div className="col-span-2 border-t border-border pt-4">
+                <h4 className="mb-1 text-sm font-medium text-foreground">
+                  3D Model
+                </h4>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Upload a GLB file to replace the default wireframe shape on the solar system map.
+                </p>
+
+                {value.model ? (
+                  <div className="space-y-3">
+                    {/* Current model */}
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm">
+                      <Box className="h-4 w-4 shrink-0 text-blue-500" />
+                      <span className="flex-1 truncate text-foreground">
+                        {value.model.split('/').pop()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={removeModel}
+                        className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Display Style */}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          Display Style
+                        </label>
+                        <select
+                          value={value.modelStyle || 'wireframe'}
+                          onChange={(e) =>
+                            updateField('modelStyle', e.target.value as 'wireframe' | 'solid' | 'textured')
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="wireframe">Wireframe — holographic edge lines</option>
+                          <option value="solid">Solid — flat color fill</option>
+                          <option value="textured">Textured — original model textures</option>
+                        </select>
+                      </div>
+
+                      {/* Edge Angle (only for wireframe) */}
+                      {(!value.modelStyle || value.modelStyle === 'wireframe') && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-foreground">
+                            Edge Threshold
+                          </label>
+                          <input
+                            type="number"
+                            value={value.modelEdgeAngle || ''}
+                            onChange={(e) =>
+                              updateField(
+                                'modelEdgeAngle',
+                                e.target.value
+                                  ? Math.min(89, Math.max(1, Number(e.target.value)))
+                                  : undefined
+                              )
+                            }
+                            min={1}
+                            max={89}
+                            placeholder="15"
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Higher = fewer edges. Try 30-60 for complex models.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Replace model */}
+                    <div>
+                      <input
+                        ref={modelInputRef}
+                        type="file"
+                        accept=".glb,.gltf"
+                        onChange={handleModelUpload}
+                        className="hidden"
+                        disabled={!locationId || uploadingModel}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => modelInputRef.current?.click()}
+                        disabled={!locationId || uploadingModel}
+                        className="text-xs text-muted-foreground underline hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {uploadingModel ? 'Uploading...' : 'Replace model'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={modelInputRef}
+                      type="file"
+                      accept=".glb,.gltf"
+                      onChange={handleModelUpload}
+                      className="hidden"
+                      disabled={!locationId || uploadingModel}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => modelInputRef.current?.click()}
+                      disabled={!locationId || uploadingModel}
+                      className="flex items-center gap-2 rounded-md border border-dashed border-border bg-background px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {uploadingModel ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Box className="h-4 w-4" />
+                          {locationId ? 'Upload GLB Model' : 'Save location first to upload'}
                         </>
                       )}
                     </button>

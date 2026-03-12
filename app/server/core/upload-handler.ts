@@ -44,6 +44,14 @@ export const upload = multer({
   },
 });
 
+// Separate multer instance for 3D model uploads (GLB/GLTF, not images)
+export const modelUpload = multer({
+  storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB limit for 3D models
+  },
+});
+
 // ============================================================================
 // NPC Portraits — 500x500 square JPEG
 // ============================================================================
@@ -561,5 +569,51 @@ export async function deleteArtefactImageFolder(
     await fs.rm(folderPath, { recursive: true, force: true });
   } catch {
     // Ignore if folder doesn't exist
+  }
+}
+
+// ============================================================================
+// 3D Models — GLB/GLTF binary passthrough (no image processing)
+// ============================================================================
+
+const ALLOWED_3D_EXTENSIONS = new Set(['.glb', '.gltf']);
+
+async function ensure3DModelDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', '3d-models');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+/** Save a GLB/GLTF file as-is (no processing). */
+export async function processAndSave3DModel(
+  campaignId: string,
+  locationId: string,
+  buffer: Buffer,
+  originalFilename: string
+): Promise<string> {
+  const ext = path.extname(originalFilename).toLowerCase() || '.glb';
+  if (!ALLOWED_3D_EXTENSIONS.has(ext)) {
+    throw new Error(`Unsupported 3D model format: ${ext}. Use .glb or .gltf`);
+  }
+
+  const uploadDir = await ensure3DModelDir(campaignId);
+  const filename = `${locationId}${ext}`;
+  const filepath = path.join(uploadDir, filename);
+
+  // Binary passthrough — no processing needed
+  await fs.writeFile(filepath, buffer);
+
+  return `assets/3d-models/${filename}`;
+}
+
+export async function delete3DModel(
+  campaignId: string,
+  modelPath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, modelPath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
   }
 }

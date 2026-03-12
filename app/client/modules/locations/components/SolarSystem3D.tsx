@@ -6,17 +6,26 @@
  * Fresnel rim glow, star glow sprite, HUD corner brackets, CSS scanline overlay.
  */
 
-import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
+import { useRef, useMemo, useCallback, useEffect, useState, Suspense, createContext, useContext } from 'react';
 import type { MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Html, Stars } from '@react-three/drei';
+import { OrbitControls, Html, Stars, useGLTF } from '@react-three/drei';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import * as THREE from 'three';
 import type { FileMetadata } from '@shared/types/file';
 import type { CelestialData } from '@shared/schemas/location';
+
+// ── Scene time context ─────────────────────────────────────────────────────
+// Provides a pauseable clock (t) and paused flag to all animated components.
+// Components use t.current instead of clock.elapsedTime, and multiply dt by
+// paused.current ? 0 : 1 for delta-based animations.
+const SceneTimeCtx = createContext<{
+  t: MutableRefObject<number>;
+  paused: MutableRefObject<boolean>;
+}>({ t: { current: 0 }, paused: { current: false } });
 
 // ── Scale ──────────────────────────────────────────────────────────────────
 const ORBIT_SCALE = 1 / 25;
@@ -206,7 +215,19 @@ function build3DPositions(locations: CelestialLocation[]): Map<string, Vec3> {
 
 // ── Hex Grid Floor (static) ────────────────────────────────────────────────
 
-function HexGridFloor() {
+function HexGridFloor({ bootRef }: { bootRef: MutableRefObject<number> }) {
+  const matRef = useRef<THREE.LineBasicMaterial>(null);
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const b = bootRef.current;
+    if (matRef.current) matRef.current.opacity = b * 0.5;
+    if (groupRef.current) {
+      const s = 0.85 + b * 0.15;
+      groupRef.current.scale.set(s, 1, s);
+    }
+  });
+
   const geo = useMemo(() => {
     const SIZE = 3.5;
     const EXTENT = 90;
@@ -241,9 +262,11 @@ function HexGridFloor() {
   }, []);
 
   return (
-    <lineSegments geometry={geo}>
-      <lineBasicMaterial color="#071c2c" opacity={0.5} transparent />
-    </lineSegments>
+    <group ref={groupRef}>
+      <lineSegments geometry={geo}>
+        <lineBasicMaterial ref={matRef} color="#071c2c" opacity={0} transparent />
+      </lineSegments>
+    </group>
   );
 }
 
@@ -299,8 +322,9 @@ function OrbitTrail({
     [lineObj],
   );
 
-  useFrame(({ clock }) => {
-    const currentAngle = startAngle + clock.elapsedTime * speed;
+  const { t: sceneT } = useContext(SceneTimeCtx);
+  useFrame(() => {
+    const currentAngle = startAngle + sceneT.current * speed;
     const a = orbitDist;
     const b = ecc > 0 ? a * Math.sqrt(1 - ecc ** 2) : a;
     const pp = parentLivePos.current;
@@ -328,8 +352,15 @@ function InstancedAsteroidBelt({ loc, parentPos }: { loc: CelestialLocation; par
   const c = loc.celestial;
   const orbitDist = (c.orbitDistance ?? 200) * ORBIT_SCALE;
   const ringWidth = ((c.ringWidth ?? 40) * ORBIT_SCALE) / 2;
+  const rotSpeed = 0.015; // slow orbit rotation
 
+  const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const { paused: pausedBelt } = useContext(SceneTimeCtx);
+
+  useFrame((_, dt) => {
+    if (groupRef.current && !pausedBelt.current) groupRef.current.rotation.y += dt * rotSpeed;
+  });
 
   const [geo, mat] = useMemo(() => {
     const g = new THREE.IcosahedronGeometry(0.055, 0);
@@ -368,13 +399,18 @@ function InstancedAsteroidBelt({ loc, parentPos }: { loc: CelestialLocation; par
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [orbitDist, ringWidth, parentPos.x, parentPos.z]);
 
-  return <instancedMesh ref={meshRef} args={[geo, mat, ASTEROID_COUNT]} />;
+  return (
+    <group ref={groupRef}>
+      <instancedMesh ref={meshRef} args={[geo, mat, ASTEROID_COUNT]} />
+    </group>
+  );
 }
 
 // ── Wireframe Bodies ───────────────────────────────────────────────────────
 
 function StarBody({ radius, color }: { radius: number; color: string }) {
   const ref = useRef<THREE.LineSegments>(null);
+  const { paused } = useContext(SceneTimeCtx);
   const geo = useMemo(() => {
     const base = new THREE.IcosahedronGeometry(radius, 2);
     const wf = new THREE.WireframeGeometry(base);
@@ -382,37 +418,40 @@ function StarBody({ radius, color }: { radius: number; color: string }) {
     return wf;
   }, [radius]);
   useFrame((_, dt) => {
-    if (ref.current) { ref.current.rotation.y += dt * 0.3; ref.current.rotation.x += dt * 0.1; }
+    if (ref.current && !paused.current) { ref.current.rotation.y += dt * 0.3; ref.current.rotation.x += dt * 0.1; }
   });
   return <lineSegments ref={ref} geometry={geo}><lineBasicMaterial color={color} /></lineSegments>;
 }
 
 function PlanetBody({ radius, color, speed }: { radius: number; color: string; speed: number }) {
   const ref = useRef<THREE.LineSegments>(null);
+  const { paused } = useContext(SceneTimeCtx);
   const geo = useMemo(() => {
     const b = new THREE.IcosahedronGeometry(radius, 1);
     const wf = new THREE.WireframeGeometry(b);
     b.dispose();
     return wf;
   }, [radius]);
-  useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * speed; });
+  useFrame((_, dt) => { if (ref.current && !paused.current) ref.current.rotation.y += dt * speed; });
   return <lineSegments ref={ref} geometry={geo}><lineBasicMaterial color={color} /></lineSegments>;
 }
 
 function MoonBody({ radius, color, speed }: { radius: number; color: string; speed: number }) {
   const ref = useRef<THREE.LineSegments>(null);
+  const { paused } = useContext(SceneTimeCtx);
   const geo = useMemo(() => {
     const b = new THREE.IcosahedronGeometry(radius, 1);
     const wf = new THREE.WireframeGeometry(b);
     b.dispose();
     return wf;
   }, [radius]);
-  useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * speed; });
+  useFrame((_, dt) => { if (ref.current && !paused.current) ref.current.rotation.y += dt * speed; });
   return <lineSegments ref={ref} geometry={geo}><lineBasicMaterial color={color} /></lineSegments>;
 }
 
 function StationBody({ radius, color, speed }: { radius: number; color: string; speed: number }) {
   const ref = useRef<THREE.LineSegments>(null);
+  const { paused } = useContext(SceneTimeCtx);
   const geo = useMemo(() => {
     const b = new THREE.OctahedronGeometry(radius);
     const wf = new THREE.WireframeGeometry(b);
@@ -420,9 +459,181 @@ function StationBody({ radius, color, speed }: { radius: number; color: string; 
     return wf;
   }, [radius]);
   useFrame((_, dt) => {
-    if (ref.current) { ref.current.rotation.y += dt * speed; ref.current.rotation.z += dt * speed * 0.4; }
+    if (ref.current && !paused.current) { ref.current.rotation.y += dt * speed; ref.current.rotation.z += dt * speed * 0.4; }
   });
   return <lineSegments ref={ref} geometry={geo}><lineBasicMaterial color={color} /></lineSegments>;
+}
+
+// ── Custom GLB Model ───────────────────────────────────────────────────────
+
+// Solid: clone the scene, stamp every mesh with a flat MeshBasicMaterial.
+// Instant — no edge computation, no loading delay.
+function SolidModelBody({ url, radius, color, speed, onReady }: {
+  url: string; radius: number; color: string; speed: number; onReady?: () => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const gltf = useGLTF(url);
+
+  const { clone, scaleFactor } = useMemo(() => {
+    gltf.scene.updateMatrixWorld(true);
+    const worldBox = new THREE.Box3().setFromObject(gltf.scene);
+    const sz = new THREE.Vector3();
+    worldBox.getSize(sz);
+    const sf = (radius * 2) / (Math.max(sz.x, sz.y, sz.z) || 1);
+    const center = new THREE.Vector3();
+    worldBox.getCenter(center);
+    const c = gltf.scene.clone(true);
+    c.position.sub(center);
+    c.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({ color });
+      }
+    });
+    return { clone: c, scaleFactor: sf };
+  }, [gltf, radius, color]);
+
+  useEffect(() => { onReady?.(); }, []);
+
+  useEffect(() => () => {
+    clone.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        ((child as THREE.Mesh).material as THREE.Material).dispose();
+      }
+    });
+  }, [clone]);
+
+  const { paused } = useContext(SceneTimeCtx);
+  useFrame((_, dt) => {
+    if (groupRef.current && !paused.current) groupRef.current.rotation.y += dt * speed;
+  });
+
+  return (
+    <group ref={groupRef} scale={scaleFactor}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+// Textured: render the GLB with its original color maps but via MeshBasicMaterial
+// so it's fully unlit — consistent brightness regardless of scene lighting.
+function TexturedModelBody({ url, radius, speed, onReady }: {
+  url: string; radius: number; speed: number; onReady?: () => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const gltf = useGLTF(url);
+
+  const { clone, scaleFactor } = useMemo(() => {
+    gltf.scene.updateMatrixWorld(true);
+    const worldBox = new THREE.Box3().setFromObject(gltf.scene);
+    const sz = new THREE.Vector3();
+    worldBox.getSize(sz);
+    const sf = (radius * 2) / (Math.max(sz.x, sz.y, sz.z) || 1);
+    const center = new THREE.Vector3();
+    worldBox.getCenter(center);
+    const c = gltf.scene.clone(true);
+    c.position.sub(center);
+    // Swap every material for an unlit BasicMaterial that keeps the color map
+    c.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const src = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+        const map = (src as THREE.MeshStandardMaterial)?.map ?? null;
+        const color = (src as THREE.MeshStandardMaterial)?.color ?? new THREE.Color(1, 1, 1);
+        mesh.material = new THREE.MeshBasicMaterial({ map, color: map ? undefined : color });
+      }
+    });
+    return { clone: c, scaleFactor: sf };
+  }, [gltf, radius]);
+
+  useEffect(() => { onReady?.(); }, []);
+
+  const { paused: pausedT } = useContext(SceneTimeCtx);
+  useFrame((_, dt) => {
+    if (groupRef.current && !pausedT.current) groupRef.current.rotation.y += dt * speed;
+  });
+
+  return (
+    <group ref={groupRef} scale={scaleFactor}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+// Wireframe: compute EdgesGeometry per mesh (one per animation frame so the
+// loading screen stays live). The loading overlay covers the wait.
+function ModelBody({ url, radius, color, speed, edgeAngle = 15, onReady }: {
+  url: string; radius: number; color: string; speed: number; edgeAngle?: number; onReady?: () => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const gltf = useGLTF(url);
+  const [edgeData, setEdgeData] = useState<{ edges: THREE.EdgesGeometry[]; scaleFactor: number } | null>(null);
+
+  // Process one mesh per animation frame — the loading screen covers the wait,
+  // and multi-mesh models build progressively without blocking between each mesh.
+  useEffect(() => {
+    let cancelled = false;
+    const built: THREE.EdgesGeometry[] = [];
+
+    gltf.scene.updateMatrixWorld(true);
+    const worldBox = new THREE.Box3().setFromObject(gltf.scene);
+    const size = new THREE.Vector3();
+    worldBox.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scaleFactor = (radius * 2) / maxDim;
+    const center = new THREE.Vector3();
+    worldBox.getCenter(center);
+
+    const meshes: THREE.Mesh[] = [];
+    gltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
+    });
+
+    let idx = 0;
+    let rafId: number;
+
+    const processNext = () => {
+      if (cancelled) return;
+      if (idx >= meshes.length) {
+        if (!cancelled) {
+          setEdgeData({ edges: built, scaleFactor });
+          onReady?.();
+        }
+        return;
+      }
+      const mesh = meshes[idx++];
+      const eg = new THREE.EdgesGeometry(mesh.geometry, edgeAngle);
+      eg.applyMatrix4(mesh.matrixWorld);
+      eg.translate(-center.x, -center.y, -center.z);
+      built.push(eg);
+      rafId = requestAnimationFrame(processNext);
+    };
+
+    rafId = requestAnimationFrame(processNext);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+      for (const eg of built) eg.dispose();
+      setEdgeData(null);
+    };
+  }, [gltf, radius, edgeAngle]);
+
+  const { paused: pausedW } = useContext(SceneTimeCtx);
+  useFrame((_, dt) => {
+    if (groupRef.current && !pausedW.current) groupRef.current.rotation.y += dt * speed;
+  });
+
+  if (!edgeData) return null;
+
+  return (
+    <group ref={groupRef} scale={edgeData.scaleFactor}>
+      {edgeData.edges.map((eg, i) => (
+        <lineSegments key={i} geometry={eg}>
+          <lineBasicMaterial color={color} />
+        </lineSegments>
+      ))}
+    </group>
+  );
 }
 
 // ── Fresnel Rim Atmosphere ─────────────────────────────────────────────────
@@ -579,10 +790,14 @@ interface BodyNodeProps {
   ownLivePos: MutableRefObject<THREE.Vector3>;
   isSelected: boolean;
   onSelect: (loc: CelestialLocation) => void;
+  bootRef: MutableRefObject<number>;
+  bootDone: boolean;
+  campaignId: string | null;
+  onModelReady?: () => void;
 }
 
 function CelestialBodyNode({
-  loc, initialPos, parentLivePos, ownLivePos, isSelected, onSelect,
+  loc, initialPos, parentLivePos, ownLivePos, isSelected, onSelect, bootRef, bootDone, campaignId, onModelReady,
 }: BodyNodeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const c = loc.celestial;
@@ -600,9 +815,16 @@ function CelestialBodyNode({
   const rotRad = ((c.orbitRotation ?? 0) * Math.PI) / 180;
   const cosR = Math.cos(rotRad), sinR = Math.sin(rotRad);
 
-  useFrame(({ clock }) => {
-    if (!groupRef.current || !isOrbiting) return;
-    const angle = startAngle + clock.elapsedTime * speed;
+  const { t: nodeT } = useContext(SceneTimeCtx);
+  useFrame(() => {
+    if (!groupRef.current) return;
+    // Boot scale: ease-out from 0 to 1
+    const bv = bootRef.current;
+    const s = bv < 1 ? 1 - Math.pow(1 - bv, 3) : 1;
+    groupRef.current.scale.setScalar(s);
+
+    if (!isOrbiting) return;
+    const angle = startAngle + nodeT.current * speed;
     const a = orbitDist;
     const b = c.orbitShape === 'ellipse' ? a * Math.sqrt(1 - ecc ** 2) : a;
     const lx = a * Math.cos(angle), lz = b * Math.sin(angle);
@@ -621,6 +843,9 @@ function CelestialBodyNode({
 
   if (bodyType === 'asteroid_ring') return null;
   const isStar = bodyType === 'star';
+  const modelUrl = c.model && campaignId
+    ? `/api/campaigns/${campaignId}/assets/${c.model.replace(/^assets\//, '')}`
+    : null;
 
   return (
     <group ref={groupRef} position={[initialPos.x, initialPos.y, initialPos.z]}>
@@ -637,11 +862,31 @@ function CelestialBodyNode({
       {/* Selection brackets */}
       {isSelected && <HudBrackets radius={radius} />}
 
-      {/* Body mesh */}
-      {isStar      && <StarBody    radius={radius} color={color} />}
-      {bodyType === 'planet'  && <PlanetBody  radius={radius} color={color} speed={rotSpeed} />}
-      {bodyType === 'moon'    && <MoonBody    radius={radius} color={color} speed={rotSpeed} />}
-      {bodyType === 'station' && <StationBody radius={radius} color={color} speed={rotSpeed} />}
+      {/* Body mesh — custom GLB model overrides default procedural shape.
+          Suspense lets the map render immediately; the model swaps in once loaded. */}
+      {modelUrl
+        ? <Suspense fallback={
+            <>
+              {isStar      && <StarBody    radius={radius} color={color} />}
+              {bodyType === 'planet'  && <PlanetBody  radius={radius} color={color} speed={rotSpeed} />}
+              {bodyType === 'moon'    && <MoonBody    radius={radius} color={color} speed={rotSpeed} />}
+              {bodyType === 'station' && <StationBody radius={radius} color={color} speed={rotSpeed} />}
+            </>
+          }>
+            {c.modelStyle === 'solid'
+              ? <SolidModelBody url={modelUrl} radius={radius} color={color} speed={rotSpeed * 0.15} onReady={onModelReady} />
+              : c.modelStyle === 'textured'
+              ? <TexturedModelBody url={modelUrl} radius={radius} speed={rotSpeed * 0.15} onReady={onModelReady} />
+              : <ModelBody url={modelUrl} radius={radius} color={color} speed={rotSpeed * 0.15} edgeAngle={c.modelEdgeAngle ?? 15} onReady={onModelReady} />
+            }
+          </Suspense>
+        : <>
+            {isStar      && <StarBody    radius={radius} color={color} />}
+            {bodyType === 'planet'  && <PlanetBody  radius={radius} color={color} speed={rotSpeed} />}
+            {bodyType === 'moon'    && <MoonBody    radius={radius} color={color} speed={rotSpeed} />}
+            {bodyType === 'station' && <StationBody radius={radius} color={color} speed={rotSpeed} />}
+          </>
+      }
 
       {!isStar && <EquatorialRing radius={radius} color={color} />}
 
@@ -653,7 +898,7 @@ function CelestialBodyNode({
 
       <FloorMarker color={color} />
 
-      {c.showLabel !== false && (
+      {c.showLabel !== false && bootDone && (
         <Html position={[0, radius + 0.35, 0]} center distanceFactor={16} occlude={false}>
           <div style={{
             color: isSelected ? '#93C5FD' : '#5a7a8e',
@@ -736,6 +981,101 @@ function CameraController({
   return null;
 }
 
+// ── Signal / Comm Pulses ──────────────────────────────────────────────────
+
+const MAX_PULSES = 3;
+
+function CommPulses({
+  locations,
+  posRefs,
+}: {
+  locations: CelestialLocation[];
+  posRefs: Map<string, MutableRefObject<THREE.Vector3>>;
+}) {
+  const bodies = useMemo(
+    () => locations.filter((l) => l.celestial.bodyType !== 'asteroid_ring'),
+    [locations],
+  );
+
+  // Pre-allocate 3 line objects with independent materials
+  const lines = useMemo(() => {
+    const arr: Array<{ geo: THREE.BufferGeometry; mat: THREE.LineBasicMaterial; line: THREE.Line }> = [];
+    for (let i = 0; i < MAX_PULSES; i++) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const m = new THREE.LineBasicMaterial({
+        color: '#3B82F6',
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      arr.push({ geo: g, mat: m, line: new THREE.Line(g, m) });
+    }
+    return arr;
+  }, []);
+
+  useEffect(() => () => {
+    for (const l of lines) { l.geo.dispose(); l.mat.dispose(); }
+  }, [lines]);
+
+  const pulsesRef = useRef<Array<{
+    fromId: string; toId: string;
+    startTime: number; duration: number;
+    slot: number;
+  }>>([]);
+  const nextPulseRef = useRef(2); // first pulse after 2s
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (bodies.length < 2) return;
+
+    // Spawn new pulse?
+    if (t > nextPulseRef.current && pulsesRef.current.length < MAX_PULSES) {
+      const usedSlots = new Set(pulsesRef.current.map((p) => p.slot));
+      let slot = 0;
+      while (usedSlots.has(slot)) slot++;
+      const a = Math.floor(Math.random() * bodies.length);
+      let b = Math.floor(Math.random() * (bodies.length - 1));
+      if (b >= a) b++;
+      pulsesRef.current.push({
+        fromId: bodies[a].id, toId: bodies[b].id,
+        startTime: t, duration: 0.6 + Math.random() * 0.5,
+        slot,
+      });
+      nextPulseRef.current = t + 3 + Math.random() * 5;
+    }
+
+    // Reset all slots
+    for (const l of lines) l.mat.opacity = 0;
+
+    // Update active pulses
+    pulsesRef.current = pulsesRef.current.filter((pulse) => {
+      const progress = (t - pulse.startTime) / pulse.duration;
+      if (progress > 1) return false;
+
+      const fromPos = posRefs.get(pulse.fromId)?.current;
+      const toPos = posRefs.get(pulse.toId)?.current;
+      if (!fromPos || !toPos) return false;
+
+      const l = lines[pulse.slot];
+      const arr = (l.geo.attributes.position as THREE.BufferAttribute).array as Float32Array;
+      arr[0] = fromPos.x; arr[1] = fromPos.y; arr[2] = fromPos.z;
+      arr[3] = toPos.x; arr[4] = toPos.y; arr[5] = toPos.z;
+      (l.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+
+      l.mat.opacity = (progress < 0.3 ? progress / 0.3 : (1 - progress) / 0.7) * 0.5;
+      return true;
+    });
+  });
+
+  return (
+    <group>
+      {lines.map((l, i) => <primitive key={i} object={l.line} />)}
+    </group>
+  );
+}
+
 // ── Scene Content ──────────────────────────────────────────────────────────
 
 interface SceneContentProps {
@@ -743,10 +1083,19 @@ interface SceneContentProps {
   selectedId: string | null;
   onSelect: (loc: CelestialLocation) => void;
   livePosMapRef: MutableRefObject<Map<string, MutableRefObject<THREE.Vector3>>>;
+  bootRef: MutableRefObject<number>;
+  bootDone: boolean;
+  campaignId: string | null;
+  onModelReady?: () => void;
+  pausedRef: MutableRefObject<boolean>;
 }
 
-function SceneContent({ locations, selectedId, onSelect, livePosMapRef }: SceneContentProps) {
+function SceneContent({ locations, selectedId, onSelect, livePosMapRef, bootRef, bootDone, campaignId, onModelReady, pausedRef }: SceneContentProps) {
   const staticPos = useMemo(() => build3DPositions(locations), [locations]);
+
+  // Own scene time — advances only when not paused
+  const timeRef = useRef(0);
+  useFrame((_, dt) => { if (!pausedRef.current) timeRef.current += dt; });
 
   const livePosMap = useRef<Map<string, MutableRefObject<THREE.Vector3>>>(new Map());
 
@@ -772,8 +1121,8 @@ function SceneContent({ locations, selectedId, onSelect, livePosMapRef }: SceneC
   const allOrbiters = locations.filter((l) => l.parent && l.celestial.bodyType !== 'asteroid_ring');
 
   return (
-    <>
-      <HexGridFloor />
+    <SceneTimeCtx.Provider value={{ t: timeRef, paused: pausedRef }}>
+      <HexGridFloor bootRef={bootRef} />
       <NebulaSkybox />
 
       {/* Orbit trails */}
@@ -816,10 +1165,17 @@ function SceneContent({ locations, selectedId, onSelect, livePosMapRef }: SceneC
               ownLivePos={ownRef}
               isSelected={selectedId === loc.id}
               onSelect={onSelect}
+              bootRef={bootRef}
+              bootDone={bootDone}
+              campaignId={campaignId}
+              onModelReady={onModelReady}
             />
           );
         })}
-    </>
+
+      {/* Signal/comm pulses between bodies */}
+      <CommPulses locations={locations} posRefs={posRefs} />
+    </SceneTimeCtx.Provider>
   );
 }
 
@@ -831,6 +1187,7 @@ const HolographicShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
     uTime: { value: 0 },
+    uBoot: { value: 0 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -842,26 +1199,27 @@ const HolographicShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime;
+    uniform float uBoot;
     varying vec2 vUv;
 
     void main() {
       vec2 uv = vUv;
 
-      // Chromatic aberration
-      float ca = 0.0012;
+      // Chromatic aberration (subtle)
+      float ca = 0.0004 * uBoot;
       float r = texture2D(tDiffuse, uv + vec2(ca, 0.0)).r;
       float g = texture2D(tDiffuse, uv).g;
       float b = texture2D(tDiffuse, uv - vec2(ca, 0.0)).b;
       vec3 col = vec3(r, g, b);
 
-      // Scanlines
+      // Scanlines (subtle)
       float scanline = sin(gl_FragCoord.y * 1.8) * 0.5 + 0.5;
-      col *= 0.92 + 0.08 * scanline;
+      col *= 1.0 - 0.04 * scanline * uBoot;
 
       // Sweep band
       float sweep = fract(uTime * 0.07);
       float d = min(abs(uv.y - sweep), min(abs(uv.y - sweep + 1.0), abs(uv.y - sweep - 1.0)));
-      float glow = exp(-d * 16.0) * 0.14;
+      float glow = exp(-d * 16.0) * 0.14 * uBoot;
       col += vec3(glow * 0.15, glow * 0.4, glow * 0.95);
 
       // Vignette
@@ -872,14 +1230,14 @@ const HolographicShader = {
       vec2 seed = gl_FragCoord.xy + fract(uTime) * 1000.0;
       vec3 p3 = fract(vec3(seed.xyx) * 0.1031);
       p3 += dot(p3, p3.yzx + 33.33);
-      col += (fract((p3.x + p3.y) * p3.z) - 0.5) * 0.035;
+      col += (fract((p3.x + p3.y) * p3.z) - 0.5) * 0.018 * uBoot;
 
       gl_FragColor = vec4(col, 1.0);
     }
   `,
 };
 
-function PostEffects() {
+function PostEffects({ bootRef }: { bootRef: MutableRefObject<number> }) {
   const { gl, scene, camera, size } = useThree();
   const composerRef = useRef<EffectComposer | null>(null);
   const passRef = useRef<ShaderPass | null>(null);
@@ -901,6 +1259,7 @@ function PostEffects() {
   useFrame((_, delta) => {
     if (passRef.current) {
       passRef.current.uniforms.uTime.value += delta;
+      passRef.current.uniforms.uBoot.value = bootRef.current;
     }
     composerRef.current?.render(delta);
   }, 1);
@@ -914,17 +1273,54 @@ interface SolarSystem3DProps {
   locations: FileMetadata[];
   selectedId: string | null;
   onSelect: (loc: FileMetadata | null) => void;
+  campaignId?: string | null;
 }
 
-export function SolarSystem3D({ locations, selectedId, onSelect }: SolarSystem3DProps) {
+export function SolarSystem3D({ locations, selectedId, onSelect, campaignId = null }: SolarSystem3DProps) {
   const resetRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<((target: THREE.Vector3, radius: number) => void) | null>(null);
   const livePosMapRef = useRef<Map<string, MutableRefObject<THREE.Vector3>>>(new Map());
+
+  // Pause
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  // Boot-up sequence
+  const bootRef = useRef(0);
+  const [bootDone, setBootDone] = useState(false);
+
+  useEffect(() => {
+    const start = performance.now();
+    const duration = 2500;
+    let raf: number;
+    function tick() {
+      const t = Math.min((performance.now() - start) / duration, 1);
+      bootRef.current = t;
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        setBootDone(true);
+      }
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   const celestialLocs = useMemo(
     () => locations.filter((loc): loc is CelestialLocation => !!loc.celestial),
     [locations],
   );
+
+  // Track GLB model loading progress for the loading overlay
+  const totalModels = useMemo(
+    () => celestialLocs.filter((l) => l.celestial.model && campaignId).length,
+    [celestialLocs, campaignId],
+  );
+  const [modelsReady, setModelsReady] = useState(0);
+  const handleModelReady = useCallback(() => setModelsReady((n) => n + 1), []);
+  const loadingDone = totalModels === 0 || modelsReady >= totalModels;
+  const loadProgress = totalModels === 0 ? 1 : modelsReady / totalModels;
 
   const handleSelect = useCallback(
     (loc: CelestialLocation) => { onSelect(selectedId === loc.id ? null : loc); },
@@ -978,10 +1374,38 @@ export function SolarSystem3D({ locations, selectedId, onSelect }: SolarSystem3D
       >
         <Stars radius={180} depth={60} count={2500} factor={3} saturation={0} speed={0} />
         <CameraController resetRef={resetRef} focusRef={focusRef} />
-        <SceneContent locations={celestialLocs} selectedId={selectedId} onSelect={handleSelect} livePosMapRef={livePosMapRef} />
+        <SceneContent locations={celestialLocs} selectedId={selectedId} onSelect={handleSelect} livePosMapRef={livePosMapRef} bootRef={bootRef} bootDone={bootDone} campaignId={campaignId} onModelReady={handleModelReady} pausedRef={pausedRef} />
         <OrbitControls makeDefault minDistance={2} maxDistance={220} enablePan enableDamping dampingFactor={0.07} />
-        <PostEffects />
+        <PostEffects bootRef={bootRef} />
       </Canvas>
+
+      {/* GLB asset loading overlay — shown until all custom models have computed their wireframes */}
+      {!loadingDone && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 50,
+          background: '#03050e',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'ui-monospace, monospace',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ color: '#93C5FD', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 20 }}>
+            LOADING STELLAR ASSETS
+          </div>
+          <div style={{ width: 200, height: 2, background: 'rgba(59,130,246,0.12)', borderRadius: 1 }}>
+            <div style={{
+              width: `${loadProgress * 100}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg, rgba(30,58,95,0.8), #93C5FD)',
+              borderRadius: 1,
+              transition: 'width 0.4s ease',
+              boxShadow: '0 0 10px rgba(147,197,253,0.5)',
+            }} />
+          </div>
+          <div style={{ color: '#334155', fontSize: '9px', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 14 }}>
+            {modelsReady} / {totalModels}
+          </div>
+        </div>
+      )}
 
       {/* Search bar */}
       <div style={{
@@ -1001,7 +1425,7 @@ export function SolarSystem3D({ locations, selectedId, onSelect }: SolarSystem3D
             onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
             onFocus={() => setSearchOpen(true)}
             onBlur={() => setSearchOpen(false)}
-            placeholder="SEARCH BODIES..."
+            placeholder="SEARCH..."
             style={inputStyle}
           />
         </div>
@@ -1070,6 +1494,23 @@ export function SolarSystem3D({ locations, selectedId, onSelect }: SolarSystem3D
         onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; }}
       >
         Reset View
+      </button>
+
+      <button
+        onClick={() => setPaused((p) => !p)}
+        style={{
+          position: 'absolute', bottom: 16, right: 108, zIndex: 11,
+          background: paused ? 'rgba(59,130,246,0.15)' : 'rgba(4, 8, 22, 0.85)',
+          border: paused ? '1px solid rgba(59,130,246,0.6)' : '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: '4px', color: paused ? '#93C5FD' : '#475569',
+          fontFamily: 'ui-monospace, monospace', fontSize: '10px',
+          letterSpacing: '0.12em', padding: '5px 10px', cursor: 'pointer',
+          textTransform: 'uppercase', transition: 'color 0.15s, border-color 0.15s, background 0.15s',
+        }}
+        onMouseEnter={(e) => { if (!paused) { e.currentTarget.style.color = '#93C5FD'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; } }}
+        onMouseLeave={(e) => { if (!paused) { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; } }}
+      >
+        {paused ? '▶ Resume' : '⏸ Pause'}
       </button>
     </div>
   );

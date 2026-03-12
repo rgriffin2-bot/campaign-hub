@@ -61,6 +61,9 @@ export const celestialDataSchema = z.object({
   showLabel: z.boolean().default(true),
   mapImage: z.string().optional(), // Image path for map visualization (separate from card image)
   ringWidth: z.number().optional(), // For asteroid rings
+  model: z.string().optional(), // Path to GLB/GLTF file for custom 3D shape
+  modelStyle: z.enum(['wireframe', 'solid', 'textured']).optional(), // Rendering style (default: wireframe)
+  modelEdgeAngle: z.number().min(1).max(89).optional(), // Edge threshold for wireframe (default 15; raise to 30-60 for complex/high-poly models)
 });
 
 export const locationDmOnlySchema = z.object({
