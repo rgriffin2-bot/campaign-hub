@@ -13,11 +13,10 @@ celestial:
   orbitRotation: 0
   startPosition: 0
   orbitStyle: solid
-  radius: 40 
+  radius: 40
   color: '#8B5CF6'
   showLabel: true
-  model: assets/3d-models/Meshy_AI_Neon_Orbital_City_0310224852_generate.glb
-  modelEdgeAngle: 45
-  modelStyle: wireframe
+  model: assets/3d-models/ship-bUvDjR.glb
+  modelStyle: textured
 ---
 
