@@ -573,6 +573,48 @@ export async function deleteArtefactImageFolder(
 }
 
 // ============================================================================
+// Faction Images — 800x800 square cover-crop JPEG (logo / emblem style)
+// ============================================================================
+
+async function ensureFactionImageDir(campaignId: string): Promise<string> {
+  const uploadDir = path.join(config.campaignsDir, campaignId, 'assets', 'factions');
+  await fs.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
+}
+
+export async function processAndSaveFactionImage(
+  campaignId: string,
+  factionId: string,
+  buffer: Buffer
+): Promise<string> {
+  const uploadDir = await ensureFactionImageDir(campaignId);
+  const filename = `${factionId}.jpg`;
+  const filepath = path.join(uploadDir, filename);
+
+  await sharp(buffer)
+    .resize(800, 800, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({ quality: 85 })
+    .toFile(filepath);
+
+  return `assets/factions/${filename}`;
+}
+
+export async function deleteFactionImage(
+  campaignId: string,
+  imagePath: string
+): Promise<void> {
+  const fullPath = path.join(config.campaignsDir, campaignId, imagePath);
+  try {
+    await fs.unlink(fullPath);
+  } catch {
+    // Ignore if file doesn't exist
+  }
+}
+
+// ============================================================================
 // 3D Models — GLB/GLTF binary passthrough (no image processing)
 // ============================================================================
 

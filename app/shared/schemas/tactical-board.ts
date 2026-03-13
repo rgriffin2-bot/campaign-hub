@@ -15,6 +15,9 @@ export const tokenSourceTypes = [
   'npc',
   'ship',
   'location',
+  'faction',
+  'artefact',
+  'lore',
   'custom',
   'text',
 ] as const;

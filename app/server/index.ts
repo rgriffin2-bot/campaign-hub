@@ -20,7 +20,7 @@ import { fileStore } from './core/file-store.js';
 import { relationshipIndex } from './core/relationship-index.js';
 import { fileWatcher } from './core/file-watcher.js';
 import { moduleRegistry } from './modules/registry.js';
-import { upload, modelUpload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage, processAndSaveArtefactImage, deleteArtefactImage, processAndSave3DModel } from './core/upload-handler.js';
+import { upload, modelUpload, processAndSavePortrait, processAndSaveLoreImage, processAndSaveLocationImage, processAndSaveMapImage, processAndSavePCPortrait, processAndSaveShipImage, processAndSaveFactionImage, processAndSaveBoardBackground, processAndSaveBoardTokenImage, processAndSaveArtefactImage, deleteArtefactImage, processAndSave3DModel } from './core/upload-handler.js';
 import { playerRoutes } from './routes/player-routes.js';
 import { createAuthMiddleware, login, loginAsPlayer, logout, validateSession } from './core/auth-middleware.js';
 import { generateStarSystemMap } from './modules/locations/map-generator.js';
@@ -692,6 +692,35 @@ app.post(
       res.json({ success: true, data: { path: imagePath } });
     } catch (error) {
       console.error('Error uploading ship image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload image';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+);
+
+// Upload an image for a faction
+app.post(
+  '/api/campaigns/:campaignId/faction-images/:factionId',
+  auth.requireDm,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      const { campaignId, factionId } = req.params;
+
+      if (!req.file) {
+        res.status(400).json({ success: false, error: 'No file uploaded' });
+        return;
+      }
+
+      const imagePath = await processAndSaveFactionImage(
+        campaignId,
+        factionId,
+        req.file.buffer
+      );
+
+      res.json({ success: true, data: { path: imagePath } });
+    } catch (error) {
+      console.error('Error uploading faction image:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload image';
       res.status(500).json({ success: false, error: message });
     }

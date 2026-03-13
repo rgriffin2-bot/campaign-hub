@@ -9,7 +9,7 @@
  * position/size is synced to the server only on mouse-up.
  */
 import { useRef, useState, useCallback, useEffect, memo } from 'react';
-import { User, Ship, MapPin, Skull, Circle, Type, Lock } from 'lucide-react';
+import { User, Ship, MapPin, Skull, Circle, Type, Lock, Shield, Archive, BookOpen } from 'lucide-react';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { BoardToken as BoardTokenType, TokenSourceType } from '@shared/schemas/tactical-board';
 
@@ -36,6 +36,12 @@ function getSourceIcon(sourceType: TokenSourceType) {
       return Ship;
     case 'location':
       return MapPin;
+    case 'faction':
+      return Shield;
+    case 'artefact':
+      return Archive;
+    case 'lore':
+      return BookOpen;
     case 'text':
       return Type;
     case 'custom':

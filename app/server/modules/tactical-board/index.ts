@@ -221,9 +221,9 @@ const customRoutes: ModuleRoute[] = [
 
 export const tacticalBoardModule: ModuleDefinition = {
   id: 'tactical-board',
-  name: 'Tactical Board',
+  name: 'Boards',
   icon: 'LayoutGrid',
-  description: 'Visual encounter maps with tokens from your campaign',
+  description: 'Tactical maps, conspiracy boards, and visual layouts with campaign tokens',
   dataFolder: 'tactical-boards',
   schema: tacticalBoardSchema,
   routes: customRoutes,

@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Users } from 'lucide-react';
 import { useFiles } from '../../hooks/useFiles';
+import { FactionImageUpload } from './components/FactionImageUpload';
 import { affinityLabels, FACTION_TYPE_LABELS, type FactionType, type FactionFrontmatter } from '@shared/schemas/faction';
 
 export function FactionEdit() {
@@ -27,6 +28,8 @@ export function FactionEdit() {
   const [leader, setLeader] = useState('');
   const [tags, setTags] = useState('');
   const [hidden, setHidden] = useState(false);
+  const [image, setImage] = useState<string | undefined>(undefined);
+  const [imagePosition, setImagePosition] = useState<{ x: number; y: number; scale: number } | undefined>(undefined);
   const [dmSecrets, setDmSecrets] = useState('');
   const [dmNotes, setDmNotes] = useState('');
   const [content, setContent] = useState('');
@@ -44,6 +47,8 @@ export function FactionEdit() {
       setLeader(fm.leader || '');
       setTags((fm.tags || []).join(', '));
       setHidden(fm.hidden || false);
+      setImage(fm.image);
+      setImagePosition(fm.imagePosition);
       setDmSecrets(fm.dmOnly?.secrets || '');
       setDmNotes(fm.dmOnly?.notes || '');
       setContent(existingFaction.content);
@@ -78,6 +83,8 @@ export function FactionEdit() {
             affinity,
             location: location || undefined,
             leader: leader || undefined,
+            image,
+            imagePosition,
             tags: tagsArray,
             hidden,
             dmOnly,
@@ -96,6 +103,8 @@ export function FactionEdit() {
               affinity,
               location: location || undefined,
               leader: leader || undefined,
+              image,
+              imagePosition,
               tags: tagsArray,
               hidden,
               dmOnly,
@@ -282,6 +291,28 @@ export function FactionEdit() {
           </label>
         </div>
       </div>
+
+      {/* Image Upload - only show for existing factions */}
+      {!isNew && fileId && (
+        <div className="space-y-2 rounded-lg border border-border bg-card p-6">
+          <h3 className="mb-4 font-medium text-foreground">Faction Image</h3>
+          <FactionImageUpload
+            currentImage={image}
+            imagePosition={imagePosition}
+            factionId={fileId}
+            onUploadComplete={(path, position) => {
+              setImage(path);
+              setImagePosition(position);
+            }}
+          />
+        </div>
+      )}
+
+      {isNew && (
+        <div className="rounded-md border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+          Save the faction first to upload an image.
+        </div>
+      )}
 
       {/* DM Only Section */}
       <div className="space-y-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-6">

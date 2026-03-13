@@ -253,6 +253,23 @@ export function TacticalBoardDetail() {
     [board, fileId, update]
   );
 
+  // Handle updating a connection's properties (label, color, style, etc.)
+  const handleUpdateConnection = useCallback(
+    async (connectionId: string, updates: Record<string, unknown>) => {
+      if (!board || !fileId) return;
+
+      const connections = (board.connections || []).map((c) =>
+        c.id === connectionId ? { ...c, ...updates } : c
+      );
+
+      await update.mutateAsync({
+        fileId,
+        input: { frontmatter: { ...board, connections } },
+      });
+    },
+    [board, fileId, update]
+  );
+
   // Handle deleting a connection
   const handleDeleteConnection = useCallback(
     async (connectionId: string) => {
@@ -391,6 +408,7 @@ export function TacticalBoardDetail() {
               onDeleteToken={handleDeleteToken}
               onAddConnection={handleAddConnection}
               onDeleteConnection={handleDeleteConnection}
+              onUpdateConnection={handleUpdateConnection}
               onUpdateFog={handleUpdateFog}
               isPlayerView={false}
             />

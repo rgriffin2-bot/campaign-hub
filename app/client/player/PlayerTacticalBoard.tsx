@@ -58,7 +58,7 @@ export function PlayerTacticalBoardList() {
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
         <LayoutGrid className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">Tactical Boards</h1>
+        <h1 className="text-2xl font-bold text-foreground">Boards</h1>
       </div>
 
       {boards.length === 0 ? (
@@ -68,7 +68,7 @@ export function PlayerTacticalBoardList() {
             No boards available
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            The DM hasn't shared any tactical boards yet.
+            The DM hasn't shared any boards yet.
           </p>
         </div>
       ) : (

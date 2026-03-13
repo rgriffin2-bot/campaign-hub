@@ -137,7 +137,7 @@ export function TacticalBoardList() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <LayoutGrid className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Tactical Boards</h1>
+          <h1 className="text-2xl font-bold text-foreground">Boards</h1>
         </div>
         <Link
           to="/modules/tactical-board/new"
@@ -165,11 +165,11 @@ export function TacticalBoardList() {
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
           <LayoutGrid className="h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold text-foreground">
-            {boards.length === 0 ? 'No tactical boards yet' : 'No matches found'}
+            {boards.length === 0 ? 'No boards yet' : 'No matches found'}
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {boards.length === 0
-              ? 'Create a board to set up encounter maps with tokens.'
+              ? 'Create a tactical map, conspiracy board, or visual layout.'
               : 'Try adjusting your search.'}
           </p>
           {boards.length === 0 && (

@@ -126,6 +126,26 @@ export function TacticalBoardEdit() {
     );
   }
 
+  // Preset configurations for different board types
+  const applyPreset = (type: 'tactical' | 'investigation') => {
+    if (type === 'tactical') {
+      setGridEnabled(true);
+      setSnapToGrid(true);
+      setGridSize(50);
+      setCanvasWidth(2000);
+      setCanvasHeight(2000);
+      if (!name) setName('');
+      if (!description) setDescription('');
+    } else {
+      setGridEnabled(false);
+      setSnapToGrid(false);
+      setCanvasWidth(4000);
+      setCanvasHeight(3000);
+      if (!name) setName('');
+      if (!description) setDescription('');
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {/* Header */}
@@ -137,9 +157,31 @@ export function TacticalBoardEdit() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-2xl font-bold text-foreground">
-          {isNew ? 'Create Tactical Board' : 'Edit Board Settings'}
+          {isNew ? 'Create Board' : 'Edit Board Settings'}
         </h1>
       </div>
+
+      {/* Board type presets (only for new boards) */}
+      {isNew && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => applyPreset('tactical')}
+            className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+          >
+            <span className="text-sm font-semibold text-foreground">Tactical Map</span>
+            <span className="text-xs text-muted-foreground">Grid on, snap-to-grid, 2000x2000 canvas. Ideal for combat encounters.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('investigation')}
+            className="flex flex-col gap-1 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+          >
+            <span className="text-sm font-semibold text-foreground">Investigation Board</span>
+            <span className="text-xs text-muted-foreground">No grid, free placement, 4000x3000 canvas. Pin clues, suspects, and connections.</span>
+          </button>
+        </div>
+      )}
 
       {/* Form */}
       <div className="space-y-6 rounded-lg border border-border bg-card p-6">

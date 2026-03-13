@@ -5,7 +5,7 @@
  * for placing arbitrary image tokens on the canvas.
  */
 import { useState, useRef } from 'react';
-import { User, Skull, Ship, MapPin, Circle, Plus, Search, ChevronDown, ChevronRight, ImagePlus, Loader2 } from 'lucide-react';
+import { User, Skull, Ship, MapPin, Circle, Plus, Search, ChevronDown, ChevronRight, ImagePlus, Loader2, Shield, Archive, BookOpen } from 'lucide-react';
 import { useFiles } from '../../../hooks/useFiles';
 import { useCampaign } from '../../../core/providers/CampaignProvider';
 import type { TokenSourceType } from '@shared/schemas/tactical-board';
@@ -33,6 +33,9 @@ const SOURCE_CATEGORIES: SourceCategory[] = [
   { id: 'npc', label: 'NPCs', icon: Skull, moduleId: 'npcs' },
   { id: 'ship', label: 'Ships & Vehicles', icon: Ship, moduleId: 'ships' },
   { id: 'location', label: 'Locations', icon: MapPin, moduleId: 'locations' },
+  { id: 'faction', label: 'Factions', icon: Shield, moduleId: 'factions' },
+  { id: 'artefact', label: 'Artefacts', icon: Archive, moduleId: 'story-artefacts' },
+  { id: 'lore', label: 'Lore', icon: BookOpen, moduleId: 'lore' },
 ];
 
 interface EntityItemProps {

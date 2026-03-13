@@ -116,6 +116,7 @@ interface BoardCanvasProps {
   onDeleteToken?: () => void;
   onAddConnection?: (fromTokenId: string, toTokenId: string) => void;
   onDeleteConnection?: (connectionId: string) => void;
+  onUpdateConnection?: (connectionId: string, updates: Partial<import('@shared/schemas/tactical-board').BoardConnection>) => void;
   onUpdateFog?: (fogCells: string[]) => void;
   isPlayerView?: boolean;
 }
@@ -141,6 +142,7 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
     onDeleteToken,
     onAddConnection,
     onDeleteConnection,
+    onUpdateConnection,
     onUpdateFog,
     isPlayerView = false,
   },
@@ -772,18 +774,54 @@ export const BoardCanvas = forwardRef<BoardCanvasRef, BoardCanvasProps>(function
       )}
 
       {/* Selected connection controls */}
-      {selectedConnectionId && onDeleteConnection && (
-        <div className="absolute top-4 right-4 flex gap-2 rounded bg-black/80 px-3 py-2 text-xs">
-          <span className="text-white/70">Connection selected</span>
-          <button
-            type="button"
-            onClick={handleDeleteSelectedConnection}
-            className="text-red-400 hover:text-red-300"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+      {selectedConnectionId && onDeleteConnection && (() => {
+        const conn = (board.connections || []).find((c) => c.id === selectedConnectionId);
+        return (
+          <div className="absolute top-4 right-4 flex flex-col gap-2 rounded-lg bg-black/90 border border-white/10 p-3 text-xs shadow-lg" style={{ minWidth: 220 }}>
+            <div className="flex items-center justify-between">
+              <span className="text-white/70 font-medium uppercase tracking-wider">Connection</span>
+              <button type="button" onClick={handleDeleteSelectedConnection} className="text-red-400 hover:text-red-300">Delete</button>
+            </div>
+            {conn && onUpdateConnection && (
+              <>
+                <input
+                  type="text"
+                  value={conn.label || ''}
+                  onChange={(e) => onUpdateConnection(selectedConnectionId, { label: e.target.value || undefined })}
+                  placeholder="Label (e.g. funds, suspects)"
+                  className="rounded border border-white/20 bg-white/10 px-2 py-1 text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={conn.style || 'solid'}
+                    onChange={(e) => onUpdateConnection(selectedConnectionId, { style: e.target.value as 'solid' | 'dashed' | 'dotted' })}
+                    className="flex-1 rounded border border-white/20 bg-white/10 px-1 py-1 text-white focus:outline-none"
+                  >
+                    <option value="solid">Solid</option>
+                    <option value="dashed">Dashed</option>
+                    <option value="dotted">Dotted</option>
+                  </select>
+                  <input
+                    type="color"
+                    value={conn.color || '#00ffff'}
+                    onChange={(e) => onUpdateConnection(selectedConnectionId, { color: e.target.value })}
+                    className="h-7 w-8 cursor-pointer rounded border border-white/20 bg-transparent p-0.5"
+                  />
+                  <label className="flex items-center gap-1 text-white/70">
+                    <input
+                      type="checkbox"
+                      checked={conn.animated !== false}
+                      onChange={(e) => onUpdateConnection(selectedConnectionId, { animated: e.target.checked })}
+                      className="h-3 w-3"
+                    />
+                    Glow
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 });
