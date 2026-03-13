@@ -2,7 +2,7 @@ id: ACzkxFlPORuh
 name: Haven
 description: Definitely not Cowboy Bebop
 created: '2026-01-26T02:10:26.108Z'
-lastAccessed: '2026-03-13T02:06:32.798Z'
+lastAccessed: '2026-03-13T03:18:03.789Z'
 modules:
   - live-play
   - tactical-board
@@ -10,9 +10,10 @@ modules:
   - npcs
   - ships
   - locations
-  - session-notes
   - projects
   - factions
-  - rules
-  - lore
   - story-artefacts
+  - lore
+  - rules
+  - session-notes
+  - friendship-points

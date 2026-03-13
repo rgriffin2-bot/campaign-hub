@@ -1,0 +1,25 @@
+{
+  "players": {
+    "Jon": {
+      "points": 0
+    },
+    "Mike": {
+      "points": 0
+    },
+    "Kyle": {
+      "points": 0
+    },
+    "Rob": {
+      "points": 0
+    },
+    "Alex": {
+      "points": 0
+    }
+  },
+  "lastAction": {
+    "player": "Mike",
+    "delta": -1,
+    "timestamp": "2026-03-13T03:36:56.446Z"
+  },
+  "scottPortrait": "assets/friendship-portraits/scott.jpg"
+}

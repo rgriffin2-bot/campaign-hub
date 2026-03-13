@@ -14,7 +14,7 @@ tokens:
     sourceId: test
     label: Namian Namian
     image: assets/pc-portraits/test.jpg
-    x: 500
+    x: 650
     'y': 950
     size: 107
     rotation: 0
@@ -100,10 +100,10 @@ connections:
     style: solid
     thickness: 2
     animated: true
-animationsEnabled: true
+animationsEnabled: false
 fogCells: []
 fogEnabled: false
 showInitiativePanel: false
-initiativePanelPosition: right
+initiativePanelPosition: bottom
 ---
 
