@@ -10,16 +10,16 @@
       "points": 0
     },
     "Rob": {
-      "points": 0
+      "points": 1
     },
     "Alex": {
       "points": 0
     }
   },
   "lastAction": {
-    "player": "Mike",
-    "delta": -1,
-    "timestamp": "2026-03-13T03:36:56.446Z"
+    "player": "Rob",
+    "delta": 1,
+    "timestamp": "2026-03-13T22:10:18.029Z"
   },
   "scottPortrait": "assets/friendship-portraits/scott.jpg"
 }
